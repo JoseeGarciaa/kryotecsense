@@ -752,6 +752,12 @@ def change_password_temp(usuario_id: int, password_data: dict = Body(...), db: S
 def health_check():
     return {"status": "ok", "service": "auth_service"}
 
+# Endpoint para inspeccionar el usuario actual (incluye el tenant del JWT)
+@app.get("/me")
+def who_am_i(current_user: dict = Depends(get_current_user_from_token)):
+    """Devuelve los datos decodificados del token (correo, id, rol, tenant)."""
+    return current_user
+
 if __name__ == "__main__":
     import uvicorn
     import os
