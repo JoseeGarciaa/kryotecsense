@@ -449,8 +449,9 @@ async def get_timers():
 if __name__ == "__main__":
     # Allow PORT to be provided by the platform (e.g., Railway)
     port = int(os.environ.get("PORT", 8006))
+    # Ejecutar usando el objeto app directamente para evitar problemas de import
     uvicorn.run(
-        "main:app",
+        app,
         host="0.0.0.0",
         port=port,
         reload=False,
