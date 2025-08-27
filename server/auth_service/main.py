@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Body
+from fastapi import FastAPI, Depends, HTTPException, status, Body, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -66,33 +66,29 @@ def get_tenant_schemas(db: Session):
         return schemas
     except Exception as e:
         print(f"Error obteniendo esquemas de tenant: {e}")
-        try:
-            # Usar tenant_base por defecto para la prueba
-            tenant_schema = "tenant_base"
-            print(f"DEBUG: Endpoint /usuarios/test usando tenant: {tenant_schema}")
-            query = text(f"SELECT id, nombre, correo, telefono, rol, activo, fecha_creacion, ultimo_ingreso FROM {tenant_schema}.usuarios ORDER BY id LIMIT 10")
-            result = db.execute(query)
-            users = []
-            for row in result.fetchall():
-                users.append({
-                    "id": row[0],
-                    "nombre": row[1],
-                    "correo": row[2],
-                    "telefono": row[3],
-                    "rol": row[4],
-                    "activo": row[5],
-                    "fecha_creacion": row[6].isoformat() if row[6] else None,
-                    "ultimo_ingreso": row[7].isoformat() if row[7] else None
-                })
-            print(f"DEBUG: Retornando {len(users)} usuarios de {tenant_schema}")
-            for user in users:
-                print(f"  - ID: {user['id']}, Email: {user['correo']}, Nombre: {user['nombre']}")
-            return {"status": "success", "users": users, "count": len(users)}
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-    
-    print(f"Usuario {correo} no encontrado en ningún tenant")
-    return None
+        # En error, retornar lista vacía (el resto de endpoints decidirán qué hacer)
+        return []
+
+# Helper para listar usuarios desde un esquema específico (solo prueba/diagnóstico)
+def _list_users_from_schema(db: Session, tenant_schema: str):
+    query = text(
+        f"SELECT id, nombre, correo, telefono, rol, activo, fecha_creacion, ultimo_ingreso FROM {tenant_schema}.usuarios ORDER BY id LIMIT 100"
+    )
+    result = db.execute(query)
+    users = []
+    for row in result.fetchall():
+        users.append({
+            "id": row[0],
+            "nombre": row[1],
+            "correo": row[2],
+            "telefono": row[3],
+            "rol": row[4],
+            "activo": row[5],
+            "fecha_creacion": row[6].isoformat() if row[6] else None,
+            "ultimo_ingreso": row[7].isoformat() if row[7] else None,
+            "tenant": tenant_schema,
+        })
+    return users
 
 # Función para obtener usuario por ID con tenant dinámico
 def get_user_by_id(db: Session, usuario_id: int, tenant_schema: str = None):
@@ -210,32 +206,51 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 
 # Endpoint de prueba sin autenticación
 @app.get("/usuarios/test")
-def get_users_test(db: Session = Depends(get_db)):
+def get_users_test(
+    schema: Optional[str] = Query(None, description="Esquema tenant a consultar o 'all' para todos"),
+    db: Session = Depends(get_db)
+):
     from sqlalchemy import text
     try:
-        # Usar esquema por defecto configurable
-        tenant_schema = DEFAULT_TENANT_SCHEMA
+        if schema == "all":
+            schemas = get_tenant_schemas(db)
+            print(f"DEBUG: /usuarios/test agregando usuarios de todos los tenants: {schemas}")
+            aggregated = []
+            for s in schemas:
+                try:
+                    aggregated.extend(_list_users_from_schema(db, s))
+                except Exception as e:
+                    print(f"WARN: Error listando usuarios en {s}: {e}")
+                    continue
+            return {"status": "success", "users": aggregated, "count": len(aggregated)}
+        # Caso por esquema específico o default
+        tenant_schema = schema or DEFAULT_TENANT_SCHEMA
         print(f"DEBUG: Endpoint /usuarios/test usando tenant: {tenant_schema}")
-        query = text(f"SELECT id, nombre, correo, telefono, rol, activo, fecha_creacion, ultimo_ingreso FROM {tenant_schema}.usuarios ORDER BY id LIMIT 10")
-        result = db.execute(query)
-        users = []
-        for row in result.fetchall():
-            users.append({
-                "id": row[0],
-                "nombre": row[1],
-                "correo": row[2],
-                "telefono": row[3],
-                "rol": row[4],
-                "activo": row[5],
-                "fecha_creacion": row[6].isoformat() if row[6] else None,
-                "ultimo_ingreso": row[7].isoformat() if row[7] else None
-            })
+        users = _list_users_from_schema(db, tenant_schema)
         print(f"DEBUG: Retornando {len(users)} usuarios de {tenant_schema}")
-        for user in users:
-            print(f"  - ID: {user['id']}, Email: {user['correo']}, Nombre: {user['nombre']}")
         return {"status": "success", "users": users, "count": len(users)}
     except Exception as e:
         # No lanzar 500; retornar detalle para diagnóstico
+        return {"status": "error", "message": str(e)}
+
+# Endpoint de búsqueda rápida de usuario por correo, explora todos los tenants
+@app.get("/usuarios/search")
+def search_user_by_email(correo: str = Query(..., description="Email a buscar"), db: Session = Depends(get_db)):
+    try:
+        user = get_user_by_email(db, correo)
+        if not user:
+            return {"status": "not_found", "correo": correo}
+        return {
+            "status": "success",
+            "user": {
+                "id": user.id,
+                "nombre": getattr(user, "nombre", None),
+                "correo": user.correo,
+                "rol": getattr(user, "rol", None),
+                "tenant": getattr(user, "tenant_schema", None),
+            },
+        }
+    except Exception as e:
         return {"status": "error", "message": str(e)}
 
 # Endpoint para probar conectividad a la base de datos
