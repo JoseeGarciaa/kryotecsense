@@ -1140,3 +1140,11 @@ async def corregir_estados_envio(
         db.rollback()
         print(f"Error corrigiendo estados: {e}")
         raise HTTPException(status_code=500, detail=f"Error corrigiendo estados: {str(e)}")
+
+if __name__ == "__main__":
+    import uvicorn
+    import os
+
+    # Railway/containers set PORT; default to 8002 locally
+    port = int(os.environ.get("PORT", 8002))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
