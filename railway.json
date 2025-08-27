@@ -19,64 +19,64 @@
     {
       "name": "client",
       "builder": "dockerfile",
-      "dockerfilePath": "kryotecsense/client/Dockerfile",
-      "dockerContext": "kryotecsense/client",
-      "rootDirectory": "kryotecsense/client"
+      "dockerfilePath": "client/Dockerfile",
+      "dockerContext": "client",
+      "rootDirectory": "client"
     },
     {
       "name": "api-gateway",
       "builder": "dockerfile",
-      "dockerfilePath": "kryotecsense/server/api_gateway/Dockerfile",
-      "dockerContext": "kryotecsense/server",
-      "rootDirectory": "kryotecsense/server",
+      "dockerfilePath": "server/api_gateway/Dockerfile",
+      "dockerContext": "server",
+      "rootDirectory": "server",
       "startCommand": "uvicorn main:app --host 0.0.0.0 --port $PORT"
     },
     {
       "name": "auth-service",
       "builder": "dockerfile",
-      "dockerfilePath": "kryotecsense/server/Dockerfile",
-      "dockerContext": "kryotecsense/server",
-      "rootDirectory": "kryotecsense/server",
+      "dockerfilePath": "server/Dockerfile",
+      "dockerContext": "server",
+      "rootDirectory": "server",
       "startCommand": "uvicorn auth_service.main:app --host 0.0.0.0 --port $PORT"
     },
     {
       "name": "inventory-service",
       "builder": "dockerfile",
-      "dockerfilePath": "kryotecsense/server/Dockerfile",
-      "dockerContext": "kryotecsense/server",
-      "rootDirectory": "kryotecsense/server",
+      "dockerfilePath": "server/Dockerfile",
+      "dockerContext": "server",
+      "rootDirectory": "server",
       "startCommand": "uvicorn inventory_service.main:app --host 0.0.0.0 --port $PORT"
     },
     {
       "name": "alerts-service",
       "builder": "dockerfile",
-      "dockerfilePath": "kryotecsense/server/Dockerfile",
-      "dockerContext": "kryotecsense/server",
-      "rootDirectory": "kryotecsense/server",
+      "dockerfilePath": "server/Dockerfile",
+      "dockerContext": "server",
+      "rootDirectory": "server",
       "startCommand": "uvicorn alerts_service.main:app --host 0.0.0.0 --port $PORT"
     },
     {
       "name": "activities-service",
       "builder": "dockerfile",
-      "dockerfilePath": "kryotecsense/server/Dockerfile",
-      "dockerContext": "kryotecsense/server",
-      "rootDirectory": "kryotecsense/server",
+      "dockerfilePath": "server/Dockerfile",
+      "dockerContext": "server",
+      "rootDirectory": "server",
       "startCommand": "uvicorn activities_service.main:app --host 0.0.0.0 --port $PORT"
     },
     {
       "name": "reports-service",
       "builder": "dockerfile",
-      "dockerfilePath": "kryotecsense/server/Dockerfile",
-      "dockerContext": "kryotecsense/server",
-      "rootDirectory": "kryotecsense/server",
+      "dockerfilePath": "server/Dockerfile",
+      "dockerContext": "server",
+      "rootDirectory": "server",
       "startCommand": "uvicorn reports_service.main:app --host 0.0.0.0 --port $PORT"
     },
     {
       "name": "timer-service",
       "builder": "dockerfile",
-      "dockerfilePath": "kryotecsense/server/Dockerfile",
-      "dockerContext": "kryotecsense/server",
-      "rootDirectory": "kryotecsense/server",
+      "dockerfilePath": "server/Dockerfile",
+      "dockerContext": "server",
+      "rootDirectory": "server",
       "startCommand": "uvicorn timer_service.main:app --host 0.0.0.0 --port $PORT --ws auto"
     }
   ]
