@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+httpx
+websockets
+aio-pika==9.4.0

@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos personalizados para la barra de desplazamiento */
+@layer utilities {
+  /* Barra de desplazamiento para tema claro */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: theme('colors.primary.50');
+    border-radius: 8px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: theme('colors.primary.400');
+    border-radius: 8px;
+    border: 2px solid theme('colors.primary.50');
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: theme('colors.primary.500');
+  }
+
+  /* Barra de desplazamiento para tema oscuro */
+  .dark ::-webkit-scrollbar-track {
+    background: theme('colors.primary.900');
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: theme('colors.primary.600');
+    border: 2px solid theme('colors.primary.900');
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: theme('colors.primary.500');
+  }
+}

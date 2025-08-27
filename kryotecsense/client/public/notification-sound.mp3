@@ -1,0 +1,3 @@
+# Este archivo es un placeholder para el sonido de notificación
+# En un entorno real, aquí iría un archivo de audio MP3
+# Por ahora, usaremos el AudioContext de JavaScript para generar un tono

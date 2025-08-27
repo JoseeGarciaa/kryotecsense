@@ -1,0 +1,413 @@
+import React, { useState, useEffect } from 'react';
+import { Package, Scan, CheckCircle, AlertCircle } from 'lucide-react';
+import { useDevolucion } from '../hooks/useDevolucion';
+import { DevolucionScanModal } from './DevolucionScanModal';
+
+export const Devolucion: React.FC = () => {
+  const {
+    itemsDevolucion,
+    itemsDevueltos,
+    cargando,
+    error,
+    cargarItemsDevolucion,
+    marcarComoDevuelto,
+    marcarItemsComoDevueltos
+  } = useDevolucion();
+
+  const [mostrarModal, setMostrarModal] = useState(false);
+  const [paginaActual, setPaginaActual] = useState(1);
+  const itemsPorPagina = 5;
+
+  useEffect(() => {
+    cargarItemsDevolucion();
+  }, [cargarItemsDevolucion]);
+
+  // Resetear página cuando cambien los items devueltos
+  useEffect(() => {
+    setPaginaActual(1);
+  }, [itemsDevueltos.length]);
+
+  const handleScanItem = (item: any) => {
+    console.log('Escaneando item:', item);
+    setMostrarModal(true);
+  };
+
+  const handleConfirmarDevolucion = async (itemsEscaneados: any[]) => {
+    try {
+      // Procesar todos los items en lote (una sola operación)
+      const itemIds = itemsEscaneados.map(item => item.id);
+      await marcarItemsComoDevueltos(itemIds);
+      setMostrarModal(false);
+      // No necesitamos recargar aquí, el hook ya lo hace
+    } catch (error) {
+      console.error('Error al confirmar devolución:', error);
+    }
+  };
+
+  if (cargando) {
+    return (
+  <div className="flex-1 overflow-hidden bg-white">
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <h1 className="text-2xl font-bold text-gray-900">Gestión de Devolución</h1>
+        </div>
+        <div className="flex-1 overflow-auto p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Cargando items...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+  <div className="flex-1 overflow-hidden bg-white">
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <h1 className="text-2xl font-bold text-gray-900">Gestión de Devolución</h1>
+        </div>
+        <div className="flex-1 overflow-auto p-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
+              <p className="text-red-800">Error: {error}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Agrupar items por categoría
+  const cubesPendientes = itemsDevolucion.filter(item => item.categoria === 'Cube');
+  const vipsPendientes = itemsDevolucion.filter(item => item.categoria === 'VIP');
+  const ticsPendientes = itemsDevolucion.filter(item => item.categoria === 'TIC');
+
+  const cubesDevueltos = itemsDevueltos.filter(item => item.categoria === 'Cube');
+  const vipsDevueltos = itemsDevueltos.filter(item => item.categoria === 'VIP');
+  const ticsDevueltos = itemsDevueltos.filter(item => item.categoria === 'TIC');
+
+  return (
+  <div className="flex-1 overflow-hidden bg-white">
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900">Gestión de Devolución</h1>
+        </div>
+      </div>
+      
+      <div className="flex-1 overflow-auto p-6 space-y-6">
+        {/* Instrucciones */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h2 className="text-lg font-semibold text-blue-900 mb-2">Proceso de Devolución</h2>
+          <ol className="list-decimal list-inside space-y-1 text-blue-800">
+            <li>Los items completados en operación aparecen automáticamente como pendientes de devolución</li>
+            <li>Separar físicamente los Cubes, VIPs y TICs que han llegado a bodega</li>
+            <li>Usar el botón "Escanear Items" para confirmar la devolución</li>
+          </ol>
+        </div>
+
+        {/* Items Pendientes de Devolución - Agrupados por Categoría */}
+        <div className="bg-white rounded-lg border border-orange-200 overflow-hidden">
+          <div className="bg-orange-50 border-b border-orange-200 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-orange-800">Items Pendientes de Devolución</h2>
+                <p className="text-sm text-orange-600">({itemsDevolucion.length} items listos para devolver)</p>
+              </div>
+              {/* Botones de acción para items pendientes */}
+              <div className="flex items-center gap-2">
+                {/* Botón de escaneo RFID - Siempre visible */}
+                <button
+                  onClick={() => setMostrarModal(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                  title="Escanear items para devolver"
+                >
+                  <Scan className="w-4 h-4" />
+                  Escanear Items
+                </button>
+                
+                {/* Botón para devolver todos los items en lote - Solo cuando hay items */}
+                {itemsDevolucion.length > 0 && (
+                  <button
+                    onClick={() => {
+                      const confirmacion = window.confirm(
+                        `¿Estás seguro de que quieres devolver todos los ${itemsDevolucion.length} items?\n\n` +
+                        `Esto marcará todos los items como devueltos sin necesidad de escanear individualmente.\n\n` +
+                        `¿Continuar?`
+                      );
+                      
+                      if (confirmacion) {
+                        const itemIds = itemsDevolucion.map(item => item.id);
+                        marcarItemsComoDevueltos(itemIds);
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
+                    title="Devolver todos los items en lote"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Devolver Todos
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {itemsDevolucion.length === 0 ? (
+            <div className="p-6">
+              <div className="text-center py-8 text-gray-500">
+                <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No hay items pendientes de devolución</p>
+              </div>
+            </div>
+          ) : (
+            <div className="p-6 space-y-6">
+              {/* Cubes */}
+              {cubesPendientes.length > 0 && (
+                <div className="bg-blue-50 rounded-lg border border-blue-200 overflow-hidden">
+                  <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-5 w-5 text-blue-600" />
+                        <h3 className="font-semibold text-blue-900">Cubes</h3>
+                        <span className="bg-blue-200 text-blue-800 px-2 py-1 rounded text-sm font-medium">
+                          {cubesPendientes.length}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-2">
+                    {cubesPendientes.map((item) => (
+                      <div key={item.id} className="bg-white rounded-lg p-3 flex items-center justify-between border border-blue-200">
+                        <div className="flex items-center space-x-3">
+                          <Package className="h-4 w-4 text-blue-600" />
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-900">{item.nombre_unidad}</h4>
+                            <p className="text-xs text-gray-600">Lote: {item.lote} • RFID: {item.rfid || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <span className="text-xs text-blue-600 font-medium bg-blue-100 px-2 py-1 rounded">Pendiente</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* VIPs */}
+              {vipsPendientes.length > 0 && (
+                <div className="bg-green-50 rounded-lg border border-green-200 overflow-hidden">
+                  <div className="bg-green-100 px-4 py-3 border-b border-green-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-5 w-5 text-green-600" />
+                        <h3 className="font-semibold text-green-900">VIPs</h3>
+                        <span className="bg-green-200 text-green-800 px-2 py-1 rounded text-sm font-medium">
+                          {vipsPendientes.length}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-2">
+                    {vipsPendientes.map((item) => (
+                      <div key={item.id} className="bg-white rounded-lg p-3 flex items-center justify-between border border-green-200">
+                        <div className="flex items-center space-x-3">
+                          <Package className="h-4 w-4 text-green-600" />
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-900">{item.nombre_unidad}</h4>
+                            <p className="text-xs text-gray-600">Lote: {item.lote} • RFID: {item.rfid || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <span className="text-xs text-green-600 font-medium bg-green-100 px-2 py-1 rounded">Pendiente</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* TICs */}
+              {ticsPendientes.length > 0 && (
+                <div className="bg-yellow-50 rounded-lg border border-yellow-200 overflow-hidden">
+                  <div className="bg-yellow-100 px-4 py-3 border-b border-yellow-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-5 w-5 text-yellow-600" />
+                        <h3 className="font-semibold text-yellow-900">TICs</h3>
+                        <span className="bg-yellow-200 text-yellow-800 px-2 py-1 rounded text-sm font-medium">
+                          {ticsPendientes.length}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-2">
+                    {ticsPendientes.map((item) => (
+                      <div key={item.id} className="bg-white rounded-lg p-3 flex items-center justify-between border border-yellow-200">
+                        <div className="flex items-center space-x-3">
+                          <Package className="h-4 w-4 text-yellow-600" />
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-900">{item.nombre_unidad}</h4>
+                            <p className="text-xs text-gray-600">Lote: {item.lote} • RFID: {item.rfid || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <span className="text-xs text-yellow-600 font-medium bg-yellow-100 px-2 py-1 rounded">Pendiente</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Items Devueltos */}
+        <div className="bg-white rounded-lg shadow border border-gray-200">
+          <div className="bg-green-50 border-b border-green-200 px-6 py-4">
+            <h3 className="text-lg font-semibold text-green-800 flex items-center">
+              <CheckCircle className="h-5 w-5 mr-2" />
+              Items Devueltos
+              <span className="ml-2 bg-green-100 text-green-800 px-2 py-1 rounded text-sm">
+                {itemsDevueltos.length}
+              </span>
+            </h3>
+          </div>
+          <div className="p-6">
+            {itemsDevueltos.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No hay items devueltos</p>
+              </div>
+            ) : (
+              <>
+                {/* Resumen agrupado por categoría */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-blue-50 rounded-lg p-4 text-center">
+                    <Package className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                    <h4 className="font-semibold text-blue-900">Cubes</h4>
+                    <p className="text-2xl font-bold text-blue-800">
+                      {itemsDevueltos.filter(item => item.categoria === 'Cube').length}
+                    </p>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-4 text-center">
+                    <Package className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                    <h4 className="font-semibold text-green-900">VIPs</h4>
+                    <p className="text-2xl font-bold text-green-800">
+                      {itemsDevueltos.filter(item => item.categoria === 'VIP').length}
+                    </p>
+                  </div>
+                  <div className="bg-yellow-50 rounded-lg p-4 text-center">
+                    <Package className="h-8 w-8 text-yellow-600 mx-auto mb-2" />
+                    <h4 className="font-semibold text-yellow-900">TICs</h4>
+                    <p className="text-2xl font-bold text-yellow-800">
+                      {itemsDevueltos.filter(item => item.categoria === 'TIC').length}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Lista paginada de items devueltos */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-gray-900">Items devueltos:</h4>
+                    <span className="text-sm text-gray-500">
+                      {itemsDevueltos.length} total{itemsDevueltos.length !== 1 ? 'es' : ''}
+                    </span>
+                  </div>
+                  
+                  {(() => {
+                    const totalPaginas = Math.ceil(itemsDevueltos.length / itemsPorPagina);
+                    const indiceInicio = (paginaActual - 1) * itemsPorPagina;
+                    const indiceFin = indiceInicio + itemsPorPagina;
+                    const itemsPaginaActual = itemsDevueltos.slice(indiceInicio, indiceFin);
+                    
+                    return (
+                      <>
+                        {itemsPaginaActual.map((item) => (
+                          <div key={item.id} className="bg-green-50 rounded-lg p-3 flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                              <div>
+                                <h4 className="text-sm font-medium text-gray-900">{item.nombre_unidad}</h4>
+                                <p className="text-xs text-gray-600">{item.categoria} • Lote: {item.lote}</p>
+                              </div>
+                            </div>
+                            <span className="text-xs text-green-600 font-medium">Devuelto</span>
+                          </div>
+                        ))}
+                        
+                        {/* Paginación */}
+                        {totalPaginas > 1 && (
+                          <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-200">
+                            <div className="text-sm text-gray-500">
+                              Mostrando {indiceInicio + 1} a {Math.min(indiceFin, itemsDevueltos.length)} de {itemsDevueltos.length} items
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => setPaginaActual(prev => Math.max(prev - 1, 1))}
+                                disabled={paginaActual === 1}
+                                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                ‹ Anterior
+                              </button>
+                              
+                              <div className="flex items-center space-x-1">
+                                {Array.from({ length: totalPaginas }, (_, i) => i + 1).map(numeroPagina => {
+                                  // Mostrar solo algunas páginas alrededor de la actual
+                                  if (
+                                    numeroPagina === 1 ||
+                                    numeroPagina === totalPaginas ||
+                                    (numeroPagina >= paginaActual - 1 && numeroPagina <= paginaActual + 1)
+                                  ) {
+                                    return (
+                                      <button
+                                        key={numeroPagina}
+                                        onClick={() => setPaginaActual(numeroPagina)}
+                                        className={`px-3 py-1 text-sm border rounded-md ${
+                                          paginaActual === numeroPagina
+                                            ? 'bg-blue-600 text-white border-blue-600'
+                                            : 'border-gray-300 hover:bg-white'
+                                        }`}
+                                      >
+                                        {numeroPagina}
+                                      </button>
+                                    );
+                                  } else if (
+                                    numeroPagina === paginaActual - 2 ||
+                                    numeroPagina === paginaActual + 2
+                                  ) {
+                                    return <span key={numeroPagina} className="px-2 text-gray-400">…</span>;
+                                  }
+                                  return null;
+                                })}
+                              </div>
+                              
+                              <button
+                                onClick={() => setPaginaActual(prev => Math.min(prev + 1, totalPaginas))}
+                                disabled={paginaActual === totalPaginas}
+                                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Siguiente ›
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Modal de escaneo */}
+      {mostrarModal && (
+        <DevolucionScanModal
+          isOpen={mostrarModal}
+          onClose={() => setMostrarModal(false)}
+          itemsPendientes={itemsDevolucion}
+          onConfirmar={handleConfirmarDevolucion}
+        />
+      )}
+    </div>
+  );
+};
