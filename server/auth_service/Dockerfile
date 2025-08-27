@@ -1,22 +1,31 @@
-# Usa una imagen oficial de Python
+# Use an official Python runtime as a parent image
 FROM python:3.12-slim
 
-# Setear directorio de trabajo
+# Set the working directory in the container
 WORKDIR /app
 
-# Copiar requirements primero (mejor cacheo)
-COPY ../requirements.txt .
-COPY ../shared ./shared
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Instalar dependencias Python
+# Copy requirements first for better caching
+COPY requirements.txt ./requirements.txt
+
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar el código del servicio
-COPY . .
+# Copy shared folder and this service code
+COPY server/shared ./shared
+COPY server/auth_service ./auth_service
 
-# Crear usuario no root
+# Set working directory to the service
+WORKDIR /app/auth_service
+
+# Create a non-root user
 RUN useradd --create-home --shell /bin/bash app
 USER app
 
-# Railway usa la variable PORT automáticamente
+# Railway will set the PORT environment variable
 CMD ["python", "main.py"]
