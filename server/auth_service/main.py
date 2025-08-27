@@ -46,6 +46,16 @@ origins = [
     "http://127.0.0.1:5173",
 ]
 
+# Permitir orígenes adicionales desde entorno: FRONTEND_ORIGIN (uno) o CORS_ALLOW_ORIGINS (lista separada por comas)
+env_origin = os.getenv("FRONTEND_ORIGIN")
+if env_origin:
+    origins.append(env_origin)
+env_origins_csv = os.getenv("CORS_ALLOW_ORIGINS")
+if env_origins_csv:
+    for o in [x.strip() for x in env_origins_csv.split(",") if x.strip()]:
+        if o not in origins:
+            origins.append(o)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
