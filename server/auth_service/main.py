@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Body, Query
+from fastapi import FastAPI, Depends, HTTPException, status, Body, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -20,7 +20,10 @@ def get_user_by_email(db: Session, correo: str):
             continue
     return None
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Dict
+from pydantic import BaseModel
+import json
+import asyncio
 
 from shared.database import get_db, get_engine
 from shared.utils import verify_password, get_password_hash, create_access_token, get_current_user_from_token
@@ -63,6 +66,106 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ==========================================================
+#  WebSocket de Timers + Endpoint de Alertas (monolito)
+#  Esto permite usar solo CLIENT + este BACKEND.
+#  El cliente se conecta a wss://<backend>/ws/timers y
+#  publica eventos a POST /api/alerts/timer-completed
+# ==========================================================
+
+class TimerData(BaseModel):
+    id: str
+    nombre: str
+    tipoOperacion: str
+    tiempoInicialMinutos: int
+    fechaInicio: str
+    fechaFin: str
+
+
+class TimerCompletedEvent(BaseModel):
+    timer: TimerData
+    timestamp: str
+
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        print(f"✅ Nueva conexión WebSocket (timers). Total: {len(self.active_connections)}")
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        print(f"🔌 Conexión WebSocket cerrada. Total: {len(self.active_connections)}")
+
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        try:
+            await websocket.send_text(message)
+        except Exception as e:
+            print(f"❌ Error enviando mensaje personal: {e}")
+            self.disconnect(websocket)
+
+    async def broadcast(self, message: str):
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except Exception as e:
+                print(f"❌ Error en broadcast: {e}")
+                disconnected.append(connection)
+        for conn in disconnected:
+            self.disconnect(conn)
+
+
+manager = ConnectionManager()
+
+
+@app.websocket("/ws/timers")
+async def websocket_timers(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            print(f"📨 [WS timers] Recibido: {data}")
+            try:
+                message = json.loads(data)
+            except json.JSONDecodeError as e:
+                await manager.send_personal_message(json.dumps({"error": "Invalid JSON", "details": str(e)}), websocket)
+                continue
+
+            # Eco/respuesta básica + opción broadcast
+            response = {"status": "received", "data": message}
+            await manager.send_personal_message(json.dumps(response), websocket)
+
+            if message.get("type") == "REQUEST_SYNC":
+                # Aquí podrías recuperar timers persistidos si existiera almacenamiento en servidor
+                await manager.send_personal_message(json.dumps({"type": "TIMER_SYNC", "data": {"timers": []}}), websocket)
+            elif message.get("broadcast"):
+                await manager.broadcast(json.dumps({"type": "broadcast", "data": message}))
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        print(f"❌ Error en WebSocket timers: {e}")
+        manager.disconnect(websocket)
+
+
+async def send_ws_notification(message_type: str, data: Dict):
+    await manager.broadcast(json.dumps({"type": message_type, "data": data}))
+
+
+@app.post("/api/alerts/timer-completed")
+async def handle_timer_completed(event: TimerCompletedEvent):
+    try:
+        await send_ws_notification("timer_completed", event.model_dump())
+        print(f"✅ Evento timer-completed procesado para: {event.timer.nombre}")
+        return {"status": "success"}
+    except Exception as e:
+        print(f"❌ Error procesando timer-completed: {e}")
+        raise HTTPException(status_code=500, detail=f"Error procesando evento: {e}")
 
 # Configuración de OAuth2
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
