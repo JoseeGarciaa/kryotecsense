@@ -1,0 +1,83 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "deploy": {
+    "startCommand": "uvicorn main:app --host 0.0.0.0 --port $PORT",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  },
+  "plugins": [
+    {
+      "name": "postgresql",
+      "id": "postgresql"
+    },
+    {
+      "name": "rabbitmq",
+      "id": "rabbitmq"
+    }
+  ],
+  "services": [
+    {
+      "name": "client",
+      "builder": "dockerfile",
+      "dockerfilePath": "Dockerfile",
+      "dockerContext": "client",
+      "rootDirectory": "client"
+    },
+    {
+      "name": "api-gateway",
+      "builder": "dockerfile",
+      "dockerfilePath": "api_gateway/Dockerfile",
+      "dockerContext": "server",
+      "rootDirectory": "server",
+      "startCommand": "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    },
+    {
+      "name": "auth-service",
+      "builder": "dockerfile",
+      "dockerfilePath": "Dockerfile",
+      "dockerContext": "server",
+      "rootDirectory": "server",
+      "startCommand": "uvicorn auth_service.main:app --host 0.0.0.0 --port $PORT"
+    },
+    {
+      "name": "inventory-service",
+      "builder": "dockerfile",
+      "dockerfilePath": "Dockerfile",
+      "dockerContext": "server",
+      "rootDirectory": "server",
+      "startCommand": "uvicorn inventory_service.main:app --host 0.0.0.0 --port $PORT"
+    },
+    {
+      "name": "alerts-service",
+      "builder": "dockerfile",
+      "dockerfilePath": "Dockerfile",
+      "dockerContext": "server",
+      "rootDirectory": "server",
+      "startCommand": "uvicorn alerts_service.main:app --host 0.0.0.0 --port $PORT"
+    },
+    {
+      "name": "activities-service",
+      "builder": "dockerfile",
+      "dockerfilePath": "Dockerfile",
+      "dockerContext": "server",
+      "rootDirectory": "server",
+      "startCommand": "uvicorn activities_service.main:app --host 0.0.0.0 --port $PORT"
+    },
+    {
+      "name": "reports-service",
+      "builder": "dockerfile",
+      "dockerfilePath": "Dockerfile",
+      "dockerContext": "server",
+      "rootDirectory": "server",
+      "startCommand": "uvicorn reports_service.main:app --host 0.0.0.0 --port $PORT"
+    },
+    {
+      "name": "timer-service",
+      "builder": "dockerfile",
+      "dockerfilePath": "Dockerfile",
+      "dockerContext": "server",
+      "rootDirectory": "server",
+      "startCommand": "uvicorn timer_service.main:app --host 0.0.0.0 --port $PORT --ws auto"
+    }
+  ]
+}
