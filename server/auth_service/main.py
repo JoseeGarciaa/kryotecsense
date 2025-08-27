@@ -767,6 +767,15 @@ def change_password_temp(usuario_id: int, password_data: dict = Body(...), db: S
 def health_check():
     return {"status": "ok", "service": "auth_service"}
 
+# Endpoint de diagnóstico: lista los esquemas tenant detectados y el tenant por defecto
+@app.get("/tenants")
+def list_tenants(db: Session = Depends(get_db)):
+    try:
+        schemas = get_tenant_schemas(db)
+        return {"status": "success", "schemas": schemas, "default": DEFAULT_TENANT_SCHEMA}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "default": DEFAULT_TENANT_SCHEMA}
+
 # Endpoint para inspeccionar el usuario actual (incluye el tenant del JWT)
 @app.get("/me")
 def who_am_i(current_user: dict = Depends(get_current_user_from_token)):
