@@ -13,7 +13,8 @@ load_dotenv()
 
 # Configuración de JWT
 SECRET_KEY = os.getenv("JWT_SECRET")
-ALGORITHM = os.getenv("JWT_ALGORITHM")
+# Usa HS256 por defecto si no se define explícitamente
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 
 # Configuración de hashing de contraseñas
@@ -23,8 +24,13 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verifica si la contraseña coincide con el hash."""
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verifica si la contraseña coincide con el hash. Si el hash es inválido, retorna False."""
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception as e:
+        # Puede ocurrir si el hash almacenado no es bcrypt u otro formato soportado
+        print(f"WARN: Error verificando contraseña: {e}")
+        return False
 
 def get_password_hash(password: str) -> str:
     """Genera un hash para la contraseña."""
@@ -47,6 +53,14 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     Returns:
         Token JWT codificado
     """
+    # Validaciones básicas de configuración
+    if not SECRET_KEY:
+        # Configuración crítica ausente
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="JWT no configurado en el servidor"
+        )
+
     to_encode = data.copy()
     
     if expires_delta:
