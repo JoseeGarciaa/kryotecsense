@@ -20,15 +20,13 @@
       "name": "client",
       "builder": "dockerfile",
       "dockerfilePath": "client/Dockerfile",
-      "dockerContext": "client",
-      "rootDirectory": "client"
+      "dockerContext": "client"
     },
     {
       "name": "api-gateway",
       "builder": "dockerfile",
       "dockerfilePath": "server/api_gateway/Dockerfile",
       "dockerContext": "server",
-      "rootDirectory": "server",
       "startCommand": "uvicorn main:app --host 0.0.0.0 --port $PORT"
     },
     {
@@ -36,7 +34,6 @@
       "builder": "dockerfile",
       "dockerfilePath": "server/Dockerfile",
       "dockerContext": "server",
-      "rootDirectory": "server",
       "startCommand": "uvicorn auth_service.main:app --host 0.0.0.0 --port $PORT"
     },
     {
@@ -44,7 +41,6 @@
       "builder": "dockerfile",
       "dockerfilePath": "server/Dockerfile",
       "dockerContext": "server",
-      "rootDirectory": "server",
       "startCommand": "uvicorn inventory_service.main:app --host 0.0.0.0 --port $PORT"
     },
     {
@@ -52,7 +48,6 @@
       "builder": "dockerfile",
       "dockerfilePath": "server/Dockerfile",
       "dockerContext": "server",
-      "rootDirectory": "server",
       "startCommand": "uvicorn alerts_service.main:app --host 0.0.0.0 --port $PORT"
     },
     {
@@ -60,7 +55,6 @@
       "builder": "dockerfile",
       "dockerfilePath": "server/Dockerfile",
       "dockerContext": "server",
-      "rootDirectory": "server",
       "startCommand": "uvicorn activities_service.main:app --host 0.0.0.0 --port $PORT"
     },
     {
@@ -68,7 +62,6 @@
       "builder": "dockerfile",
       "dockerfilePath": "server/Dockerfile",
       "dockerContext": "server",
-      "rootDirectory": "server",
       "startCommand": "uvicorn reports_service.main:app --host 0.0.0.0 --port $PORT"
     },
     {
@@ -76,7 +69,6 @@
       "builder": "dockerfile",
       "dockerfilePath": "server/Dockerfile",
       "dockerContext": "server",
-      "rootDirectory": "server",
       "startCommand": "uvicorn timer_service.main:app --host 0.0.0.0 --port $PORT --ws auto"
     }
   ]
