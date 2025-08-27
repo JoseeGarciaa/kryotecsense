@@ -11,5 +11,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar el código de la aplicación
 COPY . .
 
-# El comando se especificará en docker-compose.yml
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0"]
+# Asegurar que los módulos sean importables vía 'python -m'
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Comando configurable por variable de entorno START_CMD; por defecto levanta auth_service
+# Puedes sobrescribirlo en Railway añadiendo la variable START_CMD, por ejemplo:
+#  - START_CMD="python -m inventory_service.main"
+#  - START_CMD="python -m api_gateway.main"
+ENV START_CMD="python -m auth_service.main"
+
+# Ejecutar el comando configurado (usa $PORT si tu script lo lee)
+CMD ["sh", "-c", "$START_CMD"]
