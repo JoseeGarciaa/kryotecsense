@@ -22,7 +22,7 @@ def get_user_by_email(db: Session, correo: str):
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from shared.database import get_db
+from shared.database import get_db, get_engine
 from shared.utils import verify_password, get_password_hash, create_access_token, get_current_user_from_token
 from .models import Usuario
 from .schemas import UsuarioCreate, Usuario as UsuarioModel, UsuarioSchema, Token, LoginRequest, UsuarioUpdate
@@ -33,6 +33,10 @@ app = FastAPI(
     description="Microservicio para gestión de usuarios y autenticación",
     version="1.0.0"
 )
+
+# Esquema por defecto configurable por entorno
+import os
+DEFAULT_TENANT_SCHEMA = os.getenv("DEFAULT_TENANT_SCHEMA", "tenant_base")
 
 # Configuración de CORS
 origins = [
@@ -209,8 +213,8 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 def get_users_test(db: Session = Depends(get_db)):
     from sqlalchemy import text
     try:
-        # Usar tenant_base por defecto para la prueba
-        tenant_schema = "tenant_base"
+    # Usar esquema por defecto configurable
+    tenant_schema = DEFAULT_TENANT_SCHEMA
         print(f"DEBUG: Endpoint /usuarios/test usando tenant: {tenant_schema}")
         query = text(f"SELECT id, nombre, correo, telefono, rol, activo, fecha_creacion, ultimo_ingreso FROM {tenant_schema}.usuarios ORDER BY id LIMIT 10")
         result = db.execute(query)
@@ -230,6 +234,19 @@ def get_users_test(db: Session = Depends(get_db)):
         for user in users:
             print(f"  - ID: {user['id']}, Email: {user['correo']}, Nombre: {user['nombre']}")
         return {"status": "success", "users": users, "count": len(users)}
+    except Exception as e:
+        # No lanzar 500; retornar detalle para diagnóstico
+        return {"status": "error", "message": str(e)}
+
+# Endpoint para probar conectividad a la base de datos
+@app.get("/db/ping")
+def db_ping():
+    from sqlalchemy import text
+    try:
+        eng = get_engine()
+        with eng.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {"status": "ok", "db": "reachable"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
