@@ -60,6 +60,17 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 # Función para obtener todos los esquemas de tenant
 def get_tenant_schemas(db: Session):
     from sqlalchemy import text
+    # 1) Permitir override por entorno: TENANT_SCHEMAS=tenant_base,tenant_brandon,tenant_cruz_verde
+    env_list = os.getenv("TENANT_SCHEMAS")
+    if env_list:
+        schemas = [s.strip() for s in env_list.split(",") if s.strip()]
+        # Normalizar y filtrar duplicados
+        unique = []
+        for s in schemas:
+            if s not in unique:
+                unique.append(s)
+        return unique
+    # 2) Descubrir desde information_schema
     try:
         result = db.execute(text("SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE 'tenant_%'"))
         schemas = [row[0] for row in result.fetchall()]
@@ -216,13 +227,16 @@ def get_users_test(
             schemas = get_tenant_schemas(db)
             print(f"DEBUG: /usuarios/test agregando usuarios de todos los tenants: {schemas}")
             aggregated = []
+            errors = []
             for s in schemas:
                 try:
                     aggregated.extend(_list_users_from_schema(db, s))
                 except Exception as e:
-                    print(f"WARN: Error listando usuarios en {s}: {e}")
+                    msg = f"Error listando usuarios en {s}: {e}"
+                    print(f"WARN: {msg}")
+                    errors.append({"schema": s, "error": str(e)})
                     continue
-            return {"status": "success", "users": aggregated, "count": len(aggregated)}
+            return {"status": "success", "users": aggregated, "count": len(aggregated), "schemas": schemas, "errors": errors}
         # Caso por esquema específico o default
         tenant_schema = schema or DEFAULT_TENANT_SCHEMA
         print(f"DEBUG: Endpoint /usuarios/test usando tenant: {tenant_schema}")
