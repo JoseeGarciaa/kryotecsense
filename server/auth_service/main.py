@@ -213,8 +213,8 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 def get_users_test(db: Session = Depends(get_db)):
     from sqlalchemy import text
     try:
-    # Usar esquema por defecto configurable
-    tenant_schema = DEFAULT_TENANT_SCHEMA
+        # Usar esquema por defecto configurable
+        tenant_schema = DEFAULT_TENANT_SCHEMA
         print(f"DEBUG: Endpoint /usuarios/test usando tenant: {tenant_schema}")
         query = text(f"SELECT id, nombre, correo, telefono, rol, activo, fecha_creacion, ultimo_ingreso FROM {tenant_schema}.usuarios ORDER BY id LIMIT 10")
         result = db.execute(query)
