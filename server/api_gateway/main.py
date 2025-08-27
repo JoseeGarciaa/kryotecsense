@@ -79,29 +79,46 @@ if os.path.isdir(static_dir):
 #     print("🛑 API Gateway desconectado de RabbitMQ")
 
 # Configuración de CORS para permitir peticiones desde el frontend
+frontend_origin = os.getenv("FRONTEND_ORIGIN")
+additional_origins = [o.strip() for o in os.getenv("CORS_ADDITIONAL_ORIGINS", "").split(",") if o.strip()]
+default_local_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+]
+allow_origins = default_local_origins + additional_origins
+if frontend_origin:
+    allow_origins.append(frontend_origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173", 
-        "http://localhost:5174", 
-        "http://127.0.0.1:5174",
-        "https://kryotecsense-production.up.railway.app",  # Railway production URL
-    ], # Orígenes permitidos
+    allow_origins=allow_origins or ["*"],
     allow_credentials=True,
-    allow_methods=["*"], # Métodos permitidos
-    allow_headers=["*"], # Cabeceras permitidas
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # URLs de los servicios internos usando nombres de contenedor Docker
+def _service_url(name: str, default_host: str, default_port: str) -> str:
+    # Permitir pasar URL completa por env (e.g., https://service.up.railway.app)
+    url = os.getenv(f"{name.upper()}_SERVICE_URL")
+    if url:
+        return url.rstrip("/")
+    # O bien construir con HOST/PORT
+    host = os.getenv(f"{name.upper()}_SERVICE_HOST", default_host)
+    port = os.getenv(f"{name.upper()}_SERVICE_PORT", default_port)
+    scheme = os.getenv(f"{name.upper()}_SERVICE_SCHEME", "http")
+    return f"{scheme}://{host}:{port}"
+
 SERVICE_URLS = {
-    "auth": "http://auth_service:8001",
-    "inventory": "http://inventory_service:8002",
-    "alerts": "http://alerts_service:8003",
-    "activities": "http://activities_service:8004",
-    "reports": "http://reports_service:8005",
-    "dashboard": "http://inventory_service:8002",  # Dashboard metrics from inventory
-    # Añade otros servicios aquí si es necesario
+    "auth": _service_url("auth", "auth_service", "8001"),
+    "inventory": _service_url("inventory", "inventory_service", "8002"),
+    "alerts": _service_url("alerts", "alerts_service", "8003"),
+    "activities": _service_url("activities", "activities_service", "8004"),
+    "reports": _service_url("reports", "reports_service", "8005"),
+    # Dashboard usa inventario
+    "dashboard": _service_url("inventory", "inventory_service", "8002"),
 }
 
 # Clase para manejar conexiones WebSocket

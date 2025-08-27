@@ -19,8 +19,9 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   const [timers, setTimers] = useState<Timer[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   
-  // WebSocket para sincronización en tiempo real
-  const { isConnected, sendMessage, lastMessage } = useWebSocket('ws://localhost:8006/ws/timers');
+  // WebSocket para sincronización en tiempo real (configurable por env)
+  const timerWsUrl = import.meta.env.VITE_TIMER_WS_URL || 'ws://localhost:8006/ws/timers';
+  const { isConnected, sendMessage, lastMessage } = useWebSocket(timerWsUrl);
 
   // Cargar timers del localStorage al inicializar
   useEffect(() => {

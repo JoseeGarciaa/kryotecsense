@@ -8,12 +8,19 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
+# Allow build-time env injection for Vite (optional)
+ARG VITE_API_URL
+ARG VITE_TIMER_WS_URL
+
 RUN npm ci
 
 # Copy source code
 COPY . .
 
 # Build the app
+ENV VITE_API_URL=$VITE_API_URL \
+	VITE_TIMER_WS_URL=$VITE_TIMER_WS_URL
+
 RUN npm run build
 
 # Production stage
