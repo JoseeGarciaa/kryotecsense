@@ -19,9 +19,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the application code
 COPY . .
 
-# Create a non-root user
+# Create a non-root user (opcional, quitar si hay errores)
 RUN useradd --create-home --shell /bin/bash app
 USER app
 
-# Railway will set the PORT environment variable
-CMD ["python", "main.py"]
+# Railway expone automáticamente PORT
+ENV PORT=8000
+
+# Run the FastAPI app with Uvicorn
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
