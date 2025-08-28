@@ -158,39 +158,34 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
 
       case 'TIMER_TIME_UPDATE':
         // Actualización de tiempo en tiempo real desde el servidor
-        // Solo aplicar si hay una diferencia significativa para evitar conflictos con interval local
+        // Priorizar las actualizaciones del servidor para evitar conflictos
         if (lastMessage.data.timerId && lastMessage.data.tiempoRestanteSegundos !== undefined) {
           setTimers(prev => prev.map(timer => {
             if (timer.id === lastMessage.data.timerId) {
               const nuevoTiempoRestante = lastMessage.data.tiempoRestanteSegundos;
-              const diferencia = Math.abs(timer.tiempoRestanteSegundos - nuevoTiempoRestante);
+              const completado = nuevoTiempoRestante === 0;
               
-              // Solo actualizar si hay una diferencia significativa (más de 2 segundos)
-              // Esto evita conflictos con el interval local
-              if (diferencia > 2) {
-                const completado = nuevoTiempoRestante === 0;
-                
-                // Si se completó, ejecutar callback
-                if (completado && timer.activo && !timer.completado) {
-                  setTimeout(() => {
-                    if (onTimerComplete) {
-                      onTimerComplete({
-                        ...timer,
-                        tiempoRestanteSegundos: nuevoTiempoRestante,
-                        completado,
-                        activo: !completado
-                      });
-                    }
-                  }, 0);
-                }
-                
-                return {
-                  ...timer,
-                  tiempoRestanteSegundos: nuevoTiempoRestante,
-                  completado,
-                  activo: !completado && timer.activo
-                };
+              // Si se completó, ejecutar callback
+              if (completado && timer.activo && !timer.completado) {
+                setTimeout(() => {
+                  if (onTimerComplete) {
+                    onTimerComplete({
+                      ...timer,
+                      tiempoRestanteSegundos: nuevoTiempoRestante,
+                      completado,
+                      activo: !completado
+                    });
+                  }
+                }, 0);
               }
+              
+              return {
+                ...timer,
+                tiempoRestanteSegundos: nuevoTiempoRestante,
+                completado,
+                activo: !completado && timer.activo,
+                lastWebSocketUpdate: Date.now() // Marcar última actualización WebSocket
+              };
             }
             return timer;
           }));
@@ -298,6 +293,16 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       setTimers(prevTimers => 
         prevTimers.map(timer => {
           if (!timer.activo || timer.completado) return timer;
+          
+          // Si el timer recibió una actualización WebSocket reciente (menos de 2 segundos), no actualizar localmente
+          const ahora = Date.now();
+          const tiempoUltimaActualizacionWS = (timer as any).lastWebSocketUpdate || 0;
+          const tiempoDesdeUltimaActualizacionWS = ahora - tiempoUltimaActualizacionWS;
+          
+          if (tiempoDesdeUltimaActualizacionWS < 2000) {
+            // WebSocket actualizó recientemente, no hacer nada
+            return timer;
+          }
           
           const nuevoTiempoRestante = Math.max(0, timer.tiempoRestanteSegundos - 1);
           const completado = nuevoTiempoRestante === 0;

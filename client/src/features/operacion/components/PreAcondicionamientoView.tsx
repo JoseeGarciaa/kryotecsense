@@ -539,10 +539,15 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
 
       console.log(`🧹 Limpiando ${timersCompletados.length} timers completados`);
       
-      // Eliminar todos los timers completados
-      timersCompletados.forEach(timer => {
+      // Eliminar todos los timers completados uno por uno
+      for (const timer of timersCompletados) {
+        console.log(`🗑️ Eliminando timer: ${timer.id} - ${timer.nombre}`);
         eliminarTimer(timer.id);
-      });
+        // Pequeño delay entre eliminaciones para evitar problemas
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      console.log('✅ Todos los timers completados han sido eliminados');
       
       // Recargar datos después de un breve delay
       setTimeout(async () => {
@@ -552,6 +557,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       
     } catch (error) {
       console.error('❌ Error al limpiar todos los timers:', error);
+      alert('Error al limpiar los timers. Revisa la consola para más detalles.');
     }
   };
   
@@ -584,7 +590,13 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
               </button>
             )}
             <button
-              onClick={() => limpiarTimer(timerCompletado.id)}
+              onClick={() => {
+                const confirmar = window.confirm(`¿Limpiar el timer completado de ${rfid}?`);
+                if (confirmar) {
+                  console.log(`🧹 Limpiando timer individual: ${timerCompletado.id} - ${rfid}`);
+                  eliminarTimer(timerCompletado.id);
+                }
+              }}
               className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
               title="Limpiar"
             >
