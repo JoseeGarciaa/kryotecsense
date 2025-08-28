@@ -158,7 +158,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
 
       case 'TIMER_TIME_UPDATE':
         // Actualización de tiempo en tiempo real desde el servidor
-        // El WebSocket es la fuente de verdad cuando está conectado
+        // El WebSocket tiene prioridad sobre el interval local
         if (lastMessage.data.timerId && lastMessage.data.tiempoRestanteSegundos !== undefined) {
           setTimers(prev => prev.map(timer => {
             if (timer.id === lastMessage.data.timerId) {
@@ -183,7 +183,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
                 ...timer,
                 tiempoRestanteSegundos: nuevoTiempoRestante,
                 completado,
-                activo: !completado && timer.activo
+                activo: !completado && timer.activo,
+                lastWebSocketUpdate: Date.now() // Marcar timestamp de última actualización WebSocket
               };
             }
             return timer;
@@ -286,17 +287,22 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     };
   }, [isConnected, sendMessage]);
 
-  // Actualizar timers cada segundo (solo cuando NO hay conexión WebSocket)
+  // Actualizar timers cada segundo (SIEMPRE como backup, pero respetar WebSocket)
   useEffect(() => {
-    // Solo ejecutar interval local si NO estamos conectados al WebSocket
-    if (isConnected) {
-      return; // Si hay WebSocket, que se encargue el servidor
-    }
-
     const interval = setInterval(() => {
       setTimers(prevTimers => 
         prevTimers.map(timer => {
           if (!timer.activo || timer.completado) return timer;
+          
+          // Si estamos conectados al WebSocket y el timer recibió una actualización reciente, no actualizar localmente
+          const ahora = Date.now();
+          const ultimaActualizacionWS = (timer as any).lastWebSocketUpdate || 0;
+          const tiempoDesdeLaUltimaActualizacion = ahora - ultimaActualizacionWS;
+          
+          // Si estamos conectados al WebSocket y la última actualización fue hace menos de 3 segundos, no actualizar
+          if (isConnected && tiempoDesdeLaUltimaActualizacion < 3000) {
+            return timer;
+          }
           
           const nuevoTiempoRestante = Math.max(0, timer.tiempoRestanteSegundos - 1);
           const completado = nuevoTiempoRestante === 0;
@@ -435,10 +441,31 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   }, [isConnected, sendMessage]);
 
   const eliminarTimer = useCallback((id: string) => {
-    setTimers(prev => prev.filter(timer => timer.id !== id));
+    console.log('🗑️ Eliminando timer:', id);
+    
+    // Eliminar inmediatamente del estado local
+    setTimers(prev => {
+      const nuevoArray = prev.filter(timer => timer.id !== id);
+      console.log('🗑️ Timer eliminado localmente. Timers restantes:', nuevoArray.length);
+      return nuevoArray;
+    });
+    
+    // Eliminar del localStorage inmediatamente
+    const timersGuardados = localStorage.getItem('kryotec_timers');
+    if (timersGuardados) {
+      try {
+        const timersParseados = JSON.parse(timersGuardados);
+        const timersFiltrados = timersParseados.filter((timer: Timer) => timer.id !== id);
+        localStorage.setItem('kryotec_timers', JSON.stringify(timersFiltrados));
+        console.log('🗑️ Timer eliminado del localStorage');
+      } catch (error) {
+        console.error('Error al eliminar timer del localStorage:', error);
+      }
+    }
     
     // Enviar al WebSocket si está conectado
     if (isConnected) {
+      console.log('🌐 Enviando DELETE_TIMER al servidor');
       sendMessage({
         type: 'DELETE_TIMER',
         data: { timerId: id }

@@ -505,7 +505,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     }
   };
 
-  // Función para limpiar timer y recargar datos
+  // Función para limpiar timer
   const limpiarTimer = async (timerId: string) => {
     try {
       console.log(`🧹 Limpiando timer ${timerId}`);
@@ -513,11 +513,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       // Eliminar el timer
       eliminarTimer(timerId);
       
-      // Esperar un poco y luego recargar datos
-      setTimeout(async () => {
-        console.log('🔄 Recargando datos después de limpiar timer...');
-        await cargarDatos();
-      }, 500);
+      console.log('✅ Timer limpiado exitosamente');
       
     } catch (error) {
       console.error('❌ Error al limpiar timer:', error);
@@ -548,12 +544,6 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       }
       
       console.log('✅ Todos los timers completados han sido eliminados');
-      
-      // Recargar datos después de un breve delay
-      setTimeout(async () => {
-        console.log('🔄 Recargando datos después de limpiar todos los timers...');
-        await cargarDatos();
-      }, 1000);
       
     } catch (error) {
       console.error('❌ Error al limpiar todos los timers:', error);
@@ -590,7 +580,8 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
               </button>
             )}
             <button
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 const confirmar = window.confirm(`¿Limpiar el timer completado de ${rfid}?`);
                 if (confirmar) {
                   console.log(`🧹 Limpiando timer individual: ${timerCompletado.id} - ${rfid}`);
@@ -750,7 +741,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
               </span>
             </div>
             <button
-              onClick={limpiarTodosLosTimersCompletados}
+              onClick={(e) => {
+                e.stopPropagation();
+                limpiarTodosLosTimersCompletados();
+              }}
               className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm transition-colors w-full sm:w-auto"
             >
               <X size={16} />
