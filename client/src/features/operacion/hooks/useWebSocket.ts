@@ -15,12 +15,16 @@ export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) =>
 
   const connect = () => {
     try {
-      // Usar la URL del WebSocket basada en el entorno
-      // Forzar localhost para desarrollo hasta que el servidor esté listo
-      const wsUrl = 'ws://localhost:8000/ws/operaciones/';
-      // const wsUrl = import.meta.env.PROD 
-      //   ? import.meta.env.VITE_WS_URL || 'wss://api.kryotecsense.com/ws/operaciones/'
-      //   : import.meta.env.VITE_WS_LOCAL_URL || 'ws://localhost:8000/ws/operaciones/';
+      // Derivar URL de WebSocket desde env; backend unificado expone /ws/timers
+      const deriveWsUrl = () => {
+        const explicit = import.meta.env.VITE_TIMER_WS_URL as string | undefined;
+        if (explicit) return explicit;
+        const api = (import.meta.env.VITE_API_URL as string | undefined) || 'http://localhost:8001';
+        const base = api.replace(/\/?$/, '');
+        const wsBase = base.startsWith('https') ? base.replace('https', 'wss') : base.replace('http', 'ws');
+        return `${wsBase}/ws/timers`;
+      };
+      const wsUrl = deriveWsUrl();
       
       console.log('🔌 Conectando WebSocket:', wsUrl);
       

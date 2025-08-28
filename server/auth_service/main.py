@@ -566,6 +566,155 @@ def api_alerts_delete(
         print(f"Error eliminando alerta ({tenant_schema}): {e}")
         raise HTTPException(status_code=500, detail="Error eliminando alerta")
 
+
+# ===== Registro e Inventario básico (para pantalla Registro) =====
+
+class ModeloResponse(BaseModel):
+    modelo_id: int
+    nombre_modelo: str
+    volumen_litros: Optional[float] = None
+    descripcion: Optional[str] = None
+    dim_ext_frente: Optional[int] = None
+    dim_ext_profundo: Optional[int] = None
+    dim_ext_alto: Optional[int] = None
+    dim_int_frente: Optional[int] = None
+    dim_int_profundo: Optional[int] = None
+    dim_int_alto: Optional[int] = None
+    tic_frente: Optional[int] = None
+    tic_alto: Optional[int] = None
+    peso_total_kg: Optional[float] = None
+    tipo: Optional[str] = None
+
+
+class InventarioCreate(BaseModel):
+    modelo_id: int
+    nombre_unidad: str
+    rfid: str
+    lote: Optional[str] = None
+    estado: str
+    sub_estado: Optional[str] = None
+    validacion_limpieza: Optional[str] = None
+    validacion_goteo: Optional[str] = None
+    validacion_desinfeccion: Optional[str] = None
+    categoria: Optional[str] = None
+
+
+@app.get("/api/inventory/modelos/")
+def api_inventory_modelos(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        q = text(
+            f"""
+            SELECT modelo_id, nombre_modelo, volumen_litros, descripcion,
+                   dim_ext_frente, dim_ext_profundo, dim_ext_alto,
+                   dim_int_frente, dim_int_profundo, dim_int_alto,
+                   tic_frente, tic_alto, peso_total_kg, tipo
+            FROM {tenant_schema}.modelos
+            ORDER BY nombre_modelo
+            OFFSET :skip LIMIT :limit
+            """
+        )
+        rows = db.execute(q, {"skip": skip, "limit": limit})
+        return [ModeloResponse(**dict(r._mapping)) for r in rows]
+    except Exception as e:
+        print(f"Error listando modelos ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo modelos")
+
+
+@app.get("/api/inventory/verificar-rfid-sin-auth/{rfid}")
+def api_inventory_verificar_rfid(rfid: str, db: Session = Depends(get_db)):
+    """Verificación rápida sin auth estricta (compat con cliente)."""
+    try:
+        # Por ahora verificar en tenant_brandon para compat; idealmente exigir tenant
+        q = text("SELECT COUNT(*) FROM tenant_brandon.inventario_credocubes WHERE rfid = :rfid")
+        count = db.execute(q, {"rfid": rfid}).scalar() or 0
+        return {"rfid": rfid, "existe": count > 0, "count": int(count)}
+    except Exception as e:
+        print(f"Error verificando RFID: {e}")
+        return {"rfid": rfid, "existe": False, "count": 0, "error": str(e)}
+
+
+@app.post("/api/inventory/inventario/")
+def api_inventory_create(
+    item: InventarioCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        # evitar duplicados de RFID activos
+        exists = db.execute(
+            text(f"SELECT id FROM {tenant_schema}.inventario_credocubes WHERE rfid = :rfid AND activo = true"),
+            {"rfid": item.rfid},
+        ).fetchone()
+        if exists:
+            raise HTTPException(status_code=400, detail=f"Ya existe un credcube con RFID {item.rfid}")
+
+        q = text(
+            f"""
+            INSERT INTO {tenant_schema}.inventario_credocubes
+            (modelo_id, nombre_unidad, rfid, lote, estado, sub_estado,
+             validacion_limpieza, validacion_goteo, validacion_desinfeccion, categoria,
+             fecha_ingreso, ultima_actualizacion, activo)
+            VALUES (:modelo_id, :nombre_unidad, :rfid, :lote, :estado, :sub_estado,
+                    :validacion_limpieza, :validacion_goteo, :validacion_desinfeccion, :categoria,
+                    NOW(), NOW(), true)
+            RETURNING id
+            """
+        )
+        new_id = db.execute(q, item.model_dump()).fetchone()[0]
+        db.commit()
+        return {"id": new_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error creando inventario ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error creando inventario")
+
+
+class ActividadCreate(BaseModel):
+    inventario_id: Optional[int] = None
+    usuario_id: Optional[int] = None
+    descripcion: str
+    estado_nuevo: str
+    sub_estado_nuevo: Optional[str] = None
+
+
+@app.post("/api/activities/actividades/")
+def api_activities_create(
+    act: ActividadCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        q = text(
+            f"""
+            INSERT INTO {tenant_schema}.actividades_operacion
+            (inventario_id, usuario_id, descripcion, estado_nuevo, sub_estado_nuevo, timestamp)
+            VALUES (:inventario_id, :usuario_id, :descripcion, :estado_nuevo, :sub_estado_nuevo, NOW())
+            RETURNING id
+            """
+        )
+        new_id = db.execute(q, act.model_dump()).fetchone()[0]
+        db.commit()
+        # Notificar a clientes por WS (best-effort)
+        try:
+            asyncio.create_task(send_ws_notification("inventory_update", {"actividad_id": new_id}))
+        except Exception:
+            pass
+        return {"id": new_id}
+    except Exception as e:
+        db.rollback()
+        print(f"Error creando actividad ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error creando actividad")
+
 # Configuración de OAuth2
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
