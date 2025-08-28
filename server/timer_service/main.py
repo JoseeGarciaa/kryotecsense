@@ -105,11 +105,28 @@ class TimerManager:
         self.connections.add(websocket)
         logger.info(f"Nueva conexión WebSocket. Total: {len(self.connections)}")
         
-        # Enviar timers existentes al cliente recién conectado
+        # SINCRONIZACIÓN INMEDIATA: Enviar timers existentes al cliente recién conectado
+        # Recalcular todos los tiempos para garantizar precisión
+        current_time = get_utc_now()
+        timers_actualizados = []
+        
+        for timer in self.timers.values():
+            # Recalcular tiempo restante basado en tiempo actual para máxima precisión
+            tiempo_restante_ms = (timer.fechaFin - current_time).total_seconds()
+            nuevo_tiempo_restante = max(0, int(tiempo_restante_ms))
+            
+            # Actualizar timer con tiempo preciso
+            timer.tiempoRestanteSegundos = nuevo_tiempo_restante
+            timer.completado = nuevo_tiempo_restante == 0
+            timer.activo = timer.activo and not timer.completado
+            
+            timers_actualizados.append(timer.to_dict())
+        
         await self.send_to_client(websocket, {
             "type": "TIMER_SYNC",
             "data": {
-                "timers": [timer.to_dict() for timer in self.timers.values()]
+                "timers": timers_actualizados,
+                "server_time": current_time.isoformat()
             }
         })
         
@@ -222,7 +239,7 @@ class TimerManager:
         return False
         
     async def tick_timers(self):
-        """Actualizar todos los timers activos cada segundo"""
+        """Actualizar todos los timers activos cada segundo - SINCRONIZACIÓN PERFECTA"""
         save_counter = 0
         while self.running:
             try:
@@ -234,23 +251,22 @@ class TimerManager:
                     if not timer.activo or timer.completado:
                         continue
                         
-                    # Calcular tiempo restante basado en fecha fin
+                    # Calcular tiempo restante basado en fecha fin (UTC)
                     tiempo_restante_ms = (timer.fechaFin - current_time).total_seconds()
                     nuevo_tiempo_restante = max(0, int(tiempo_restante_ms))
                     
-                    # Actualizar timer si hay cambio
-                    if nuevo_tiempo_restante != timer.tiempoRestanteSegundos:
-                        timer.tiempoRestanteSegundos = nuevo_tiempo_restante
-                        timers_changed = True
-                        
-                        # Verificar si se completó
-                        if nuevo_tiempo_restante == 0 and not timer.completado:
-                            timer.completado = True
-                            timer.activo = False
-                            logger.info(f"Timer completado: {timer.nombre} ({timer_id})")
+                    # SIEMPRE actualizar y enviar, sin importar si cambió
+                    # Esto garantiza sincronización perfecta entre todos los dispositivos
+                    timer.tiempoRestanteSegundos = nuevo_tiempo_restante
                     
-                    # SIEMPRE enviar actualización para timers activos
-                    # Esto garantiza que el frontend se mantenga sincronizado
+                    # Verificar si se completó
+                    if nuevo_tiempo_restante == 0 and not timer.completado:
+                        timer.completado = True
+                        timer.activo = False
+                        timers_changed = True
+                        logger.info(f"Timer completado: {timer.nombre} ({timer_id})")
+                    
+                    # ENVIAR ACTUALIZACIÓN SIEMPRE para sincronización perfecta
                     updated_timers.append({
                         "timerId": timer_id,
                         "tiempoRestanteSegundos": timer.tiempoRestanteSegundos,
@@ -258,7 +274,8 @@ class TimerManager:
                         "activo": timer.activo
                     })
                 
-                # Enviar actualizaciones para todos los timers activos
+                # Enviar actualizaciones para TODOS los timers activos, siempre
+                # Esto garantiza que todos los dispositivos muestren exactamente lo mismo
                 if updated_timers:
                     for update in updated_timers:
                         await self.broadcast({
@@ -266,10 +283,7 @@ class TimerManager:
                             "data": update
                         })
                 
-                # Guardar cambios esporádicamente no es necesario
-                # Los timers son datos temporales
-                
-                await asyncio.sleep(1)  # Actualizar cada segundo
+                await asyncio.sleep(1)  # Actualizar cada segundo exacto
                 
             except Exception as e:
                 logger.error(f"Error en tick_timers: {e}")
@@ -310,10 +324,28 @@ async def websocket_endpoint(websocket: WebSocket):
             
             if message_type == "REQUEST_SYNC":
                 # Cliente solicita sincronización completa
+                # RECALCULAR todos los tiempos para máxima precisión
+                current_time = get_utc_now()
+                timers_actualizados = []
+                
+                for timer in timer_manager.timers.values():
+                    # Recalcular tiempo restante basado en tiempo actual para máxima precisión
+                    tiempo_restante_ms = (timer.fechaFin - current_time).total_seconds()
+                    nuevo_tiempo_restante = max(0, int(tiempo_restante_ms))
+                    
+                    # Actualizar timer con tiempo preciso
+                    timer.tiempoRestanteSegundos = nuevo_tiempo_restante
+                    timer.completado = nuevo_tiempo_restante == 0
+                    timer.activo = timer.activo and not timer.completado
+                    
+                    timers_actualizados.append(timer.to_dict())
+                
+                logger.info(f"Sincronización solicitada - enviando {len(timers_actualizados)} timers actualizados")
                 await timer_manager.send_to_client(websocket, {
                     "type": "TIMER_SYNC",
                     "data": {
-                        "timers": [timer.to_dict() for timer in timer_manager.timers.values()]
+                        "timers": timers_actualizados,
+                        "server_time": current_time.isoformat()
                     }
                 })
                 
@@ -359,10 +391,61 @@ async def health_check():
 
 @app.get("/timers")
 async def get_timers():
-    """Obtener todos los timers (REST API)"""
+    """Obtener todos los timers con tiempos recalculados (REST API)"""
+    current_time = get_utc_now()
+    timers_actualizados = []
+    
+    for timer in timer_manager.timers.values():
+        # Recalcular tiempo restante basado en tiempo actual para máxima precisión
+        tiempo_restante_ms = (timer.fechaFin - current_time).total_seconds()
+        nuevo_tiempo_restante = max(0, int(tiempo_restante_ms))
+        
+        # Actualizar timer con tiempo preciso
+        timer.tiempoRestanteSegundos = nuevo_tiempo_restante
+        timer.completado = nuevo_tiempo_restante == 0
+        timer.activo = timer.activo and not timer.completado
+        
+        timers_actualizados.append(timer.to_dict())
+    
     return {
-        "timers": [timer.to_dict() for timer in timer_manager.timers.values()],
-        "count": len(timer_manager.timers)
+        "timers": timers_actualizados,
+        "count": len(timers_actualizados),
+        "server_time": current_time.isoformat()
+    }
+
+@app.post("/timers/sync")
+async def force_sync():
+    """Forzar sincronización de todos los timers (REST API)"""
+    current_time = get_utc_now()
+    timers_actualizados = []
+    
+    for timer in timer_manager.timers.values():
+        # Recalcular tiempo restante basado en tiempo actual para máxima precisión
+        tiempo_restante_ms = (timer.fechaFin - current_time).total_seconds()
+        nuevo_tiempo_restante = max(0, int(tiempo_restante_ms))
+        
+        # Actualizar timer con tiempo preciso
+        timer.tiempoRestanteSegundos = nuevo_tiempo_restante
+        timer.completado = nuevo_tiempo_restante == 0
+        timer.activo = timer.activo and not timer.completado
+        
+        timers_actualizados.append(timer.to_dict())
+    
+    # Broadcast a todos los clientes conectados
+    if timers_actualizados:
+        await timer_manager.broadcast({
+            "type": "TIMER_SYNC",
+            "data": {
+                "timers": timers_actualizados,
+                "server_time": current_time.isoformat()
+            }
+        })
+    
+    return {
+        "message": "Sincronización forzada completada",
+        "timers": timers_actualizados,
+        "count": len(timers_actualizados),
+        "server_time": current_time.isoformat()
     }
 
 if __name__ == "__main__":
