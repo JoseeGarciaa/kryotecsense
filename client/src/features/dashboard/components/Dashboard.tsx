@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { PropiedadesDashboard } from '../../../shared/types';
 import Navbar from '../../../shared/components/Navbar';
 import Inicio from './Inicio';
-import Registro from '../../registro/components/Registro';
+import RegistroMejorado from '../../registro/components/RegistroMejorado';
 import Inventario from '../../inventario/components/Inventario';
 import Operacion from '../../operacion/components/Operacion';
 import { Devolucion } from '../../devolucion';
@@ -41,7 +41,7 @@ const Dashboard: React.FC<PropiedadesDashboard> = ({ alCerrarSesion }) => {
       case 'inicio':
         return <Inicio />;
       case 'registro':
-        return <Registro />;
+        return <RegistroMejorado />;
       case 'inventario':
         return <Inventario />;
       case 'operacion':

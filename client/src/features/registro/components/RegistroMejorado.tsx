@@ -9,9 +9,8 @@ interface RfidLectura {
   nombre_unidad: string;
   timestamp: string;
 }
-}
 
-const Registro: React.FC = () => {
+const RegistroMejorado: React.FC = () => {
   const [tipoSeleccionado, setTipoSeleccionado] = useState('');
   const [litrajeSeleccionado, setLitrajeSeleccionado] = useState('');
   const [modelos, setModelos] = useState<ModeloCredcube[]>([]);
@@ -43,11 +42,11 @@ const Registro: React.FC = () => {
 
   // Obtener tipos únicos de los modelos
   const getTiposUnicos = () => {
-    const tipos = [...new Set(modelos.map(modelo => {
+    const tipos = [...new Set(modelos.map((modelo: any) => {
       const nombre = modelo.nombre_modelo.toLowerCase();
-  if (typeof nombre === 'string' && (nombre.includes('credcube') || nombre.includes('credo cube'))) return 'CUBE';
-  if (typeof nombre === 'string' && nombre.includes('tics')) return 'TIC';
-  if (typeof nombre === 'string' && nombre.includes('vip')) return 'VIP';
+      if (typeof nombre === 'string' && (nombre.includes('credcube') || nombre.includes('credo cube'))) return 'CUBE';
+      if (typeof nombre === 'string' && nombre.includes('tics')) return 'TIC';
+      if (typeof nombre === 'string' && nombre.includes('vip')) return 'VIP';
       return 'Otro';
     }))].filter(tipo => tipo !== 'Otro');
     return tipos;
@@ -55,7 +54,7 @@ const Registro: React.FC = () => {
 
   // Obtener litrajes para el tipo seleccionado
   const getLitrajesParaTipo = (tipo: string) => {
-    const modelosFiltrados = modelos.filter(modelo => {
+    const modelosFiltrados = modelos.filter((modelo: any) => {
       const nombre = modelo.nombre_modelo.toLowerCase();
       return (
         (tipo === 'CUBE' && (nombre.includes('credcube') || nombre.includes('credo cube'))) ||
@@ -64,15 +63,15 @@ const Registro: React.FC = () => {
        );
      });
     
-    const litrajes = [...new Set(modelosFiltrados.map(modelo => modelo.volumen_litros))]
+    const litrajes = [...new Set(modelosFiltrados.map((modelo: any) => modelo.volumen_litros))]
       .filter(vol => vol != null)
-      .sort((a, b) => (a || 0) - (b || 0));
+      .sort((a: any, b: any) => (a || 0) - (b || 0));
     return litrajes;
   };
 
   // Encontrar modelo por tipo y litraje
   const encontrarModelo = (tipo: string, litraje: number) => {
-    return modelos.find(modelo => {
+    return modelos.find((modelo: any) => {
       // Primero verificar si el modelo tiene el campo tipo (preferido)
       if (modelo.tipo) {
         // Comparación case-insensitive para el tipo
@@ -82,9 +81,9 @@ const Registro: React.FC = () => {
       // Fallback: usar lógica basada en nombre_modelo
       const nombre = modelo.nombre_modelo.toLowerCase();
       const esTipo = (
-  (tipo === 'CUBE' && (typeof nombre === 'string' && (nombre.includes('credcube') || nombre.includes('credo cube')))) ||
-  (tipo === 'TIC' && typeof nombre === 'string' && nombre.includes('tics')) ||
-  (tipo === 'VIP' && typeof nombre === 'string' && nombre.includes('vip'))
+        (tipo === 'CUBE' && (typeof nombre === 'string' && (nombre.includes('credcube') || nombre.includes('credo cube')))) ||
+        (tipo === 'TIC' && typeof nombre === 'string' && nombre.includes('tics')) ||
+        (tipo === 'VIP' && typeof nombre === 'string' && nombre.includes('vip'))
       );
       return esTipo && modelo.volumen_litros === litraje;
     });
@@ -112,7 +111,7 @@ const Registro: React.FC = () => {
   const procesarRfid = async (rfidLimpio: string) => {
     // Verificar duplicados rápidos (mismo código en corto tiempo)
     if (isDuplicate(rfidLimpio)) {
-      setLecturasIgnoradas(prev => prev + 1);
+      setLecturasIgnoradas((prev: number) => prev + 1);
       console.log(`⚠️ Código duplicado ignorado (lectura rápida): ${rfidLimpio}`);
       setError(`Código ${rfidLimpio.substring(0, 8)}... ignorado (lectura muy rápida)`);
       setRfidInput('');
@@ -120,7 +119,7 @@ const Registro: React.FC = () => {
     }
 
     // Verificar que no esté duplicado localmente
-    if (lecturasRfid.some(lectura => lectura.rfid === rfidLimpio)) {
+    if (lecturasRfid.some((lectura: any) => lectura.rfid === rfidLimpio)) {
       setError(`RFID ${rfidLimpio} ya fue escaneado en esta sesión`);
       setRfidInput('');
       return;
@@ -138,7 +137,7 @@ const Registro: React.FC = () => {
       const response = await apiServiceClient.get(`/inventory/verificar-rfid-sin-auth/${rfidLimpio}`);
       if (response.data.existe) {
         // Agregar a la lista de duplicados detectados
-        setDuplicadosDetectados(prev => [...prev.filter(d => d !== rfidLimpio), rfidLimpio]);
+        setDuplicadosDetectados((prev: any) => [...prev.filter((d: any) => d !== rfidLimpio), rfidLimpio]);
         setError(`RFID ${rfidLimpio} ya está registrado en el sistema`);
         setRfidInput('');
         return;
@@ -151,7 +150,7 @@ const Registro: React.FC = () => {
     }
     
     // Si llegamos aquí, el código es único - remover de duplicados si estaba ahí
-    setDuplicadosDetectados(prev => prev.filter(d => d !== rfidLimpio));
+    setDuplicadosDetectados((prev: any) => prev.filter((d: any) => d !== rfidLimpio));
     
     // Obtener el modelo seleccionado para generar el nombre correcto
     const modelo = encontrarModelo(tipoSeleccionado, parseFloat(litrajeSeleccionado));
@@ -164,7 +163,7 @@ const Registro: React.FC = () => {
     };
     
     // Solo agregar a la lista, NO registrar automáticamente
-    setLecturasRfid(prev => [...prev, nuevaLectura]);
+    setLecturasRfid((prev: any) => [...prev, nuevaLectura]);
     setRfidInput('');
     setError('');
     console.log(`✅ Código procesado correctamente: ${rfidLimpio}`);
@@ -197,7 +196,7 @@ const Registro: React.FC = () => {
 
   // Eliminar lectura individual
   const eliminarLectura = (rfid: string) => {
-    setLecturasRfid(prev => prev.filter(lectura => lectura.rfid !== rfid));
+    setLecturasRfid((prev: any) => prev.filter((lectura: any) => lectura.rfid !== rfid));
   };
 
   // Limpiar todas las lecturas
@@ -300,6 +299,8 @@ const Registro: React.FC = () => {
       setLecturasRfid([]);
       setError('');
       setUltimoInputProcesado('');
+      setLecturasIgnoradas(0);
+      clearHistory();
       
     } catch (err: any) {
       console.error('Error registrando items:', err);
@@ -307,7 +308,7 @@ const Registro: React.FC = () => {
       // Manejar errores específicos
       if (err.response?.status === 400) {
         const errorDetail = err.response?.data?.detail;
-  if (errorDetail && typeof errorDetail === 'string' && errorDetail.includes('Ya existe un credcube con RFID')) {
+        if (errorDetail && typeof errorDetail === 'string' && errorDetail.includes('Ya existe un credcube con RFID')) {
           setError(`Error: ${errorDetail}. Por favor, use RFIDs diferentes.`);
         } else {
           setError(`Error de validación: ${errorDetail || 'Datos inválidos'}`);
@@ -323,25 +324,25 @@ const Registro: React.FC = () => {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+    <div className="p-3 sm:p-6">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">
           Registro de Items
         </h1>
-        <p className="text-gray-600 dark:text-gray-400">
+        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
           Registre credos, VIPs o TICs especificando el tipo y litraje correspondiente.
         </p>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 max-w-2xl">
-        <div className="flex items-center mb-6">
-          <Package className="w-6 h-6 text-primary-600 mr-3" />
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 sm:p-6 max-w-none lg:max-w-4xl mx-auto">
+        <div className="flex items-center mb-4 sm:mb-6">
+          <Package className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600 mr-3" />
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
             Registro de Items
           </h2>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {cargandoModelos ? (
             <div className="flex items-center justify-center py-8">
               <Loader className="w-6 h-6 animate-spin text-primary-600 mr-2" />
@@ -350,7 +351,7 @@ const Registro: React.FC = () => {
           ) : (
             <>
               {/* Selección de Tipo y Litraje */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div>
                   <label htmlFor="tipo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Tipo de Contenedor
@@ -358,11 +359,11 @@ const Registro: React.FC = () => {
                   <select
                     id="tipo"
                     value={tipoSeleccionado}
-                    onChange={(e) => {
+                    onChange={(e: any) => {
                       setTipoSeleccionado(e.target.value);
                       setLitrajeSeleccionado(''); // Reset litraje cuando cambia tipo
                     }}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 dark:text-white text-sm sm:text-base"
                     required
                   >
                     <option value="">Seleccione el tipo</option>
@@ -381,8 +382,8 @@ const Registro: React.FC = () => {
                   <select
                     id="litraje"
                     value={litrajeSeleccionado}
-                    onChange={(e) => setLitrajeSeleccionado(e.target.value)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 dark:text-white"
+                    onChange={(e: any) => setLitrajeSeleccionado(e.target.value)}
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 dark:text-white text-sm sm:text-base"
                     required
                     disabled={!tipoSeleccionado}
                   >
@@ -409,7 +410,7 @@ const Registro: React.FC = () => {
                   type="text"
                   id="rfid"
                   value={rfidInput}
-                  onChange={(e) => handleRfidChange(e.target.value)}
+                  onChange={(e: any) => handleRfidChange(e.target.value)}
                   onKeyDown={handleRfidInput}
                   maxLength={24}
                   placeholder={
@@ -417,7 +418,7 @@ const Registro: React.FC = () => {
                       ? "Complete tipo y litraje primero..." 
                       : `DataWedge: Escanee RFID de ${tipoSeleccionado} ${litrajeSeleccionado}L (auto-procesa a 24 chars)...`
                   }
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 dark:text-white text-sm"
                   disabled={!tipoSeleccionado || !litrajeSeleccionado}
                   autoComplete="off"
                 />
@@ -454,21 +455,21 @@ const Registro: React.FC = () => {
 
           {/* Lista de RFIDs Escaneados */}
           {lecturasRfid.length > 0 && (
-            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 sm:p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+                <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white">
                   RFIDs Escaneados ({lecturasRfid.length})
                 </h3>
                 <button
                   type="button"
                   onClick={limpiarLecturas}
-                  className="text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                  className="text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 self-start sm:self-auto"
                 >
                   Limpiar Todo
                 </button>
               </div>
               <div className="max-h-60 overflow-y-auto space-y-2">
-                {lecturasRfid.map((lectura, index) => (
+                {lecturasRfid.map((lectura: any, index: any) => (
                   <div key={lectura.rfid} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white dark:bg-gray-800 rounded-md p-3 border border-gray-200 dark:border-gray-700 gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
@@ -501,31 +502,39 @@ const Registro: React.FC = () => {
 
           {duplicadosDetectados.length > 0 && (
             <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md dark:bg-yellow-900/20 dark:border-yellow-800">
-              <div className="flex items-center">
-                <svg className="h-5 w-5 text-yellow-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                <span className="text-yellow-800 dark:text-yellow-200 font-medium">
-                  {duplicadosDetectados.length} código(s) duplicado(s) detectado(s)
-                </span>
-              </div>
-              <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-                Los siguientes códigos ya están registrados en el sistema: {duplicadosDetectados.join(', ')}
+              <div className="flex items-start">
+                <AlertTriangle className="h-5 w-5 text-yellow-400 mr-2 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <span className="text-yellow-800 dark:text-yellow-200 font-medium">
+                    {duplicadosDetectados.length} código(s) duplicado(s) detectado(s)
+                  </span>
+                  <div className="mt-1 text-sm text-yellow-700 dark:text-yellow-300">
+                    Los siguientes códigos ya están registrados en el sistema:
+                  </div>
+                  <div className="mt-1 text-xs font-mono text-yellow-600 dark:text-yellow-400 break-all">
+                    {duplicadosDetectados.join(', ')}
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div className="text-sm text-gray-600 dark:text-gray-400">
               {lecturasRfid.length > 0 && (
                 <span>Listo para registrar {lecturasRfid.length} item(s)</span>
+              )}
+              {lecturasIgnoradas > 0 && (
+                <span className="block text-orange-600 mt-1">
+                  Se ignoraron {lecturasIgnoradas} lecturas duplicadas rápidas
+                </span>
               )}
             </div>
             <button
               type="button"
               onClick={handleSubmit}
               disabled={lecturasRfid.length === 0 || procesandoRegistro}
-              className="inline-flex items-center px-6 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
+              className="w-full sm:w-auto inline-flex items-center justify-center px-4 sm:px-6 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200 text-sm sm:text-base"
             >
               {procesandoRegistro ? (
                 <>
@@ -544,25 +553,32 @@ const Registro: React.FC = () => {
       </div>
 
       {/* Información adicional */}
-      <div className="mt-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <h3 className="text-lg font-medium text-blue-900 dark:text-blue-100 mb-2">
+      <div className="mt-6 sm:mt-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 sm:p-4">
+        <h3 className="text-base sm:text-lg font-medium text-blue-900 dark:text-blue-100 mb-2">
           Instrucciones de Uso
         </h3>
-        <div className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
-          <div>
-            <p><strong>Paso 1:</strong> Seleccione el tipo de contenedor (CUBE, TIC o VIP)</p>
-            <p><strong>Paso 2:</strong> Seleccione el litraje correspondiente</p>
-            <p><strong>Paso 3:</strong> Use la pistola RFID para escanear los códigos</p>
-            <p><strong>Paso 4:</strong> Presione "Registrar" para guardar todos los items</p>
+        <div className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
+            <div>
+              <p><strong>Paso 1:</strong> Seleccione el tipo de contenedor (CUBE, TIC o VIP)</p>
+              <p><strong>Paso 2:</strong> Seleccione el litraje correspondiente</p>
+            </div>
+            <div>
+              <p><strong>Paso 3:</strong> Use la pistola RFID para escanear los códigos</p>
+              <p><strong>Paso 4:</strong> Presione "Registrar" para guardar todos los items</p>
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
             <p><strong>Nota:</strong> El lote se asignará posteriormente en la sección de Pre-acondicionamiento</p>
+            <p><strong>Protección anti-duplicados:</strong> Los códigos escaneados muy rápidamente (menos de 2 segundos) se ignoran automáticamente para evitar duplicaciones accidentales</p>
           </div>
         </div>
       </div>
 
       {/* Modal de Éxito */}
       {mostrarModalExito && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-md mx-auto">
             <div className="text-center">
               <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
                 <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
@@ -570,18 +586,18 @@ const Registro: React.FC = () => {
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                 ¡Registro Exitoso!
               </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 sm:mb-6">
                 Se registraron exitosamente <strong>{itemsRegistrados}</strong> items de tipo{' '}
                 <strong>{tipoSeleccionado === 'CUBE' ? 'CUBE' : tipoSeleccionado}</strong> de{' '}
                 <strong>{litrajeSeleccionado}L</strong>.
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-6">
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4 sm:mb-6">
                 Los items han sido agregados al inventario y están disponibles en la sección "En bodega" de operaciones.
                 El lote se asignará durante el proceso de pre-acondicionamiento.
               </p>
               <button
                 onClick={() => setMostrarModalExito(false)}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200"
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 text-sm sm:text-base"
               >
                 Continuar
               </button>
@@ -593,4 +609,4 @@ const Registro: React.FC = () => {
   );
 };
 
-export default Registro;
+export default RegistroMejorado;
