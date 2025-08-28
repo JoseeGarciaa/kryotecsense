@@ -81,6 +81,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/cors/config")
+def cors_config():
+    return {"allow_all": allow_all, "origins": cors_allow_origins}
+
 # ==========================================================
 #  WebSocket de Timers + Endpoint de Alertas (monolito)
 #  Esto permite usar solo CLIENT + este BACKEND.
