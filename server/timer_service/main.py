@@ -20,8 +20,7 @@ import uvicorn
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Archivo de persistencia
-TIMERS_FILE = "timers_data.json"
+# Los timers son datos temporales - no requieren persistencia
 
 def get_utc_now():
     """Obtener tiempo UTC actual con zona horaria"""
