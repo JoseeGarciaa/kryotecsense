@@ -271,17 +271,6 @@ export const useOperaciones = () => {
         const esEnBodega = item.estado === 'En bodega';
         const categoriaValida = categoria === 'tic' || categoria === 'vip' || categoria === 'cube';
         
-        if (esEnBodega) {
-          console.log('🔍 Item EN BODEGA encontrado:', {
-            id: item.id,
-            nombre: item.nombre_unidad,
-            estado: item.estado,
-            categoria: item.categoria,
-            categoria_lower: categoria,
-            categoriaValida: categoriaValida
-          });
-        }
-        
         return item && item.estado && item.categoria &&
                esEnBodega && categoriaValida;
       });
@@ -322,18 +311,7 @@ export const useOperaciones = () => {
       });
       
       // Solo mostrar log si hay cambios significativos
-      console.log(`📈 Items por estado: Bodega(${itemsEnBodega.length}) Pre-acond(${itemsPreAcondicionamiento.length}) Acond(${itemsAcondicionamiento.length}) Op(${itemsOperacion.length}) Dev(${itemsDevolucion.length}) Insp(${itemsInspeccion.length})`);
-      
-      if (itemsEnBodega.length > 0) {
-        console.log('✅ Items en bodega encontrados:', itemsEnBodega.map(item => ({
-          id: item.id,
-          nombre: item.nombre_unidad,
-          categoria: item.categoria
-        })));
-      } else {
-        console.log('❌ NO se encontraron items en bodega');
-      }
-      
+      // Estadísticas de items por estado
       // Crear cards para En bodega usando el hook especializado
       const cardsGruposPrincipales = bodegaHook.crearCardsGruposPrincipales(itemsEnBodega);
       
@@ -348,9 +326,9 @@ export const useOperaciones = () => {
           ...prevColumns['pre-acondicionamiento'],
           items: (() => {
             // Crear cards de pre-acondicionamiento usando el hook especializado
-            console.log('🔧 Creando cards para pre-acondicionamiento. Items:', itemsPreAcondicionamiento.length);
+            // Crear cards para pre-acondicionamiento
             const cardsPreAcondicionamiento = preAcondicionamientoHook.crearCardsPreAcondicionamiento(itemsPreAcondicionamiento);
-            console.log('📋 Cards de pre-acondicionamiento creadas:', cardsPreAcondicionamiento.length);
+            // Cards de pre-acondicionamiento creadas
             return cardsPreAcondicionamiento;
           })()
         },
@@ -358,9 +336,9 @@ export const useOperaciones = () => {
         ...prevColumns['acondicionamiento'],
         items: (() => {
           // Crear cards para items en acondicionamiento usando el hook especializado
-          console.log('🔧 Creando cards para acondicionamiento. Items:', itemsAcondicionamiento.length);
+          // Crear cards para acondicionamiento
           const cardsAcondicionamiento = acondicionamientoHook.crearCardsGruposAcondicionamiento(itemsAcondicionamiento);
-          console.log('✅ Cards de acondicionamiento creadas:', cardsAcondicionamiento.length);
+          // Cards de acondicionamiento creadas
           
           return cardsAcondicionamiento;
         })()
@@ -369,8 +347,7 @@ export const useOperaciones = () => {
         ...prevColumns['operacion'],
         items: (() => {
           // Agrupar items de operación solo por categoría
-          console.log('🔧 Creando cards agrupadas para operación. Items:', itemsOperacion.length);
-          
+          // Crear cards agrupadas para operación
           if (itemsOperacion.length === 0) {
             return [];
           }
@@ -419,7 +396,7 @@ export const useOperaciones = () => {
             cardsOperacion.push(cardGrupo);
           });
           
-          console.log('✅ Cards agrupadas de operación creadas:', cardsOperacion.length);
+          // Cards agrupadas de operación creadas
           return cardsOperacion;
         })()
       },
@@ -427,7 +404,7 @@ export const useOperaciones = () => {
         ...prevColumns['devolucion'],
         items: (() => {
           // Agrupar items de devolución por categoría (igual que operación)
-          console.log('🔧 Creando cards agrupadas para devolución. Items:', itemsDevolucion.length);
+          // Crear cards agrupadas para devolución
           
           if (itemsDevolucion.length === 0) {
             return [];
@@ -477,7 +454,7 @@ export const useOperaciones = () => {
             cardsDevolucion.push(cardGrupo);
           });
           
-          console.log('✅ Cards agrupadas de devolución creadas:', cardsDevolucion.length);
+          // Cards agrupadas de devolución creadas
           return cardsDevolucion;
         })()
       },
@@ -485,7 +462,7 @@ export const useOperaciones = () => {
         ...prevColumns['inspeccion'],
         items: (() => {
           // Agrupar items de inspección por categoría (igual que operación y devolución)
-          console.log('🔧 Creando cards agrupadas para inspección. Items:', itemsInspeccion.length);
+          // Crear cards agrupadas para inspección
           
           if (itemsInspeccion.length === 0) {
             return [];
@@ -533,13 +510,13 @@ export const useOperaciones = () => {
             cardsInspeccion.push(cardGrupo);
           });
           
-          console.log('✅ Cards agrupadas de inspección creadas:', cardsInspeccion.length);
+          // Cards agrupadas de inspección creadas
           return cardsInspeccion;
         })()
       }
     }));
       
-      console.log('✅ Columnas actualizadas exitosamente');
+      // Columnas actualizadas exitosamente
     } catch (error) {
       console.error('❌ Error actualizando columnas desde el backend:', error);
       console.error('❌ Tipo de error:', typeof error);

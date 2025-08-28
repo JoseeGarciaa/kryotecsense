@@ -152,7 +152,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       setTicsCongelamiento(congelamiento);
       setTicsAtemperamiento(atemperamiento);
       
-      console.log('✅ Datos actualizados - Congelamiento:', congelamiento.length, 'Atemperamiento:', atemperamiento.length);
+      // Datos actualizados - Congelamiento y Atemperamiento
     }
   }, [operaciones.inventarioCompleto, cargando]);
   
@@ -201,19 +201,9 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       const esPreAcond = item.estado === 'Pre-acondicionamiento';
       const esAtemperamiento = item.sub_estado === 'Atemperamiento';
       
-      if (esTic && esPreAcond) {
-        console.log('🧐 TIC en Pre-acondicionamiento encontrado:', {
-          nombre: item.nombre_unidad,
-          categoria: item.categoria,
-          estado: item.estado,
-          sub_estado: item.sub_estado,
-          esAtemperamiento: esAtemperamiento
-        });
-      }
-      
       return esTic && esPreAcond && esAtemperamiento;
     });
-    console.log('🥶 TICs filtrados para Atemperamiento:', filtered.length);
+    // TICs filtrados para Atemperamiento
     return filtered;
   };
 
