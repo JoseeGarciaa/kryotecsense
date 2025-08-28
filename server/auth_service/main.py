@@ -48,6 +48,24 @@ CORS flexible:
  - CORS_ALLOW_ALL=true: permite cualquier origen (Access-Control-Allow-Origin: *)
 """
 
+from urllib.parse import urlparse
+
+
+def _normalize_origin(value: str) -> str:
+    """Return scheme://host[:port] without trailing slash; ignore any path/query.
+    Accepts plain origins or full URLs like https://host/path and reduces to origin.
+    """
+    if not value:
+        return ""
+    v = value.strip()
+    # If it's already a bare origin without scheme, return as-is (after stripping slash)
+    parsed = urlparse(v)
+    if parsed.scheme and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}"
+    # No scheme: just strip trailing slash
+    return v.rstrip("/")
+
+
 allow_all = os.getenv("CORS_ALLOW_ALL", "false").lower() == "true"
 if allow_all:
     cors_allow_origins = ["*"]
@@ -62,12 +80,13 @@ else:
     ]
     env_origin = os.getenv("FRONTEND_ORIGIN")
     if env_origin:
-        safe_origin = env_origin.strip().rstrip("/")
+        safe_origin = _normalize_origin(env_origin)
         if safe_origin not in cors_allow_origins:
             cors_allow_origins.append(safe_origin)
     env_origins_csv = os.getenv("CORS_ALLOW_ORIGINS")
     if env_origins_csv:
-        for o in [x.strip().rstrip("/") for x in env_origins_csv.split(",") if x.strip()]:
+        for o in [x.strip() for x in env_origins_csv.split(",") if x.strip()]:
+            o = _normalize_origin(o)
             if o and o not in cors_allow_origins:
                 cors_allow_origins.append(o)
 
@@ -83,7 +102,14 @@ app.add_middleware(
 
 @app.get("/cors/config")
 def cors_config():
-    return {"allow_all": allow_all, "origins": cors_allow_origins}
+    return {
+        "allow_all": allow_all,
+        "origins": cors_allow_origins,
+        "env": {
+            "FRONTEND_ORIGIN": os.getenv("FRONTEND_ORIGIN"),
+            "CORS_ALLOW_ORIGINS": os.getenv("CORS_ALLOW_ORIGINS"),
+        },
+    }
 
 # ==========================================================
 #  WebSocket de Timers + Endpoint de Alertas (monolito)
