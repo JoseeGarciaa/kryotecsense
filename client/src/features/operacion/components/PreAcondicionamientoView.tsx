@@ -577,7 +577,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             {!esAtemperamiento && (
               <button
                 onClick={() => completarTIC(rfid, timerCompletado)}
-                className="p-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
+                className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
                 title="Completar"
               >
                 <CheckCircle className="w-3 h-3" />
@@ -585,7 +585,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             )}
             <button
               onClick={() => limpiarTimer(timerCompletado.id)}
-              className="p-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
+              className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
               title="Limpiar"
             >
               <X className="w-3 h-3" />
@@ -616,7 +616,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
               
               setMostrarModalTimer(true);
             }}
-            className="flex items-center justify-center p-1 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs transition-colors"
+            className="flex items-center justify-center p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs transition-colors"
             title="Iniciar temporizador"
           >
             <Play className="w-3 h-3" />
@@ -644,7 +644,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         <div className="flex items-center gap-1">
           <button
             onClick={() => timer.activo ? pausarTimer(timer.id) : reanudarTimer(timer.id)}
-            className={`p-1 rounded text-xs transition-colors ${
+            className={`p-1.5 rounded text-xs transition-colors ${
               timer.activo 
                 ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700' 
                 : 'bg-green-100 hover:bg-green-200 text-green-700'
@@ -667,14 +667,14 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
               }
               setMostrarModalTimer(true);
             }}
-            className="p-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
+            className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
             title="Editar"
           >
             <Edit className="w-3 h-3" />
           </button>
           <button
             onClick={() => eliminarTimer(timer.id)}
-            className="p-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs transition-colors"
+            className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs transition-colors"
             title="Eliminar"
           >
             <Trash2 className="w-3 h-3" />
@@ -739,9 +739,9 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             </div>
             <button
               onClick={limpiarTodosLosTimersCompletados}
-              className="flex items-center justify-center gap-2 px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm transition-colors w-full sm:w-auto"
+              className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm transition-colors w-full sm:w-auto"
             >
-              <X size={14} />
+              <X size={16} />
               Limpiar Todos
             </button>
           </div>
@@ -794,15 +794,15 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                   onClick={cargarDatos}
                   disabled={cargando}
                 >
-                  <Loader size={18} className={cargando ? 'animate-spin' : ''} />
+                  <Loader size={16} className={cargando ? 'animate-spin' : ''} />
                 </button>
                 
                 <div className="relative" ref={dropdownRefCongelacion}>
                   <button 
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md flex items-center gap-2 justify-center min-w-0"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md flex items-center gap-2 justify-center text-sm min-w-0"
                     onClick={() => setShowDropdownCongelacion(!showDropdownCongelacion)}
                   >
-                    <Plus size={18} />
+                    <Plus size={16} />
                     <span>Agregar TICs</span>
                     <ChevronDown size={16} />
                   </button>
@@ -845,11 +845,11 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         {/* Barra de búsqueda */}
         <div className="p-3 sm:p-4 bg-gray-50 border-b border-gray-200">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
             <input
               type="text"
               placeholder="Buscar por RFID, nombre o lote..."
-              className="w-full pl-10 pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               value={busquedaCongelamiento}
               onChange={(e) => {
                 setBusquedaCongelamiento(e.target.value);
@@ -924,7 +924,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                         <p className="text-xs">No se encontraron TICs</p>
                         <button 
                           onClick={() => setBusquedaCongelamiento('')}
-                          className="mt-1 text-blue-600 hover:text-blue-700 text-xs"
+                          className="mt-2 px-2 py-1 text-blue-600 hover:text-blue-700 text-xs hover:bg-blue-50 rounded transition-colors"
                         >
                           Limpiar búsqueda
                         </button>
@@ -956,17 +956,17 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 <button
                   onClick={() => setPaginaActualCongelamiento(paginaActualCongelamiento - 1)}
                   disabled={paginaActualCongelamiento === 1}
-                  className="px-2 py-1 text-xs rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-2 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   ‹
                 </button>
-                <span className="text-xs text-gray-600 px-1">
+                <span className="text-xs text-gray-600 px-2">
                   {paginaActualCongelamiento}/{totalPaginasCongelamiento}
                 </span>
                 <button
                   onClick={() => setPaginaActualCongelamiento(paginaActualCongelamiento + 1)}
                   disabled={paginaActualCongelamiento === totalPaginasCongelamiento}
-                  className="px-2 py-1 text-xs rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-2 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   ›
                 </button>
@@ -1022,15 +1022,15 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                   onClick={cargarDatos}
                   disabled={cargando}
                 >
-                  <Loader size={18} className={cargando ? 'animate-spin' : ''} />
+                  <Loader size={16} className={cargando ? 'animate-spin' : ''} />
                 </button>
                 
                 <div className="relative" ref={dropdownRefAtemperamiento}>
                   <button 
-                    className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md flex items-center gap-2 justify-center min-w-0"
+                    className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md flex items-center gap-2 justify-center text-sm min-w-0"
                     onClick={() => setShowDropdownAtemperamiento(!showDropdownAtemperamiento)}
                   >
-                    <Plus size={18} />
+                    <Plus size={16} />
                     <span>Agregar TICs</span>
                     <ChevronDown size={16} />
                   </button>
@@ -1073,11 +1073,11 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         {/* Barra de búsqueda */}
         <div className="p-3 sm:p-4 bg-gray-50 border-b border-gray-200">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
             <input
               type="text"
               placeholder="Buscar por RFID, nombre o lote..."
-              className="w-full pl-10 pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               value={busquedaAtemperamiento}
               onChange={(e) => {
                 setBusquedaAtemperamiento(e.target.value);
@@ -1152,7 +1152,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                         <p className="text-xs">No se encontraron TICs</p>
                         <button 
                           onClick={() => setBusquedaAtemperamiento('')}
-                          className="mt-1 text-orange-600 hover:text-orange-700 text-xs"
+                          className="mt-2 px-2 py-1 text-orange-600 hover:text-orange-700 text-xs hover:bg-orange-50 rounded transition-colors"
                         >
                           Limpiar búsqueda
                         </button>
@@ -1184,17 +1184,17 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 <button
                   onClick={() => setPaginaActualAtemperamiento(paginaActualAtemperamiento - 1)}
                   disabled={paginaActualAtemperamiento === 1}
-                  className="px-2 py-1 text-xs rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-2 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   ‹
                 </button>
-                <span className="text-xs text-gray-600 px-1">
+                <span className="text-xs text-gray-600 px-2">
                   {paginaActualAtemperamiento}/{totalPaginasAtemperamiento}
                 </span>
                 <button
                   onClick={() => setPaginaActualAtemperamiento(paginaActualAtemperamiento + 1)}
                   disabled={paginaActualAtemperamiento === totalPaginasAtemperamiento}
-                  className="px-2 py-1 text-xs rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-2 py-1.5 text-xs rounded border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   ›
                 </button>
