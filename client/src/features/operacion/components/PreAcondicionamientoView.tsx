@@ -439,40 +439,58 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       // Determinar el siguiente estado basado en el tipo de operación
       let siguienteEstado = '';
       let siguienteSubEstado = '';
+      let tiempoNuevo = 0; // Tiempo en minutos para el nuevo estado
       
       if (timerCompletado.tipoOperacion === 'congelamiento') {
         // Congelamiento completado → va a Atemperamiento
         siguienteEstado = 'Pre-acondicionamiento';
         siguienteSubEstado = 'Atemperamiento';
+        tiempoNuevo = 10; // 10 minutos para atemperamiento
       } else if (timerCompletado.tipoOperacion === 'atemperamiento') {
         // Atemperamiento completado → va a Almacenamiento
         siguienteEstado = 'Almacenamiento';
         siguienteSubEstado = 'Almacenamiento';
+        tiempoNuevo = 0; // Sin timer para almacenamiento
       }
 
-      console.log(`🔄 Completando TIC ${rfid} - Moviendo a ${siguienteEstado} / ${siguienteSubEstado}`);
+      console.log(`🔄 Completando TIC ${rfid} - Moviendo a ${siguienteEstado} / ${siguienteSubEstado} con tiempo: ${tiempoNuevo} min`);
 
       // Confirmar con el usuario
       const mensajeConfirmacion = timerCompletado.tipoOperacion === 'congelamiento' 
-        ? `¿Completar el proceso de congelamiento para el TIC ${rfid}?\n\nEsto moverá el TIC a: Atemperamiento`
+        ? `¿Completar el proceso de congelamiento para el TIC ${rfid}?\n\nEsto moverá el TIC a: Atemperamiento (${tiempoNuevo} minutos)`
         : `¿Completar el proceso de atemperamiento para el TIC ${rfid}?\n\nEsto moverá el TIC a: Almacenamiento`;
       
       const confirmar = window.confirm(mensajeConfirmacion);
 
       if (!confirmar) return;
 
+      // Eliminar el timer completado ANTES de mover
+      eliminarTimer(timerCompletado.id);
+
       // Mover el TIC al siguiente estado usando la función existente
       const resultado = await operaciones.confirmarPreAcondicionamiento([rfid], siguienteSubEstado);
       
       if (resultado || resultado !== false) {
-        // Eliminar el timer completado
-        eliminarTimer(timerCompletado.id);
+        // Si el nuevo estado necesita timer, crearlo
+        if (tiempoNuevo > 0) {
+          console.log(`⏰ Creando nuevo timer de ${tiempoNuevo} minutos para ${rfid}`);
+          
+          // Crear nuevo timer para el siguiente estado
+          const tipoOperacion = siguienteSubEstado.toLowerCase() as 'congelamiento' | 'atemperamiento' | 'envio';
+          const timerId = crearTimer(
+            `TIC ${rfid}`,
+            tipoOperacion,
+            tiempoNuevo
+          );
+          
+          console.log(`✅ Nuevo timer creado con ID: ${timerId}`);
+        }
         
         // Recargar datos
         await cargarDatos();
         
         const mensajeExito = timerCompletado.tipoOperacion === 'congelamiento'
-          ? `✅ TIC ${rfid} completado y movido a Atemperamiento`
+          ? `✅ TIC ${rfid} completado y movido a Atemperamiento con timer de ${tiempoNuevo} minutos`
           : `✅ TIC ${rfid} completado y movido a Almacenamiento`;
         
         alert(mensajeExito);
@@ -517,9 +535,11 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
               </button>
             )}
             <button
-              onClick={() => {
+              onClick={async () => {
                 // Eliminar el timer completado
                 eliminarTimer(timerCompletado.id);
+                // Recargar datos para actualizar la interfaz
+                await cargarDatos();
               }}
               className="flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-md text-xs transition-colors"
               title="Limpiar registro"

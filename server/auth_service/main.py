@@ -425,6 +425,18 @@ class TimerManager:
 # Variable global para el timer manager - Inicializar inmediatamente
 timer_manager = TimerManager()
 
+# Variable global para almacenar el background task
+background_task = None
+
+async def ensure_timer_task_running():
+    """Asegurar que el background task de timers esté ejecutándose"""
+    global background_task
+    if background_task is None or background_task.done():
+        timer_logger.info("Iniciando/reiniciando background task de timers")
+        background_task = asyncio.create_task(timer_manager.tick_timers())
+        timer_logger.info("Background task de timers iniciado")
+    return background_task
+
 
 @app.websocket("/ws/timers")
 async def websocket_endpoint(websocket: WebSocket):
@@ -432,6 +444,10 @@ async def websocket_endpoint(websocket: WebSocket):
     timer_logger.info("Nueva conexión WebSocket intentando conectarse")
     await websocket.accept()
     timer_logger.info("Conexión WebSocket aceptada")
+    
+    # Asegurar que el background task esté ejecutándose
+    await ensure_timer_task_running()
+    
     await timer_manager.add_connection(websocket)
     
     try:
