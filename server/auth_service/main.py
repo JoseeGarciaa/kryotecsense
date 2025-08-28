@@ -20,7 +20,7 @@ def get_user_by_email(db: Session, correo: str):
             continue
     return None
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 import json
 import asyncio
@@ -219,6 +219,352 @@ async def handle_timer_completed(event: TimerCompletedEvent):
     except Exception as e:
         print(f"❌ Error procesando timer-completed: {e}")
         raise HTTPException(status_code=500, detail=f"Error procesando evento: {e}")
+
+# ==========================================================
+#  Endpoints unificados para Inventory Dashboard y Alertas
+#  (compatibles con rutas del API Gateway bajo /api/*)
+# ==========================================================
+
+# Helpers y esquemas para inventory dashboard
+class DashboardMetrics(BaseModel):
+    total_items: int
+    en_bodega: int
+    en_operacion: int
+    en_limpieza: int
+    en_devolucion: int
+    otros_estados: int
+    por_validar: int
+    validados: int
+
+
+class ProcessingData(BaseModel):
+    mes: str
+    recepcion: int
+    inspeccion: int
+    limpieza: int
+    operacion: int
+
+
+class ActivityItem(BaseModel):
+    id: int
+    inventario_id: Optional[int] = None
+    descripcion: str
+    timestamp: datetime
+    nombre_unidad: Optional[str] = None
+    rfid: Optional[str] = None
+    estado_nuevo: Optional[str] = None
+
+
+def _get_tenant_schema_from_user(current_user: Dict[str, Any]) -> str:
+    return current_user.get("tenant", "tenant_base")
+
+
+@app.get("/api/inventory/dashboard/metrics")
+def api_inventory_dashboard_metrics(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    """Métricas del dashboard (unificado)."""
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        query = text(
+            f"""
+            SELECT 
+                COUNT(*) as total_items,
+                COUNT(CASE WHEN LOWER(estado) = 'en bodega' THEN 1 END) as en_bodega,
+                COUNT(CASE WHEN LOWER(estado) IN ('en operacion','en operación') THEN 1 END) as en_operacion,
+                COUNT(CASE WHEN LOWER(estado) = 'en limpieza' THEN 1 END) as en_limpieza,
+                COUNT(CASE WHEN LOWER(estado) IN ('en devolucion','en devolución') THEN 1 END) as en_devolucion,
+                COUNT(CASE WHEN LOWER(estado) NOT IN ('en bodega','en operacion','en operación','en limpieza','en devolucion','en devolución') THEN 1 END) as otros_estados,
+                COUNT(CASE WHEN validacion_limpieza IS NULL OR validacion_goteo IS NULL OR validacion_desinfeccion IS NULL THEN 1 END) as por_validar,
+                COUNT(CASE WHEN validacion_limpieza IS NOT NULL AND validacion_goteo IS NOT NULL AND validacion_desinfeccion IS NOT NULL THEN 1 END) as validados
+            FROM {tenant_schema}.inventario_credocubes 
+            WHERE activo = true
+            """
+        )
+        row = db.execute(query).fetchone()
+        if row:
+            return DashboardMetrics(**dict(row._mapping))
+        return DashboardMetrics(
+            total_items=0,
+            en_bodega=0,
+            en_operacion=0,
+            en_limpieza=0,
+            en_devolucion=0,
+            otros_estados=0,
+            por_validar=0,
+            validados=0,
+        )
+    except Exception as e:
+        print(f"Error obteniendo métricas dashboard ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo métricas")
+
+
+@app.get("/api/inventory/dashboard/processing-data")
+def api_inventory_processing_data(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        query = text(
+            f"""
+            WITH monthly_data AS (
+                SELECT 
+                    TO_CHAR(fecha_ingreso, 'Mon') as mes,
+                    COUNT(CASE WHEN LOWER(estado) IN ('recepcion','recepción') THEN 1 END) as recepcion,
+                    COUNT(CASE WHEN LOWER(estado) IN ('inspeccion','inspección') THEN 1 END) as inspeccion,
+                    COUNT(CASE WHEN LOWER(estado) = 'en limpieza' THEN 1 END) as limpieza,
+                    COUNT(CASE WHEN LOWER(estado) IN ('en operacion','en operación') THEN 1 END) as operacion
+                FROM {tenant_schema}.inventario_credocubes 
+                WHERE activo = true AND fecha_ingreso >= NOW() - INTERVAL '12 months'
+                GROUP BY DATE_TRUNC('month', fecha_ingreso), TO_CHAR(fecha_ingreso, 'Mon')
+                ORDER BY DATE_TRUNC('month', fecha_ingreso)
+            )
+            SELECT mes,
+                   COALESCE(recepcion,0) as recepcion,
+                   COALESCE(inspeccion,0) as inspeccion,
+                   COALESCE(limpieza,0) as limpieza,
+                   COALESCE(operacion,0) as operacion
+            FROM monthly_data
+            """
+        )
+        result = db.execute(query)
+        return [ProcessingData(**dict(r._mapping)) for r in result]
+    except Exception as e:
+        print(f"Error obteniendo processing-data ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo datos de procesamiento")
+
+
+@app.get("/api/inventory/dashboard/recent-activity")
+def api_inventory_recent_activity(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        query = text(
+            f"""
+            SELECT a.id, a.inventario_id, a.descripcion, a.timestamp,
+                   i.nombre_unidad, i.rfid, a.estado_nuevo
+            FROM {tenant_schema}.actividades_operacion a
+            LEFT JOIN {tenant_schema}.inventario_credocubes i ON a.inventario_id = i.id
+            ORDER BY a.timestamp DESC
+            LIMIT 10
+            """
+        )
+        result = db.execute(query)
+        return [ActivityItem(**dict(r._mapping)) for r in result]
+    except Exception as e:
+        print(f"Error obteniendo recent-activity ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo actividad reciente")
+
+
+# Esquemas para alertas
+class AlertaBase(BaseModel):
+    inventario_id: Optional[int] = None
+    tipo_alerta: str
+    descripcion: str
+
+
+class AlertaCreate(AlertaBase):
+    pass
+
+
+class AlertaUpdate(BaseModel):
+    resuelta: Optional[bool] = None
+    descripcion: Optional[str] = None
+
+
+@app.get("/api/alerts/alertas/")
+def api_alerts_list(
+    inventario_id: Optional[int] = None,
+    resuelta: Optional[bool] = None,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    base = f"SELECT id, inventario_id, tipo_alerta, descripcion, fecha_creacion, resuelta, fecha_resolucion FROM {tenant_schema}.alertas WHERE 1=1"
+    params: Dict[str, any] = {}
+    if inventario_id is not None:
+        base += " AND inventario_id = :inventario_id"
+        params["inventario_id"] = inventario_id
+    if resuelta is not None:
+        base += " AND resuelta = :resuelta"
+        params["resuelta"] = resuelta
+    base += " ORDER BY fecha_creacion DESC OFFSET :skip LIMIT :limit"
+    params.update({"skip": skip, "limit": limit})
+    try:
+        rows = db.execute(text(base), params).fetchall()
+        return [
+            {
+                "id": r[0],
+                "inventario_id": r[1],
+                "tipo_alerta": r[2],
+                "descripcion": r[3],
+                "fecha_creacion": r[4],
+                "resuelta": r[5],
+                "fecha_resolucion": r[6],
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        print(f"Error listando alertas ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo alertas")
+
+
+@app.get("/api/alerts/alertas/{alerta_id}")
+def api_alerts_get(
+    alerta_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        q = text(
+            f"SELECT id, inventario_id, tipo_alerta, descripcion, fecha_creacion, resuelta, fecha_resolucion FROM {tenant_schema}.alertas WHERE id = :id"
+        )
+        r = db.execute(q, {"id": alerta_id}).fetchone()
+        if not r:
+            raise HTTPException(status_code=404, detail="Alerta no encontrada")
+        return {
+            "id": r[0],
+            "inventario_id": r[1],
+            "tipo_alerta": r[2],
+            "descripcion": r[3],
+            "fecha_creacion": r[4],
+            "resuelta": r[5],
+            "fecha_resolucion": r[6],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error obteniendo alerta ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo alerta")
+
+
+@app.post("/api/alerts/alertas/")
+def api_alerts_create(
+    alerta: AlertaCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        q = text(
+            f"""
+            INSERT INTO {tenant_schema}.alertas (inventario_id, tipo_alerta, descripcion, fecha_creacion, resuelta)
+            VALUES (:inventario_id, :tipo_alerta, :descripcion, NOW(), false)
+            RETURNING id, inventario_id, tipo_alerta, descripcion, fecha_creacion, resuelta, fecha_resolucion
+            """
+        )
+        r = db.execute(
+            q,
+            {
+                "inventario_id": alerta.inventario_id,
+                "tipo_alerta": alerta.tipo_alerta,
+                "descripcion": alerta.descripcion,
+            },
+        ).fetchone()
+        db.commit()
+        return {
+            "id": r[0],
+            "inventario_id": r[1],
+            "tipo_alerta": r[2],
+            "descripcion": r[3],
+            "fecha_creacion": r[4],
+            "resuelta": r[5],
+            "fecha_resolucion": r[6],
+        }
+    except Exception as e:
+        db.rollback()
+        print(f"Error creando alerta ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error creando alerta")
+
+
+@app.put("/api/alerts/alertas/{alerta_id}")
+def api_alerts_update(
+    alerta_id: int,
+    alerta: AlertaUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        # verificar existencia
+        exists = db.execute(
+            text(f"SELECT id FROM {tenant_schema}.alertas WHERE id = :id"), {"id": alerta_id}
+        ).fetchone()
+        if not exists:
+            raise HTTPException(status_code=404, detail="Alerta no encontrada")
+
+        update_fields = []
+        params: Dict[str, any] = {"id": alerta_id}
+        if alerta.resuelta is not None:
+            update_fields.append("resuelta = :resuelta")
+            params["resuelta"] = alerta.resuelta
+            if alerta.resuelta:
+                update_fields.append("fecha_resolucion = NOW()")
+        if alerta.descripcion is not None:
+            update_fields.append("descripcion = :descripcion")
+            params["descripcion"] = alerta.descripcion
+
+        if not update_fields:
+            q = text(
+                f"SELECT id, inventario_id, tipo_alerta, descripcion, fecha_creacion, resuelta, fecha_resolucion FROM {tenant_schema}.alertas WHERE id = :id"
+            )
+            r = db.execute(q, {"id": alerta_id}).fetchone()
+        else:
+            q = text(
+                f"""
+                UPDATE {tenant_schema}.alertas 
+                SET {', '.join(update_fields)}
+                WHERE id = :id
+                RETURNING id, inventario_id, tipo_alerta, descripcion, fecha_creacion, resuelta, fecha_resolucion
+                """
+            )
+            r = db.execute(q, params).fetchone()
+            db.commit()
+
+        return {
+            "id": r[0],
+            "inventario_id": r[1],
+            "tipo_alerta": r[2],
+            "descripcion": r[3],
+            "fecha_creacion": r[4],
+            "resuelta": r[5],
+            "fecha_resolucion": r[6],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error actualizando alerta ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error actualizando alerta")
+
+
+@app.delete("/api/alerts/alertas/{alerta_id}", status_code=204)
+def api_alerts_delete(
+    alerta_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        q = text(f"DELETE FROM {tenant_schema}.alertas WHERE id = :id RETURNING id")
+        r = db.execute(q, {"id": alerta_id}).fetchone()
+        if not r:
+            raise HTTPException(status_code=404, detail="Alerta no encontrada")
+        db.commit()
+        return None
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error eliminando alerta ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error eliminando alerta")
 
 # Configuración de OAuth2
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
