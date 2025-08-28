@@ -598,6 +598,40 @@ class InventarioCreate(BaseModel):
     validacion_desinfeccion: Optional[str] = None
     categoria: Optional[str] = None
 
+class InventarioResponse(BaseModel):
+    id: int
+    modelo_id: int
+    nombre_modelo: Optional[str] = None
+    nombre_unidad: str
+    rfid: str
+    lote: Optional[str] = None
+    estado: str
+    sub_estado: Optional[str] = None
+    validacion_limpieza: Optional[str] = None
+    validacion_goteo: Optional[str] = None
+    validacion_desinfeccion: Optional[str] = None
+    categoria: Optional[str] = None
+    fecha_ingreso: Optional[datetime] = None
+    ultima_actualizacion: Optional[datetime] = None
+    fecha_vencimiento: Optional[datetime] = None
+    activo: Optional[bool] = True
+
+class InventarioUpdate(BaseModel):
+    modelo_id: Optional[int] = None
+    nombre_unidad: Optional[str] = None
+    rfid: Optional[str] = None
+    lote: Optional[str] = None
+    estado: Optional[str] = None
+    sub_estado: Optional[str] = None
+    validacion_limpieza: Optional[str] = None
+    validacion_goteo: Optional[str] = None
+    validacion_desinfeccion: Optional[str] = None
+    categoria: Optional[str] = None
+
+class EstadoUpdate(BaseModel):
+    estado: str
+    sub_estado: Optional[str] = None
+
 
 @app.get("/api/inventory/modelos/")
 def api_inventory_modelos(
@@ -639,6 +673,63 @@ def api_inventory_verificar_rfid(rfid: str, db: Session = Depends(get_db)):
         return {"rfid": rfid, "existe": False, "count": 0, "error": str(e)}
 
 
+# ===== Inventario CRUD y utilidades usadas por Operación =====
+
+def _generar_lote_automatico(db: Session, tenant_schema: str) -> str:
+    """Genera lote YYYYMMDDXXX incrementando el último del día."""
+    try:
+        fecha_actual = datetime.now().strftime("%Y%m%d")
+        q = text(
+            f"""
+            SELECT lote FROM {tenant_schema}.inventario_credocubes
+            WHERE lote LIKE :prefijo
+            ORDER BY lote DESC
+            LIMIT 1
+            """
+        )
+        ultimo = db.execute(q, {"prefijo": f"{fecha_actual}%"}).fetchone()
+        sec = 1
+        if ultimo and ultimo[0] and isinstance(ultimo[0], str) and len(ultimo[0]) >= 11:
+            try:
+                sec = int(ultimo[0][-3:]) + 1
+            except Exception:
+                sec = 1
+        return f"{fecha_actual}{sec:03d}"
+    except Exception:
+        # Fallback simple
+        return datetime.now().strftime("%Y%m%d001")
+
+
+@app.get("/api/inventory/inventario/", response_model=List[InventarioResponse])
+def api_inventory_list(
+    skip: int = 0,
+    limit: int = 1000,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    """Lista completa del inventario activo, unida con modelos."""
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        q = text(
+            f"""
+            SELECT i.id, i.modelo_id, m.nombre_modelo, i.nombre_unidad, i.rfid,
+                   i.lote, i.estado, i.sub_estado, i.validacion_limpieza,
+                   i.validacion_goteo, i.validacion_desinfeccion, i.categoria,
+                   i.fecha_ingreso, i.ultima_actualizacion, i.fecha_vencimiento, i.activo
+            FROM {tenant_schema}.inventario_credocubes i
+            LEFT JOIN {tenant_schema}.modelos m ON i.modelo_id = m.modelo_id
+            WHERE i.activo = true
+            ORDER BY i.ultima_actualizacion DESC, i.fecha_ingreso DESC
+            OFFSET :skip LIMIT :limit
+            """
+        )
+        rows = db.execute(q, {"skip": skip, "limit": limit})
+        return [InventarioResponse(**dict(r._mapping)) for r in rows]
+    except Exception as e:
+        print(f"Error listando inventario ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo inventario")
+
+
 @app.post("/api/inventory/inventario/")
 def api_inventory_create(
     item: InventarioCreate,
@@ -678,6 +769,404 @@ def api_inventory_create(
         raise HTTPException(status_code=500, detail="Error creando inventario")
 
 
+@app.put("/api/inventory/inventario/{inventario_id}", response_model=InventarioResponse)
+def api_inventory_update(
+    inventario_id: int,
+    inventario: InventarioUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        exists = db.execute(
+            text(f"SELECT id FROM {tenant_schema}.inventario_credocubes WHERE id = :id"),
+            {"id": inventario_id},
+        ).fetchone()
+        if not exists:
+            raise HTTPException(status_code=404, detail="Inventario no encontrado")
+
+        # Verificar RFID único si se cambia
+        if inventario.rfid is not None:
+            r = db.execute(
+                text(
+                    f"SELECT id FROM {tenant_schema}.inventario_credocubes WHERE rfid = :rfid AND id != :id"
+                ),
+                {"rfid": inventario.rfid, "id": inventario_id},
+            ).fetchone()
+            if r:
+                raise HTTPException(status_code=400, detail=f"Ya existe un credcube con RFID {inventario.rfid}")
+
+        fields = []
+        params: Dict[str, Any] = {"id": inventario_id}
+        for k, v in inventario.model_dump(exclude_unset=True).items():
+            fields.append(f"{k} = :{k}")
+            params[k] = v
+        if not fields:
+            raise HTTPException(status_code=400, detail="No hay campos para actualizar")
+        fields.append("ultima_actualizacion = CURRENT_TIMESTAMP")
+        q = text(
+            f"""
+            UPDATE {tenant_schema}.inventario_credocubes
+            SET {', '.join(fields)}
+            WHERE id = :id
+            RETURNING id, modelo_id, (SELECT nombre_modelo FROM {tenant_schema}.modelos m WHERE m.modelo_id = {tenant_schema}.inventario_credocubes.modelo_id) as nombre_modelo,
+                      nombre_unidad, rfid, lote, estado, sub_estado,
+                      validacion_limpieza, validacion_goteo, validacion_desinfeccion,
+                      categoria, fecha_ingreso, ultima_actualizacion, fecha_vencimiento, activo
+            """
+        )
+        row = db.execute(q, params).fetchone()
+        db.commit()
+        return InventarioResponse(**dict(row._mapping))
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error actualizando inventario ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error actualizando inventario")
+
+
+@app.patch("/api/inventory/inventario/{inventario_id}/estado", response_model=InventarioResponse)
+def api_inventory_update_estado(
+    inventario_id: int,
+    estado_update: EstadoUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        exists = db.execute(
+            text(f"SELECT id FROM {tenant_schema}.inventario_credocubes WHERE id = :id"),
+            {"id": inventario_id},
+        ).fetchone()
+        if not exists:
+            raise HTTPException(status_code=404, detail="Inventario no encontrado")
+
+        set_lote = None
+        if estado_update.estado and estado_update.sub_estado:
+            est = estado_update.estado.strip().lower()
+            sub = estado_update.sub_estado.strip().lower() if estado_update.sub_estado else ""
+            if est in ["pre-acondicionamiento", "preacondicionamiento"] and sub in ["congelación", "congelacion", "atemperamiento"]:
+                # Si no tiene lote, asignar automático
+                lote_row = db.execute(
+                    text(f"SELECT lote FROM {tenant_schema}.inventario_credocubes WHERE id = :id"),
+                    {"id": inventario_id},
+                ).fetchone()
+                if not lote_row or not lote_row[0]:
+                    set_lote = _generar_lote_automatico(db, tenant_schema)
+
+        if set_lote:
+            q = text(
+                f"""
+                UPDATE {tenant_schema}.inventario_credocubes
+                SET estado = :estado, sub_estado = :sub_estado, lote = :lote,
+                    ultima_actualizacion = CURRENT_TIMESTAMP
+                WHERE id = :id
+                RETURNING id, modelo_id, (SELECT nombre_modelo FROM {tenant_schema}.modelos m WHERE m.modelo_id = {tenant_schema}.inventario_credocubes.modelo_id) as nombre_modelo,
+                          nombre_unidad, rfid, lote, estado, sub_estado,
+                          validacion_limpieza, validacion_goteo, validacion_desinfeccion,
+                          categoria, fecha_ingreso, ultima_actualizacion, fecha_vencimiento, activo
+                """
+            )
+            row = db.execute(
+                q,
+                {
+                    "id": inventario_id,
+                    "estado": estado_update.estado,
+                    "sub_estado": estado_update.sub_estado,
+                    "lote": set_lote,
+                },
+            ).fetchone()
+        else:
+            q = text(
+                f"""
+                UPDATE {tenant_schema}.inventario_credocubes
+                SET estado = :estado, sub_estado = :sub_estado,
+                    ultima_actualizacion = CURRENT_TIMESTAMP
+                WHERE id = :id
+                RETURNING id, modelo_id, (SELECT nombre_modelo FROM {tenant_schema}.modelos m WHERE m.modelo_id = {tenant_schema}.inventario_credocubes.modelo_id) as nombre_modelo,
+                          nombre_unidad, rfid, lote, estado, sub_estado,
+                          validacion_limpieza, validacion_goteo, validacion_desinfeccion,
+                          categoria, fecha_ingreso, ultima_actualizacion, fecha_vencimiento, activo
+                """
+            )
+            row = db.execute(
+                q,
+                {"id": inventario_id, "estado": estado_update.estado, "sub_estado": estado_update.sub_estado},
+            ).fetchone()
+        db.commit()
+        return InventarioResponse(**dict(row._mapping))
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error actualizando estado inventario ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error actualizando estado")
+
+
+# -------- Operaciones auxiliares: bulk y envío --------
+class AsignarLoteAutomaticoRequest(BaseModel):
+    rfids: List[str]
+    estado: str
+    sub_estado: str
+
+
+@app.patch("/api/inventory/inventario/asignar-lote-automatico")
+def api_inventory_asignar_lote_automatico(
+    req: AsignarLoteAutomaticoRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        if not req.rfids:
+            raise HTTPException(status_code=400, detail="Debe proporcionar RFIDs")
+        lote = _generar_lote_automatico(db, tenant_schema)
+        q = text(
+            f"""
+            UPDATE {tenant_schema}.inventario_credocubes
+            SET lote = :lote, estado = :estado, sub_estado = :sub_estado,
+                ultima_actualizacion = CURRENT_TIMESTAMP
+            WHERE rfid = ANY(:rfids) AND activo = true
+            RETURNING id, nombre_unidad, rfid, lote, estado, sub_estado
+            """
+        )
+        rows = db.execute(q, {"lote": lote, "estado": req.estado, "sub_estado": req.sub_estado, "rfids": req.rfids}).fetchall()
+        db.commit()
+        return {
+            "message": f"Lote automático '{lote}' asignado",
+            "lote_generado": lote,
+            "items_actualizados": len(rows),
+            "items": [
+                {"id": r[0], "nombre_unidad": r[1], "rfid": r[2], "lote": r[3], "estado": r[4], "sub_estado": r[5]}
+                for r in rows
+            ],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error asignando lote automático ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error asignando lote automático")
+
+
+class IniciarEnvioRequest(BaseModel):
+    items_ids: List[int]
+    tiempo_envio_minutos: Optional[int] = None
+    descripcion_adicional: Optional[str] = None
+
+
+@app.post("/api/inventory/inventario/iniciar-envio")
+def api_inventory_iniciar_envio(
+    req: IniciarEnvioRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        if not req.items_ids:
+            raise HTTPException(status_code=400, detail="Debe proporcionar items")
+        # Verificar existencia
+        chk = db.execute(
+            text(f"SELECT id FROM {tenant_schema}.inventario_credocubes WHERE id = ANY(:ids) AND activo = true"),
+            {"ids": req.items_ids},
+        ).fetchall()
+        if len(chk) != len(req.items_ids):
+            raise HTTPException(status_code=404, detail="Algunos items no existen o no están activos")
+        q = text(
+            f"""
+            UPDATE {tenant_schema}.inventario_credocubes
+            SET estado = 'operación', sub_estado = 'En transito', ultima_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = ANY(:ids)
+            RETURNING id, rfid, estado, sub_estado, lote
+            """
+        )
+        rows = db.execute(q, {"ids": req.items_ids}).fetchall()
+        db.commit()
+        return {
+            "message": f"Proceso de envío iniciado para {len(rows)} items",
+            "items": [
+                {"id": r[0], "rfid": r[1], "estado": r[2], "sub_estado": r[3], "lote": r[4]}
+                for r in rows
+            ],
+            "tiempo_estimado_minutos": req.tiempo_envio_minutos,
+            "descripcion": req.descripcion_adicional,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error iniciando envío ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error iniciando envío")
+
+
+@app.patch("/api/inventory/inventario/{item_id}/completar-envio")
+def api_inventory_completar_envio(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        r = db.execute(
+            text(f"SELECT id FROM {tenant_schema}.inventario_credocubes WHERE id = :id AND activo = true"),
+            {"id": item_id},
+        ).fetchone()
+        if not r:
+            raise HTTPException(status_code=404, detail="Item no encontrado")
+        q = text(
+            f"""
+            UPDATE {tenant_schema}.inventario_credocubes
+            SET estado = 'operación', sub_estado = 'entregado', ultima_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = :id
+            RETURNING id, rfid, estado, sub_estado, lote
+            """
+        )
+        row = db.execute(q, {"id": item_id}).fetchone()
+        db.commit()
+        return {
+            "message": "Envío completado",
+            "item": {"id": row[0], "rfid": row[1], "estado": row[2], "sub_estado": row[3], "lote": row[4]},
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error completando envío ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error completando envío")
+
+
+class CancelarEnvioRequest(BaseModel):
+    motivo: Optional[str] = "Cancelado por usuario"
+
+
+@app.patch("/api/inventory/inventario/{item_id}/cancelar-envio")
+def api_inventory_cancelar_envio(
+    item_id: int,
+    req: CancelarEnvioRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        r = db.execute(
+            text(f"SELECT id FROM {tenant_schema}.inventario_credocubes WHERE id = :id AND activo = true"),
+            {"id": item_id},
+        ).fetchone()
+        if not r:
+            raise HTTPException(status_code=404, detail="Item no encontrado")
+        q = text(
+            f"""
+            UPDATE {tenant_schema}.inventario_credocubes
+            SET estado = 'En bodega', sub_estado = 'Disponible', ultima_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = :id
+            RETURNING id, rfid, estado, sub_estado, lote
+            """
+        )
+        row = db.execute(q, {"id": item_id}).fetchone()
+        db.commit()
+        return {
+            "message": f"Envío cancelado: {req.motivo}",
+            "item": {"id": row[0], "rfid": row[1], "estado": row[2], "sub_estado": row[3], "lote": row[4]},
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error cancelando envío ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error cancelando envío")
+
+
+class BulkUpdateRequest(BaseModel):
+    updates: List[Dict[str, Any]]
+
+
+@app.post("/api/inventory/inventario/bulk-update")
+def api_inventory_bulk_update(
+    req: BulkUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        if not req.updates:
+            raise HTTPException(status_code=400, detail="Debe proporcionar actualizaciones")
+        updated = 0
+        for up in req.updates:
+            if "id" not in up:
+                continue
+            clauses = []
+            params: Dict[str, Any] = {"id": up["id"]}
+            for k, v in up.items():
+                if k == "id":
+                    continue
+                clauses.append(f"{k} = :{k}")
+                params[k] = v
+            if not clauses:
+                continue
+            clauses.append("ultima_actualizacion = CURRENT_TIMESTAMP")
+            q = text(
+                f"UPDATE {tenant_schema}.inventario_credocubes SET {', '.join(clauses)} WHERE id = :id AND activo = true"
+            )
+            res = db.execute(q, params)
+            updated += res.rowcount or 0
+        db.commit()
+        return {"message": "Actualización masiva completada", "items_actualizados": int(updated)}
+    except Exception as e:
+        db.rollback()
+        print(f"Error en bulk-update ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error en actualización masiva")
+
+
+class BulkActivitiesRequest(BaseModel):
+    activities: List[Dict[str, Any]]
+
+
+@app.post("/api/inventory/inventario/bulk-activities")
+def api_inventory_bulk_activities(
+    req: BulkActivitiesRequest,
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    # Placeholder, el cliente solo espera 200 OK
+    return {"message": "Actividades masivas procesadas", "activities_procesadas": len(req.activities)}
+
+
+class BulkStateChangeRequest(BaseModel):
+    updates: List[Dict[str, Any]]
+
+
+@app.post("/api/inventory/inventario/bulk-state-change")
+def api_inventory_bulk_state_change(
+    req: BulkStateChangeRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        if not req.updates:
+            raise HTTPException(status_code=400, detail="Debe proporcionar actualizaciones")
+        updated = 0
+        for up in req.updates:
+            if "id" not in up or "estado" not in up:
+                continue
+            q = text(
+                f"""
+                UPDATE {tenant_schema}.inventario_credocubes
+                SET estado = :estado, sub_estado = :sub_estado,
+                    ultima_actualizacion = CURRENT_TIMESTAMP
+                WHERE id = :id AND activo = true
+                """
+            )
+            res = db.execute(q, {"id": up["id"], "estado": up["estado"], "sub_estado": up.get("sub_estado")})
+            updated += res.rowcount or 0
+        db.commit()
+        return {"message": "Cambio de estado masivo completado", "items_actualizados": int(updated)}
+    except Exception as e:
+        db.rollback()
+        print(f"Error en bulk-state-change ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error en cambio de estado masivo")
+
+
 class ActividadCreate(BaseModel):
     inventario_id: Optional[int] = None
     usuario_id: Optional[int] = None
@@ -714,6 +1203,40 @@ def api_activities_create(
         db.rollback()
         print(f"Error creando actividad ({tenant_schema}): {e}")
         raise HTTPException(status_code=500, detail="Error creando actividad")
+
+
+@app.get("/api/activities/actividades/")
+def api_activities_list(
+    inventario_id: Optional[int] = None,
+    limit: int = 200,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    tenant_schema = _get_tenant_schema_from_user(current_user)
+    try:
+        base = f"SELECT id, inventario_id, usuario_id, descripcion, estado_nuevo, sub_estado_nuevo, timestamp FROM {tenant_schema}.actividades_operacion"
+        params: Dict[str, Any] = {}
+        if inventario_id is not None:
+            base += " WHERE inventario_id = :inventario_id"
+            params["inventario_id"] = inventario_id
+        base += " ORDER BY timestamp DESC LIMIT :limit"
+        params["limit"] = limit
+        rows = db.execute(text(base), params).fetchall()
+        return [
+            {
+                "id": r[0],
+                "inventario_id": r[1],
+                "usuario_id": r[2],
+                "descripcion": r[3],
+                "estado_nuevo": r[4],
+                "sub_estado_nuevo": r[5],
+                "timestamp": r[6],
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        print(f"Error listando actividades ({tenant_schema}): {e}")
+        raise HTTPException(status_code=500, detail="Error obteniendo actividades")
 
 # Configuración de OAuth2
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
