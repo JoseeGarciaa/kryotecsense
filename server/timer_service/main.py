@@ -96,75 +96,10 @@ class TimerManager:
         self.timers: Dict[str, Timer] = {}
         self.connections: Set[WebSocket] = set()
         self.running = True
-        # Cargar timers existentes al inicializar
-        self.load_timers_from_file()
+        # NO cargar timers desde archivo - son datos temporales
         
-    def save_timers_to_file(self):
-        """Guardar timers en archivo JSON"""
-        try:
-            timers_data = {}
-            for timer_id, timer in self.timers.items():
-                timer_dict = {
-                    "id": timer.id,
-                    "nombre": timer.nombre,
-                    "tipoOperacion": timer.tipoOperacion,
-                    "tiempoInicialMinutos": timer.tiempoInicialMinutos,
-                    "tiempoRestanteSegundos": timer.tiempoRestanteSegundos,
-                    "activo": timer.activo,
-                    "completado": timer.completado
-                }
-                
-                # Manejar fechas de forma segura
-                if isinstance(timer.fechaInicio, datetime):
-                    timer_dict["fechaInicio"] = timer.fechaInicio.isoformat()
-                else:
-                    timer_dict["fechaInicio"] = str(timer.fechaInicio)
-                    
-                if isinstance(timer.fechaFin, datetime):
-                    timer_dict["fechaFin"] = timer.fechaFin.isoformat()
-                else:
-                    timer_dict["fechaFin"] = str(timer.fechaFin)
-                
-                timers_data[timer_id] = timer_dict
-            
-            with open(TIMERS_FILE, 'w') as f:
-                json.dump(timers_data, f, indent=2)
-            logger.info(f"Timers guardados en {TIMERS_FILE}: {len(timers_data)} timers")
-        except Exception as e:
-            logger.error(f"Error guardando timers: {e}")
-    
-    def load_timers_from_file(self):
-        """Cargar timers desde archivo JSON"""
-        if not os.path.exists(TIMERS_FILE):
-            logger.info(f"Archivo {TIMERS_FILE} no existe, iniciando sin timers")
-            return
-            
-        try:
-            with open(TIMERS_FILE, 'r') as f:
-                timers_data = json.load(f)
-            
-            current_time = get_utc_now()
-            
-            for timer_id, timer_dict in timers_data.items():
-                # Parsear fechas con zona horaria
-                timer_dict['fechaInicio'] = parse_iso_datetime(timer_dict['fechaInicio'])
-                timer_dict['fechaFin'] = parse_iso_datetime(timer_dict['fechaFin'])
-                
-                # Recalcular tiempo restante basado en tiempo actual
-                tiempo_restante_ms = (timer_dict['fechaFin'] - current_time).total_seconds()
-                timer_dict['tiempoRestanteSegundos'] = max(0, int(tiempo_restante_ms))
-                
-                # Actualizar estado basado en tiempo restante
-                if timer_dict['tiempoRestanteSegundos'] == 0 and not timer_dict['completado']:
-                    timer_dict['completado'] = True
-                    timer_dict['activo'] = False
-                
-                timer = Timer(**timer_dict)
-                self.timers[timer_id] = timer
-            
-            logger.info(f"Timers cargados desde {TIMERS_FILE}: {len(self.timers)} timers")
-        except Exception as e:
-            logger.error(f"Error cargando timers: {e}")
+    # MÉTODOS ELIMINADOS - Los timers no se persisten
+    # Los timers son datos temporales que solo existen en memoria
         
     async def add_connection(self, websocket: WebSocket):
         """Agregar nueva conexión WebSocket"""
@@ -228,9 +163,6 @@ class TimerManager:
         timer = Timer(**timer_data)
         self.timers[timer.id] = timer
         
-        # Guardar en archivo
-        self.save_timers_to_file()
-        
         logger.info(f"Timer creado: {timer.nombre} ({timer.id})")
         
         # Broadcast a todos los clientes excepto el que envió
@@ -249,9 +181,6 @@ class TimerManager:
         for key, value in updates.items():
             if hasattr(timer, key):
                 setattr(timer, key, value)
-        
-        # Guardar en archivo
-        self.save_timers_to_file()
                 
         logger.info(f"Timer actualizado: {timer.nombre} ({timer_id})")
         
@@ -267,9 +196,6 @@ class TimerManager:
         """Eliminar temporizador"""
         if timer_id in self.timers:
             timer = self.timers.pop(timer_id)
-            
-            # Guardar en archivo
-            self.save_timers_to_file()
             
             logger.info(f"Timer eliminado: {timer.nombre} ({timer_id})")
             
@@ -341,11 +267,8 @@ class TimerManager:
                             "data": update
                         })
                 
-                # Guardar en archivo cada 30 segundos si hay cambios
-                save_counter += 1
-                if timers_changed and save_counter >= 30:
-                    self.save_timers_to_file()
-                    save_counter = 0
+                # Guardar cambios esporádicamente no es necesario
+                # Los timers son datos temporales
                 
                 await asyncio.sleep(1)  # Actualizar cada segundo
                 
@@ -364,10 +287,9 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Detener el servicio y guardar timers"""
+    """Detener el servicio"""
     timer_manager.running = False
-    timer_manager.save_timers_to_file()
-    logger.info("Servicio de timers detenido y timers guardados")
+    logger.info("Servicio de timers detenido")
 
 @app.websocket("/ws/timers")
 async def websocket_endpoint(websocket: WebSocket):

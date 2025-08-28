@@ -113,7 +113,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             fechaFin: new Date(timer.fechaFin)
           }));
           
-          console.log(`📥 Sincronizando ${timersDelServidor.length} timers desde el servidor`);
+          // Solo log una vez para reducir spam
+          // console.log(`📥 Sincronizando ${timersDelServidor.length} timers desde el servidor`);
           
           // Merge con timers locales (el servidor tiene prioridad)
           setTimers(prevTimers => {
@@ -125,7 +126,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             });
             
             const timersFinal = [...timersActualizados, ...timersNuevos];
-            console.log(`🔄 Timers después de sincronización: ${timersFinal.length}`);
+            // console.log(`🔄 Timers después de sincronización: ${timersFinal.length}`);
             return timersFinal;
           });
         } else {
@@ -319,19 +320,15 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && isConnected) {
-        // console.log('👁️ Pestaña visible, solicitando sincronización...');
-        sendMessage({
-          type: 'REQUEST_SYNC'
-        });
+        // DESHABILITADO: No sincronizar automáticamente para evitar spam
+        // console.log('👁️ Pestaña visible');
       }
     };
 
     const handlePageShow = () => {
       if (isConnected) {
-        // console.log('🔄 Página mostrada, solicitando sincronización...');
-        sendMessage({
-          type: 'REQUEST_SYNC'
-        });
+        // DESHABILITADO: No sincronizar automáticamente para evitar spam  
+        // console.log('🔄 Página mostrada');
       }
     };
 
