@@ -8,7 +8,7 @@ import asyncio
 import json
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Set
 import uuid
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -22,6 +22,28 @@ logger = logging.getLogger(__name__)
 
 # Archivo de persistencia
 TIMERS_FILE = "timers_data.json"
+
+def get_utc_now():
+    """Obtener tiempo UTC actual con zona horaria"""
+    return datetime.now(timezone.utc)
+
+def parse_iso_datetime(iso_string):
+    """Parsear string ISO a datetime con zona horaria UTC"""
+    try:
+        # Si ya tiene zona horaria, usarla
+        if iso_string.endswith('Z'):
+            iso_string = iso_string[:-1] + '+00:00'
+        
+        dt = datetime.fromisoformat(iso_string)
+        
+        # Si no tiene zona horaria, asumir UTC
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        
+        return dt
+    except Exception as e:
+        logger.error(f"Error parseando fecha {iso_string}: {e}")
+        return get_utc_now()
 
 app = FastAPI(
     title="Timer Service",
@@ -49,6 +71,20 @@ class Timer(BaseModel):
     fechaFin: datetime
     activo: bool = True
     completado: bool = False
+    
+    def to_dict(self):
+        """Convertir a diccionario con fechas en formato ISO string"""
+        return {
+            "id": self.id,
+            "nombre": self.nombre,
+            "tipoOperacion": self.tipoOperacion,
+            "tiempoInicialMinutos": self.tiempoInicialMinutos,
+            "tiempoRestanteSegundos": self.tiempoRestanteSegundos,
+            "fechaInicio": self.fechaInicio.isoformat() if isinstance(self.fechaInicio, datetime) else self.fechaInicio,
+            "fechaFin": self.fechaFin.isoformat() if isinstance(self.fechaFin, datetime) else self.fechaFin,
+            "activo": self.activo,
+            "completado": self.completado
+        }
 
 class WebSocketMessage(BaseModel):
     type: str
@@ -68,17 +104,28 @@ class TimerManager:
         try:
             timers_data = {}
             for timer_id, timer in self.timers.items():
-                timers_data[timer_id] = {
+                timer_dict = {
                     "id": timer.id,
                     "nombre": timer.nombre,
                     "tipoOperacion": timer.tipoOperacion,
                     "tiempoInicialMinutos": timer.tiempoInicialMinutos,
                     "tiempoRestanteSegundos": timer.tiempoRestanteSegundos,
-                    "fechaInicio": timer.fechaInicio.isoformat(),
-                    "fechaFin": timer.fechaFin.isoformat(),
                     "activo": timer.activo,
                     "completado": timer.completado
                 }
+                
+                # Manejar fechas de forma segura
+                if isinstance(timer.fechaInicio, datetime):
+                    timer_dict["fechaInicio"] = timer.fechaInicio.isoformat()
+                else:
+                    timer_dict["fechaInicio"] = str(timer.fechaInicio)
+                    
+                if isinstance(timer.fechaFin, datetime):
+                    timer_dict["fechaFin"] = timer.fechaFin.isoformat()
+                else:
+                    timer_dict["fechaFin"] = str(timer.fechaFin)
+                
+                timers_data[timer_id] = timer_dict
             
             with open(TIMERS_FILE, 'w') as f:
                 json.dump(timers_data, f, indent=2)
@@ -96,12 +143,14 @@ class TimerManager:
             with open(TIMERS_FILE, 'r') as f:
                 timers_data = json.load(f)
             
+            current_time = get_utc_now()
+            
             for timer_id, timer_dict in timers_data.items():
-                timer_dict['fechaInicio'] = datetime.fromisoformat(timer_dict['fechaInicio'])
-                timer_dict['fechaFin'] = datetime.fromisoformat(timer_dict['fechaFin'])
+                # Parsear fechas con zona horaria
+                timer_dict['fechaInicio'] = parse_iso_datetime(timer_dict['fechaInicio'])
+                timer_dict['fechaFin'] = parse_iso_datetime(timer_dict['fechaFin'])
                 
                 # Recalcular tiempo restante basado en tiempo actual
-                current_time = datetime.utcnow()
                 tiempo_restante_ms = (timer_dict['fechaFin'] - current_time).total_seconds()
                 timer_dict['tiempoRestanteSegundos'] = max(0, int(tiempo_restante_ms))
                 
@@ -117,66 +166,6 @@ class TimerManager:
         except Exception as e:
             logger.error(f"Error cargando timers: {e}")
         
-        self.load_timers_from_file()
-        
-    def save_timers_to_file(self):
-        """Guardar timers en archivo JSON"""
-        try:
-            timers_data = {}
-            for timer_id, timer in self.timers.items():
-                timers_data[timer_id] = {
-                    "id": timer.id,
-                    "nombre": timer.nombre,
-                    "tipoOperacion": timer.tipoOperacion,
-                    "tiempoInicialMinutos": timer.tiempoInicialMinutos,
-                    "tiempoRestanteSegundos": timer.tiempoRestanteSegundos,
-                    "fechaInicio": timer.fechaInicio.isoformat(),
-                    "fechaFin": timer.fechaFin.isoformat(),
-                    "activo": timer.activo,
-                    "completado": timer.completado
-                }
-            
-            with open(TIMERS_FILE, 'w') as f:
-                json.dump(timers_data, f, indent=2)
-            logger.info(f"Timers guardados en archivo: {len(timers_data)} timers")
-        except Exception as e:
-            logger.error(f"Error guardando timers: {e}")
-    
-    def load_timers_from_file(self):
-        """Cargar timers desde archivo JSON"""
-        try:
-            if os.path.exists(TIMERS_FILE):
-                with open(TIMERS_FILE, 'r') as f:
-                    timers_data = json.load(f)
-                
-                current_time = datetime.utcnow()
-                for timer_id, timer_dict in timers_data.items():
-                    # Recalcular tiempo restante basado en fechas
-                    fecha_fin = datetime.fromisoformat(timer_dict['fechaFin'])
-                    tiempo_restante_ms = (fecha_fin - current_time).total_seconds()
-                    nuevo_tiempo_restante = max(0, int(tiempo_restante_ms))
-                    
-                    timer = Timer(
-                        id=timer_dict['id'],
-                        nombre=timer_dict['nombre'],
-                        tipoOperacion=timer_dict['tipoOperacion'],
-                        tiempoInicialMinutos=timer_dict['tiempoInicialMinutos'],
-                        tiempoRestanteSegundos=nuevo_tiempo_restante,
-                        fechaInicio=datetime.fromisoformat(timer_dict['fechaInicio']),
-                        fechaFin=datetime.fromisoformat(timer_dict['fechaFin']),
-                        activo=nuevo_tiempo_restante > 0 and timer_dict['activo'],
-                        completado=nuevo_tiempo_restante == 0 or timer_dict['completado']
-                    )
-                    
-                    self.timers[timer_id] = timer
-                
-                logger.info(f"Timers cargados desde archivo: {len(self.timers)} timers")
-            else:
-                logger.info("No se encontró archivo de timers, iniciando con estado vacío")
-        except Exception as e:
-            logger.error(f"Error cargando timers: {e}")
-            self.timers = {}
-        
     async def add_connection(self, websocket: WebSocket):
         """Agregar nueva conexión WebSocket"""
         self.connections.add(websocket)
@@ -186,7 +175,7 @@ class TimerManager:
         await self.send_to_client(websocket, {
             "type": "TIMER_SYNC",
             "data": {
-                "timers": [timer.dict() for timer in self.timers.values()]
+                "timers": [timer.to_dict() for timer in self.timers.values()]
             }
         })
         
@@ -230,6 +219,12 @@ class TimerManager:
             await self.update_timer(timer_id, timer_data, websocket)
             return
         
+        # Convertir fechas string a datetime con zona horaria
+        if 'fechaInicio' in timer_data and isinstance(timer_data['fechaInicio'], str):
+            timer_data['fechaInicio'] = parse_iso_datetime(timer_data['fechaInicio'])
+        if 'fechaFin' in timer_data and isinstance(timer_data['fechaFin'], str):
+            timer_data['fechaFin'] = parse_iso_datetime(timer_data['fechaFin'])
+        
         timer = Timer(**timer_data)
         self.timers[timer.id] = timer
         
@@ -241,7 +236,7 @@ class TimerManager:
         # Broadcast a todos los clientes excepto el que envió
         await self.broadcast({
             "type": "TIMER_CREATED",
-            "data": {"timer": timer.dict()}
+            "data": {"timer": timer.to_dict()}
         }, exclude=websocket)
         
     async def update_timer(self, timer_id: str, updates: Dict, websocket: Optional[WebSocket] = None):
@@ -263,7 +258,7 @@ class TimerManager:
         # Broadcast a todos los clientes excepto el que envió
         await self.broadcast({
             "type": "TIMER_UPDATED",
-            "data": {"timer": timer.dict()}
+            "data": {"timer": timer.to_dict()}
         }, exclude=websocket)
         
         return True
@@ -306,7 +301,7 @@ class TimerManager:
         save_counter = 0
         while self.running:
             try:
-                current_time = datetime.utcnow()
+                current_time = get_utc_now()
                 updated_timers = []
                 timers_changed = False
                 
@@ -397,7 +392,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await timer_manager.send_to_client(websocket, {
                     "type": "TIMER_SYNC",
                     "data": {
-                        "timers": [timer.dict() for timer in timer_manager.timers.values()]
+                        "timers": [timer.to_dict() for timer in timer_manager.timers.values()]
                     }
                 })
                 
@@ -438,14 +433,14 @@ async def health_check():
         "status": "healthy",
         "timers_count": len(timer_manager.timers),
         "connections_count": len(timer_manager.connections),
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": get_utc_now().isoformat()
     }
 
 @app.get("/timers")
 async def get_timers():
     """Obtener todos los timers (REST API)"""
     return {
-        "timers": [timer.dict() for timer in timer_manager.timers.values()],
+        "timers": [timer.to_dict() for timer in timer_manager.timers.values()],
         "count": len(timer_manager.timers)
     }
 

@@ -455,7 +455,13 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     if (isConnected) {
       sendMessage({
         type: 'CREATE_TIMER',
-        data: { timer: nuevoTimer }
+        data: { 
+          timer: {
+            ...nuevoTimer,
+            fechaInicio: nuevoTimer.fechaInicio.toISOString(),
+            fechaFin: nuevoTimer.fechaFin.toISOString()
+          }
+        }
       });
     }
     
