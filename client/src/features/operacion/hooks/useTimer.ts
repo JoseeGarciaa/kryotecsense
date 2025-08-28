@@ -171,9 +171,6 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       case 'TIMER_TIME_UPDATE':
         // Actualización de tiempo en tiempo real desde el servidor
         if (lastMessage.data.timerId && lastMessage.data.tiempoRestanteSegundos !== undefined) {
-          // Log temporal para debugging
-          console.log(`⏱️ Timer update: ${lastMessage.data.timerId} -> ${lastMessage.data.tiempoRestanteSegundos}s`);
-          
           setTimers(prev => prev.map(timer => {
             if (timer.id === lastMessage.data.timerId) {
               const nuevoTiempoRestante = lastMessage.data.tiempoRestanteSegundos;

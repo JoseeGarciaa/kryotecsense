@@ -235,14 +235,8 @@ async def timer_websocket_proxy(websocket: WebSocket):
                 while True:
                     message = await websocket.receive_text()
                     await timer_ws.send(message)
-                    # Solo mostrar tipo de mensaje para reducir logs
-                    try:
-                        msg_data = json.loads(message)
-                        print(f"📤 Cliente -> Timer: {msg_data.get('type', 'UNKNOWN')}")
-                    except:
-                        print(f"📤 Cliente -> Timer: [mensaje no JSON]")
             except (WebSocketDisconnect, websockets.exceptions.ConnectionClosed):
-                print("🔌 Cliente desconectado del proxy")
+                pass
             except Exception as e:
                 print(f"❌ Error cliente->timer: {e}")
         
@@ -250,14 +244,8 @@ async def timer_websocket_proxy(websocket: WebSocket):
             try:
                 async for message in timer_ws:
                     await websocket.send_text(message)
-                    # Solo mostrar tipo de mensaje para reducir logs
-                    try:
-                        msg_data = json.loads(message)
-                        print(f"📥 Timer -> Cliente: {msg_data.get('type', 'UNKNOWN')}")
-                    except:
-                        print(f"📥 Timer -> Cliente: [mensaje no JSON]")
             except (WebSocketDisconnect, websockets.exceptions.ConnectionClosed):
-                print("🔌 Timer service desconectado del proxy")
+                pass
             except Exception as e:
                 print(f"❌ Error timer->cliente: {e}")
         

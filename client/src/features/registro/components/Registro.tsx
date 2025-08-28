@@ -28,6 +28,9 @@ const Registro: React.FC = () => {
 
   // Sistema anti-duplicados con delay muy corto (100ms) solo para evitar doble-procesamiento accidental
   const { isDuplicate, clearHistory } = useAntiDuplicate(100);
+  
+  // Ref adicional para prevenir RFID duplicados reales con delay más largo (1 segundo)
+  const lastRfidProcessedRef = useRef<{ rfid: string; timestamp: number } | null>(null);
 
   // Función debounced para verificar RFID en base de datos
   const verificarRfidDebounced = useDebouncedCallback(async (rfid: string) => {
@@ -116,6 +119,20 @@ const Registro: React.FC = () => {
       setRfidInput('');
       return;
     }
+
+    // Verificar RFID duplicado real con delay más largo (1 segundo)
+    const now = Date.now();
+    const lastRfidProcessed = lastRfidProcessedRef.current;
+    
+    if (lastRfidProcessed && lastRfidProcessed.rfid === rfidLimpio && (now - lastRfidProcessed.timestamp) < 1000) {
+      console.log(`🚫 RFID duplicado real bloqueado: ${rfidLimpio} (${now - lastRfidProcessed.timestamp}ms después)`);
+      setError(`RFID ${rfidLimpio} ya fue procesado recientemente. Espere un momento antes de volver a escanearlo.`);
+      setRfidInput('');
+      return;
+    }
+
+    // Registrar este RFID como procesado
+    lastRfidProcessedRef.current = { rfid: rfidLimpio, timestamp: now };
 
     // Verificar que no esté duplicado localmente en esta sesión
     if (lecturasRfid.some((lectura: any) => lectura.rfid === rfidLimpio)) {

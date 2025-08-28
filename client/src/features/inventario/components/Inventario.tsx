@@ -90,29 +90,59 @@ const Inventario: React.FC = () => {
           try {
             await apiServiceClient.delete(`/inventory/inventario/${id}`);
             return { id, success: true };
-          } catch (error) {
+          } catch (error: any) {
             console.error(`Error eliminando item ${id}:`, error);
-            return { id, success: false, error };
+            let errorMessage = 'Error desconocido';
+            
+            if (error.response) {
+              // Error del servidor con respuesta
+              if (error.response.status === 404) {
+                errorMessage = 'Item no encontrado o ya eliminado';
+              } else if (error.response.status === 409) {
+                errorMessage = 'Item en uso en proceso activo';
+              } else if (error.response.data?.detail) {
+                errorMessage = error.response.data.detail;
+              } else {
+                errorMessage = `Error HTTP ${error.response.status}`;
+              }
+            } else if (error.message) {
+              errorMessage = error.message;
+            }
+            
+            return { id, success: false, error: errorMessage };
           }
         })
       );
       
       // Analizar resultados
-      const exitosos = resultados.filter(r => r.status === 'fulfilled' && r.value.success).length;
-      const fallidos = resultados.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)).length;
+      const exitosos = resultados.filter(r => r.status === 'fulfilled' && r.value.success);
+      const fallidos = resultados.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success));
       
-      if (exitosos > 0) {
+      if (exitosos.length > 0) {
         // Limpiar selecciones y recargar inventario
         setItemsSeleccionados(new Set());
         setMostrarConfirmacionEliminacion(false);
         setError(null);
         await fetchInventario();
         
-        if (fallidos > 0) {
-          setError(`Se eliminaron ${exitosos} items. ${fallidos} items no pudieron ser eliminados.`);
+        if (fallidos.length > 0) {
+          // Mostrar detalles de los errores
+          const erroresDetallados = fallidos.map((r: any) => {
+            if (r.status === 'fulfilled' && !r.value.success) {
+              return `ID ${r.value.id}: ${r.value.error}`;
+            }
+            return 'Error desconocido';
+          }).join('; ');
+          
+          setError(`Se eliminaron ${exitosos.length} items. ${fallidos.length} items fallaron: ${erroresDetallados}`);
         }
       } else {
-        setError('No se pudo eliminar ningún item. Verifique que los items no estén siendo utilizados en procesos activos.');
+        // Ningún item se eliminó exitosamente
+        const primerError = fallidos.length > 0 && fallidos[0].status === 'fulfilled' && !(fallidos[0] as any).value.success 
+          ? (fallidos[0] as any).value.error 
+          : 'Error desconocido';
+        
+        setError(`No se pudo eliminar ningún item. ${primerError}`);
       }
       
     } catch (err) {
