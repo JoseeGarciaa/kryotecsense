@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Scan, Plus, Loader, ChevronDown, Menu, Play, Pause, Edit, Trash2, Search, CheckCircle, X } from 'lucide-react';
 import { useOperaciones } from '../hooks/useOperaciones';
 import RfidScanModal from './RfidScanModal';
@@ -505,20 +505,47 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     }
   };
 
-  // Función para limpiar timer
-  const limpiarTimer = async (timerId: string) => {
+  // Estado para prevenir clics múltiples en botones de limpiar
+  const [botonesLimpiandoSet, setBotonesLimpiandoSet] = useState<Set<string>>(new Set());
+
+  // Función para limpiar timer con debounce
+  const limpiarTimerConDebounce = useCallback(async (timerId: string, rfid: string) => {
+    // Prevenir múltiples clics del mismo botón
+    if (botonesLimpiandoSet.has(timerId)) {
+      console.log(`⚠️ Timer ${timerId} ya está siendo limpiado, ignorando clic múltiple`);
+      return;
+    }
+
     try {
-      console.log(`🧹 Limpiando timer ${timerId}`);
+      // Marcar como "limpiando" para prevenir clics múltiples
+      setBotonesLimpiandoSet(prev => new Set(prev).add(timerId));
+      
+      console.log(`🧹 Limpiando timer individual: ${timerId} - ${rfid}`);
       
       // Eliminar el timer
       eliminarTimer(timerId);
       
       console.log('✅ Timer limpiado exitosamente');
       
+      // Limpiar estado después de un breve delay
+      setTimeout(() => {
+        setBotonesLimpiandoSet(prev => {
+          const nuevo = new Set(prev);
+          nuevo.delete(timerId);
+          return nuevo;
+        });
+      }, 1000);
+      
     } catch (error) {
       console.error('❌ Error al limpiar timer:', error);
+      // Limpiar estado en caso de error también
+      setBotonesLimpiandoSet(prev => {
+        const nuevo = new Set(prev);
+        nuevo.delete(timerId);
+        return nuevo;
+      });
     }
-  };
+  }, [eliminarTimer, botonesLimpiandoSet]);
 
   // Función para limpiar todos los timers completados
   const limpiarTodosLosTimersCompletados = async () => {
@@ -582,14 +609,19 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                e.preventDefault();
                 const confirmar = window.confirm(`¿Limpiar el timer completado de ${rfid}?`);
                 if (confirmar) {
-                  console.log(`🧹 Limpiando timer individual: ${timerCompletado.id} - ${rfid}`);
-                  eliminarTimer(timerCompletado.id);
+                  limpiarTimerConDebounce(timerCompletado.id, rfid);
                 }
               }}
-              className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
-              title="Limpiar"
+              disabled={botonesLimpiandoSet.has(timerCompletado.id)}
+              className={`p-1.5 rounded text-xs transition-colors ${
+                botonesLimpiandoSet.has(timerCompletado.id) 
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+              }`}
+              title={botonesLimpiandoSet.has(timerCompletado.id) ? "Limpiando..." : "Limpiar"}
             >
               <X className="w-3 h-3" />
             </button>

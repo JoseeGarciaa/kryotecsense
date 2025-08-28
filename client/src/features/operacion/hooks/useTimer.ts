@@ -201,6 +201,16 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   // Solicitar sincronización inicial cuando se conecte
   useEffect(() => {
     if (isConnected && isInitialized) {
+      console.log('🔄 WebSocket conectado, solicitando sincronización...');
+      
+      // Resetear timestamps de WebSocket en todos los timers para que el interval local tome control inmediatamente
+      setTimers(prevTimers => 
+        prevTimers.map(timer => ({
+          ...timer,
+          lastWebSocketUpdate: 0 // Resetear para que el interval local funcione
+        }))
+      );
+      
       sendMessage({
         type: 'REQUEST_SYNC'
       });
@@ -299,11 +309,13 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
           const ultimaActualizacionWS = (timer as any).lastWebSocketUpdate || 0;
           const tiempoDesdeLaUltimaActualizacion = ahora - ultimaActualizacionWS;
           
-          // Si estamos conectados al WebSocket y la última actualización fue hace menos de 3 segundos, no actualizar
-          if (isConnected && tiempoDesdeLaUltimaActualizacion < 3000) {
+          // Si estamos conectados al WebSocket y la última actualización fue hace menos de 2 segundos, no actualizar
+          // Reducido de 3 a 2 segundos para que el interval local tome control más rápido
+          if (isConnected && tiempoDesdeLaUltimaActualizacion < 2000) {
             return timer;
           }
           
+          // Si no hay WebSocket o no ha habido actualizaciones recientes, el interval local toma control
           const nuevoTiempoRestante = Math.max(0, timer.tiempoRestanteSegundos - 1);
           const completado = nuevoTiempoRestante === 0;
           
