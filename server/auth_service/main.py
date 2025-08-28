@@ -355,6 +355,7 @@ class TimerManager:
     async def tick_timers(self):
         """Actualizar todos los timers activos cada segundo"""
         save_counter = 0
+        timer_logger.info("tick_timers iniciado - comenzando loop de actualización")
         while self.running:
             try:
                 current_time = datetime.utcnow()
@@ -391,6 +392,7 @@ class TimerManager:
                 
                 # Enviar actualizaciones para todos los timers activos
                 if updated_timers:
+                    timer_logger.info(f"Enviando {len(updated_timers)} actualizaciones de timer a {len(self.connections)} clientes")
                     for update in updated_timers:
                         await self.broadcast({
                             "type": "TIMER_TIME_UPDATE",
@@ -402,6 +404,10 @@ class TimerManager:
                 if timers_changed and save_counter >= 30:
                     self.save_timers_to_file()
                     save_counter = 0
+                
+                # Log periódico cada 10 segundos para confirmar que el loop funciona
+                if save_counter % 10 == 0:
+                    timer_logger.info(f"tick_timers activo - {len(self.timers)} timers, {len(self.connections)} conexiones")
                 
                 await asyncio.sleep(1)  # Actualizar cada segundo
                 
