@@ -48,8 +48,16 @@ export const useDashboardData = (): UseDashboardDataReturn => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // WebSocket connection
-  const { isConnected, lastMessage } = useWebSocket('ws://localhost:8000/ws/operaciones/');
+  // WebSocket connection - derive from env (backend provides /ws/timers)
+  const deriveWsUrl = () => {
+    const explicit = import.meta.env.VITE_TIMER_WS_URL as string | undefined;
+    if (explicit) return explicit;
+    const api = (import.meta.env.VITE_API_URL as string | undefined) || 'http://localhost:8001';
+    const base = api.replace(/\/?$/,'');
+    const wsBase = base.startsWith('https') ? base.replace('https','wss') : base.replace('http','ws');
+    return `${wsBase}/ws/timers`;
+  };
+  const { isConnected, lastMessage } = useWebSocket(deriveWsUrl());
 
   const fetchMetrics = async () => {
     try {
