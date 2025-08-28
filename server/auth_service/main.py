@@ -1965,6 +1965,58 @@ def change_password_temp(usuario_id: int, password_data: dict = Body(...), db: S
 def health_check():
     return {"status": "ok", "service": "auth_service"}
 
+# =========================
+# Aliases bajo /api/auth/* para compatibilidad con el cliente
+# (delegan a los handlers existentes ya multitenant)
+# =========================
+
+@app.get("/api/auth/usuarios/", response_model=List[UsuarioSchema])
+def api_alias_get_users(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    return get_users(skip=skip, limit=limit, db=db, current_user=current_user)
+
+
+@app.post("/api/auth/usuarios/", response_model=UsuarioSchema, status_code=status.HTTP_201_CREATED)
+def api_alias_create_user(
+    usuario: UsuarioCreate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    return create_user_multitenant(usuario=usuario, db=db, current_user=current_user)
+
+
+@app.put("/api/auth/usuarios/{usuario_id}", response_model=UsuarioSchema)
+def api_alias_update_user(
+    usuario_id: int,
+    usuario: UsuarioUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    return update_user_multitenant(usuario_id=usuario_id, usuario=usuario, db=db, current_user=current_user)
+
+
+@app.delete("/api/auth/usuarios/{usuario_id}", status_code=status.HTTP_200_OK)
+def api_alias_delete_user(
+    usuario_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    return delete_user_multitenant(usuario_id=usuario_id, db=db, current_user=current_user)
+
+
+@app.put("/api/auth/usuarios/change-password/{usuario_id}")
+def api_alias_change_password(
+    usuario_id: int,
+    password_data: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    return change_password_multitenant(usuario_id=usuario_id, password_data=password_data, db=db, current_user=current_user)
+
 # Endpoint de diagnóstico: lista los esquemas tenant detectados y el tenant por defecto
 @app.get("/tenants")
 def list_tenants(db: Session = Depends(get_db)):
