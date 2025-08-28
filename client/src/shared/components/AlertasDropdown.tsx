@@ -123,34 +123,38 @@ const AlertasDropdown: React.FC<AlertasDropdownProps> = ({ className = '' }) => 
 
       {/* Dropdown de alertas */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 overflow-hidden">
-          {/* Header */}
-          <div className="px-4 py-3 border-b border-gray-200">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-semibold text-gray-900">Alertas</h3>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsOpen(false);
-                }}
-                className="text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <X size={18} />
-              </button>
+        <>
+          {/* Overlay para móvil */}
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden" onClick={() => setIsOpen(false)} />
+          
+          <div className="fixed inset-x-4 top-16 sm:absolute sm:right-0 sm:top-full sm:mt-2 sm:inset-x-auto sm:w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-hidden">
+            {/* Header */}
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Alertas</h3>
+                <button
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    setIsOpen(false);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
-            
-            {/* Eliminado: selección múltiple y controles relacionados */}
-          </div>
 
           {/* Lista de alertas */}
           <div className="max-h-80 overflow-y-auto">
             {cargando ? (
-              <div className="p-4 text-center text-gray-500">
+              <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
                 Cargando alertas...
               </div>
             ) : alertas.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">
-                No hay alertas
+              <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                <Bell className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                <p>No hay alertas</p>
               </div>
             ) : (
               alertas.slice(0, 10).map((alerta: Alerta) => {
@@ -161,32 +165,32 @@ const AlertasDropdown: React.FC<AlertasDropdownProps> = ({ className = '' }) => 
                 return (
                   <div
                     key={alerta.id}
-                    className={`p-3 border-l-4 ${colorClass} ${!alerta.resuelta ? 'font-medium' : 'opacity-75'} hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}
+                    className={`p-3 border-l-4 ${colorClass} dark:bg-gray-700 dark:border-opacity-50 ${!alerta.resuelta ? 'font-medium' : 'opacity-75'} hover:bg-gray-50 dark:hover:bg-gray-600 ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''} transition-colors`}
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-2 sm:gap-3">
                       <button
                         onClick={() => handleSelectAlerta(alerta.id, !isSelected)}
-                        className="mt-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="mt-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 flex-shrink-0"
                       >
                         {isSelected ? (
                           <CheckCircle size={16} className="text-blue-600" />
                         ) : (
-                          <div className="w-4 h-4 border-2 border-gray-300 rounded"></div>
+                          <div className="w-4 h-4 border-2 border-gray-300 dark:border-gray-600 rounded"></div>
                         )}
                       </button>
-                      <Icon size={16} className="mt-1 text-gray-600 flex-shrink-0" />
+                      <Icon size={16} className="mt-1 text-gray-600 dark:text-gray-400 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-900 mb-1">
+                        <p className="text-sm text-gray-900 dark:text-white mb-1 break-words">
                           {alerta.descripcion}
                         </p>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-500">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
                             {formatearFecha(alerta.fecha_creacion)}
                           </span>
                           {!alerta.resuelta && !isSelected && (
                             <button
-                              onClick={(e) => handleMarcarResuelta(alerta.id, e)}
-                              className="text-xs text-green-600 hover:text-green-800 flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-green-500 rounded px-2 py-1"
+                              onClick={(e: React.MouseEvent) => handleMarcarResuelta(alerta.id, e)}
+                              className="text-xs text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-green-500 rounded px-2 py-1 self-start sm:self-auto transition-colors"
                               title="Marcar como resuelta"
                             >
                               <CheckCircle size={12} />
@@ -204,13 +208,14 @@ const AlertasDropdown: React.FC<AlertasDropdownProps> = ({ className = '' }) => 
 
           {/* Footer */}
           {alertas.length > 10 && (
-            <div className="px-4 py-2 border-t border-gray-200 text-center">
-              <span className="text-xs text-gray-500">
+            <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700 text-center">
+              <span className="text-xs text-gray-500 dark:text-gray-400">
                 Mostrando 10 de {alertas.length} alertas
               </span>
             </div>
           )}
         </div>
+        </>
       )}
 
     </div>

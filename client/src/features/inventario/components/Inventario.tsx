@@ -15,6 +15,7 @@ const Inventario: React.FC = () => {
   const [paginaActual, setPaginaActual] = useState(1);
   const [itemsSeleccionados, setItemsSeleccionados] = useState<Set<number>>(new Set());
   const [mostrarConfirmacionEliminacion, setMostrarConfirmacionEliminacion] = useState(false);
+  const [eliminandoItems, setEliminandoItems] = useState(false);
   const registrosPorPagina = 100;
 
   const fetchInventario = async () => {
@@ -80,6 +81,8 @@ const Inventario: React.FC = () => {
   const eliminarSeleccionados = async () => {
     if (itemsSeleccionados.size === 0) return;
     
+    setEliminandoItems(true);
+    
     try {
       // Eliminar cada item seleccionado
       const promesasEliminacion = Array.from(itemsSeleccionados).map(id =>
@@ -91,10 +94,14 @@ const Inventario: React.FC = () => {
       // Limpiar selecciones y recargar inventario
       setItemsSeleccionados(new Set());
       setMostrarConfirmacionEliminacion(false);
-      fetchInventario();
+      setError(null); // Limpiar cualquier error previo
+      await fetchInventario();
     } catch (err) {
       console.error('Error eliminando items:', err);
       setError('Error al eliminar los items seleccionados. Por favor, inténtelo de nuevo.');
+      // Mantener el modal abierto en caso de error para que el usuario pueda intentar de nuevo
+    } finally {
+      setEliminandoItems(false);
     }
   };
 
@@ -373,26 +380,42 @@ const Inventario: React.FC = () => {
 
       {/* Modal de confirmación para eliminación múltiple */}
       {mostrarConfirmacionEliminacion && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg max-w-md w-full">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Confirmar eliminación múltiple
             </h3>
             <p className="text-gray-600 dark:text-gray-300 mb-6">
               ¿Está seguro de que desea eliminar {itemsSeleccionados.size} registro{itemsSeleccionados.size !== 1 ? 's' : ''} seleccionado{itemsSeleccionados.size !== 1 ? 's' : ''}? Esta acción no se puede deshacer.
             </p>
+            
+            {/* Mostrar error si existe */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              </div>
+            )}
+            
             <div className="flex items-center justify-end gap-3">
               <button
-                onClick={() => setMostrarConfirmacionEliminacion(false)}
-                className="px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                onClick={() => {
+                  setMostrarConfirmacionEliminacion(false);
+                  setError(null); // Limpiar error al cancelar
+                }}
+                disabled={eliminandoItems}
+                className="px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>
               <button
                 onClick={eliminarSeleccionados}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                disabled={eliminandoItems}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                Eliminar {itemsSeleccionados.size} registro{itemsSeleccionados.size !== 1 ? 's' : ''}
+                {eliminandoItems && (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                )}
+                {eliminandoItems ? 'Eliminando...' : `Eliminar ${itemsSeleccionados.size} registro${itemsSeleccionados.size !== 1 ? 's' : ''}`}
               </button>
             </div>
           </div>

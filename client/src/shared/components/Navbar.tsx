@@ -516,56 +516,6 @@ const Navbar: React.FC<NavbarProps> = ({ seccionActiva, onSeccionChange, onCerra
                   );
                 })}
               </nav>
-              
-              {/* Footer del sidebar móvil - Información del usuario */}
-              <div className="border-t border-gray-200 dark:border-gray-700 p-4">
-                <div className="flex items-center">
-                  <div className="h-10 w-10 rounded-full bg-primary-100 dark:bg-primary-800 flex items-center justify-center">
-                    <User className="h-6 w-6 text-primary-600 dark:text-primary-300" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{nombreUsuario}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{usuario.correo}</p>
-                  </div>
-                </div>
-                
-                {/* Botones de acción rápida en el sidebar móvil */}
-                <div className="mt-3 space-y-1">
-                  <button
-                    onClick={() => { 
-                      onSeccionChange('configuracion'); 
-                      setMenuAbierto(false); 
-                    }}
-                    className="flex items-center w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded-md"
-                  >
-                    <Settings className="h-4 w-4 mr-3" />
-                    Configuración
-                  </button>
-                  <button
-                    onClick={() => { 
-                      alternarTema(); 
-                      setMenuUsuarioAbierto(false); 
-                    }}
-                    className="flex items-center w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded-md"
-                  >
-                    {tema === 'claro' ? 
-                      <Sun className="h-4 w-4 mr-3" /> : 
-                      <Moon className="h-4 w-4 mr-3" />
-                    }
-                    Modo {tema === 'claro' ? 'oscuro' : 'claro'}
-                  </button>
-                  <button
-                    onClick={() => { 
-                      onCerrarSesion(); 
-                      setMenuAbierto(false); 
-                    }}
-                    className="flex items-center w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-700 dark:hover:text-red-300 rounded-md"
-                  >
-                    <LogOut className="h-4 w-4 mr-3" />
-                    Cerrar sesión
-                  </button>
-                </div>
-              </div>
             </div>
           </>
         )}
