@@ -877,20 +877,20 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             <table className="w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-0">
-                    <div className="truncate">RFID</div>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div>RFID</div>
                   </th>
-                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-0">
-                    <div className="truncate">NOMBRE</div>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div>NOMBRE</div>
                   </th>
-                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-0">
-                    <div className="truncate">LOTE</div>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div>LOTE</div>
                   </th>
-                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-0">
-                    <div className="truncate">ESTADO</div>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div>ESTADO</div>
                   </th>
                   <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <div className="truncate">TIMER</div>
+                    <div>TIMER</div>
                   </th>
                 </tr>
               </thead>
@@ -907,21 +907,21 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 ) : ticsCongelamientoPaginados.length > 0 ? (
                   ticsCongelamientoPaginados.map((tic: TicItem) => (
                     <tr key={tic.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 text-xs font-medium text-gray-900 min-w-0">
-                        <div className="truncate max-w-20" title={tic.rfid}>{tic.rfid}</div>
+                      <td className="px-3 py-2 text-xs font-medium text-gray-900">
+                        <div title={tic.rfid}>{tic.rfid}</div>
                       </td>
-                      <td className="px-3 py-2 text-xs text-gray-900 min-w-0">
-                        <div className="truncate max-w-24" title={tic.nombre_unidad}>{tic.nombre_unidad}</div>
+                      <td className="px-3 py-2 text-xs text-gray-900">
+                        <div title={tic.nombre_unidad}>{tic.nombre_unidad}</div>
                       </td>
-                      <td className="px-3 py-2 text-xs text-gray-900 min-w-0">
-                        <div className="truncate max-w-16" title={tic.lote}>{tic.lote}</div>
+                      <td className="px-3 py-2 text-xs text-gray-900">
+                        <div title={tic.lote}>{tic.lote}</div>
                       </td>
-                      <td className="px-3 py-2 min-w-0">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 truncate max-w-20">
+                      <td className="px-3 py-2">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                           {tic.sub_estado}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-center min-w-0">
+                      <td className="px-3 py-2 text-center">
                         <div className="flex justify-center">
                           {renderizarTemporizador(tic.rfid)}
                         </div>
@@ -1105,20 +1105,20 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             <table className="w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-0">
-                    <div className="truncate">RFID</div>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div>RFID</div>
                   </th>
-                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-0">
-                    <div className="truncate">NOMBRE</div>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div>NOMBRE</div>
                   </th>
-                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-0">
-                    <div className="truncate">LOTE</div>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div>LOTE</div>
                   </th>
-                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-0">
-                    <div className="truncate">ESTADO</div>
+                  <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div>ESTADO</div>
                   </th>
                   <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <div className="truncate">TIMER</div>
+                    <div>TIMER</div>
                   </th>
                 </tr>
               </thead>
@@ -1135,21 +1135,21 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 ) : ticsAtemperamientoPaginados.length > 0 ? (
                   ticsAtemperamientoPaginados.map((tic: TicItem) => (
                     <tr key={tic.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 text-xs font-medium text-gray-900 min-w-0">
-                        <div className="truncate max-w-20" title={tic.rfid}>{tic.rfid}</div>
+                      <td className="px-3 py-2 text-xs font-medium text-gray-900">
+                        <div title={tic.rfid}>{tic.rfid}</div>
                       </td>
-                      <td className="px-3 py-2 text-xs text-gray-900 min-w-0">
-                        <div className="truncate max-w-24" title={tic.nombre_unidad}>{tic.nombre_unidad}</div>
+                      <td className="px-3 py-2 text-xs text-gray-900">
+                        <div title={tic.nombre_unidad}>{tic.nombre_unidad}</div>
                       </td>
-                      <td className="px-3 py-2 text-xs text-gray-900 min-w-0">
-                        <div className="truncate max-w-16" title={tic.lote}>{tic.lote}</div>
+                      <td className="px-3 py-2 text-xs text-gray-900">
+                        <div title={tic.lote}>{tic.lote}</div>
                       </td>
-                      <td className="px-3 py-2 min-w-0">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 truncate max-w-20">
+                      <td className="px-3 py-2">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
                           {tic.sub_estado}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-center min-w-0">
+                      <td className="px-3 py-2 text-center">
                         <div className="flex justify-center">
                           {renderizarTemporizador(tic.rfid, true)}
                         </div>

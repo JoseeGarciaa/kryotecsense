@@ -158,7 +158,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
 
       case 'TIMER_TIME_UPDATE':
         // Actualización de tiempo en tiempo real desde el servidor
-        // Priorizar las actualizaciones del servidor para evitar conflictos
+        // El WebSocket es la fuente de verdad cuando está conectado
         if (lastMessage.data.timerId && lastMessage.data.tiempoRestanteSegundos !== undefined) {
           setTimers(prev => prev.map(timer => {
             if (timer.id === lastMessage.data.timerId) {
@@ -183,8 +183,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
                 ...timer,
                 tiempoRestanteSegundos: nuevoTiempoRestante,
                 completado,
-                activo: !completado && timer.activo,
-                lastWebSocketUpdate: Date.now() // Marcar última actualización WebSocket
+                activo: !completado && timer.activo
               };
             }
             return timer;
@@ -287,22 +286,17 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     };
   }, [isConnected, sendMessage]);
 
-  // Actualizar timers cada segundo (SIEMPRE, como backup)
+  // Actualizar timers cada segundo (solo cuando NO hay conexión WebSocket)
   useEffect(() => {
+    // Solo ejecutar interval local si NO estamos conectados al WebSocket
+    if (isConnected) {
+      return; // Si hay WebSocket, que se encargue el servidor
+    }
+
     const interval = setInterval(() => {
       setTimers(prevTimers => 
         prevTimers.map(timer => {
           if (!timer.activo || timer.completado) return timer;
-          
-          // Si el timer recibió una actualización WebSocket reciente (menos de 2 segundos), no actualizar localmente
-          const ahora = Date.now();
-          const tiempoUltimaActualizacionWS = (timer as any).lastWebSocketUpdate || 0;
-          const tiempoDesdeUltimaActualizacionWS = ahora - tiempoUltimaActualizacionWS;
-          
-          if (tiempoDesdeUltimaActualizacionWS < 2000) {
-            // WebSocket actualizó recientemente, no hacer nada
-            return timer;
-          }
           
           const nuevoTiempoRestante = Math.max(0, timer.tiempoRestanteSegundos - 1);
           const completado = nuevoTiempoRestante === 0;
@@ -331,7 +325,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [onTimerComplete]);
+  }, [onTimerComplete, isConnected]); // Agregar isConnected como dependencia
 
   const mostrarNotificacionCompletado = async (timer: Timer) => {
     // Notificación del navegador
