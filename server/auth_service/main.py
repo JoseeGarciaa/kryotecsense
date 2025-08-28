@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from contextlib import asynccontextmanager
 
 def get_user_by_email(db: Session, correo: str):
     tenant_schemas = get_tenant_schemas(db)
@@ -409,7 +410,7 @@ class TimerManager:
                 await asyncio.sleep(1)
 
 
-# Instancia global del timer manager
+# Variable global para el timer manager - Inicializar inmediatamente
 timer_manager = TimerManager()
 
 
@@ -2540,19 +2541,12 @@ def who_am_i(current_user: dict = Depends(get_current_user_from_token)):
     """Devuelve los datos decodificados del token (correo, id, rol, tenant)."""
     return current_user
 
-# Timer service startup/shutdown events
+# Timer service startup event
 @app.on_event("startup")
 async def startup_event():
     """Iniciar el loop de actualización de timers"""
     asyncio.create_task(timer_manager.tick_timers())
-    timer_logger.info("Servicio de timers iniciado")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Detener el servicio y guardar timers"""
-    timer_manager.running = False
-    timer_manager.save_timers_to_file()
-    timer_logger.info("Servicio de timers detenido y timers guardados")
+    timer_logger.info("Servicio de timers iniciado con background task")
 
 # Health check endpoint for timers
 @app.get("/api/timers/health")

@@ -100,8 +100,6 @@ export const useReportsData = (): UseReportsDataReturn => {
   // Handle WebSocket messages for real-time updates
   useEffect(() => {
     if (lastMessage) {
-      console.log('📨 Mensaje WebSocket recibido en reportes:', lastMessage);
-      
       // Refresh data when receiving updates
       if (lastMessage.type === 'inventory_update' || 
           lastMessage.type === 'validation_update' ||

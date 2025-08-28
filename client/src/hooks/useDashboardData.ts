@@ -116,8 +116,6 @@ export const useDashboardData = (): UseDashboardDataReturn => {
   // Handle WebSocket messages for real-time updates
   useEffect(() => {
     if (lastMessage) {
-      console.log('📨 Mensaje WebSocket recibido:', lastMessage);
-      
       // Refresh data when receiving updates
       if (lastMessage.type === 'inventory_update' || 
           lastMessage.type === 'process_update' ||
