@@ -99,11 +99,12 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         // Sincronizar todos los timers desde el servidor
         console.log('✅ Respuesta de sincronización recibida del servidor');
         
-        // Limpiar timeout de sincronización
+        // Limpiar timeout de sincronización y resetear estado
         if (syncTimeoutId) {
           clearTimeout(syncTimeoutId);
           setSyncTimeoutId(null);
         }
+        setSyncRequested(false); // Permitir nueva sincronización si es necesario
         
         if (lastMessage.data.timers) {
           const timersDelServidor = lastMessage.data.timers.map((timer: any) => ({
@@ -213,11 +214,16 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
 
   // Estado para manejar timeouts de sincronización
   const [syncTimeoutId, setSyncTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [syncRequested, setSyncRequested] = useState(false);
 
   // Solicitar sincronización inicial cuando se conecte
   useEffect(() => {
-    if (isConnected && isInitialized) {
-      console.log('🔄 WebSocket conectado, solicitando sincronización...');
+    if (isConnected && isInitialized && !syncRequested) {
+      // Solo log en primera conexión para evitar spam
+      if (!syncRequested) {
+        console.log('🔄 WebSocket conectado, solicitando sincronización...');
+      }
+      setSyncRequested(true);
       
       // Resetear timestamps de WebSocket en todos los timers para que el interval local tome control inmediatamente
       setTimers(prevTimers => 
@@ -233,33 +239,41 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       }
       
       // Esperar un poco antes de solicitar sincronización para evitar conflictos
-      setTimeout(() => {
-        console.log('📡 Enviando REQUEST_SYNC al servidor...');
-        sendMessage({
-          type: 'REQUEST_SYNC'
-        });
-        
-        // Configurar timeout para la sincronización
-        const timeoutId = setTimeout(() => {
-          console.log('⏰ Timeout de sincronización - continuando con timers locales');
-          // No hacer nada especial, los timers locales seguirán funcionando
-        }, 5000); // 5 segundos de timeout
-        
-        setSyncTimeoutId(timeoutId);
+      const requestTimeout = setTimeout(() => {
+        if (isConnected) { // Solo enviar si aún estamos conectados
+          console.log('📡 Enviando REQUEST_SYNC al servidor...');
+          sendMessage({
+            type: 'REQUEST_SYNC'
+          });
+          
+          // Configurar timeout para la sincronización (una sola vez)
+          const timeoutId = setTimeout(() => {
+            console.log('⏰ Timeout de sincronización - continuando con timers locales');
+            setSyncRequested(false); // Permitir nueva sincronización en próxima conexión
+            setSyncTimeoutId(null);
+          }, 5000); // 5 segundos de timeout
+          
+          setSyncTimeoutId(timeoutId);
+        }
       }, 500);
-      
-      // NO enviar timers locales automáticamente para evitar errores de formato
-      // Los timers se crearán manualmente cuando sea necesario
     }
     
-    // Limpiar timeout al desconectar
-    return () => {
+    // Reset sync state cuando se desconecta
+    if (!isConnected) {
+      setSyncRequested(false);
       if (syncTimeoutId) {
         clearTimeout(syncTimeoutId);
         setSyncTimeoutId(null);
       }
+    }
+    
+    // Limpiar timeout al desmontar
+    return () => {
+      if (syncTimeoutId) {
+        clearTimeout(syncTimeoutId);
+      }
     };
-  }, [isConnected, isInitialized, sendMessage]);
+  }, [isConnected, isInitialized, sendMessage, syncRequested]);
 
   // Cargar timers del localStorage cuando no hay conexión WebSocket (fallback)
   useEffect(() => {
