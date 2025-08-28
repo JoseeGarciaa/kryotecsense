@@ -259,10 +259,12 @@ class TimerManager:
         disconnected = set()
         
         if not self.connections:
-            timer_logger.info("No hay conexiones WebSocket activas para broadcast")
+            # Solo log ocasional para reducir spam
             return
             
-        timer_logger.info(f"Broadcasting mensaje tipo '{message.get('type')}' a {len(self.connections)} conexiones")
+        # Solo log para mensajes importantes, no para TIMER_TIME_UPDATE
+        if message.get('type') != 'TIMER_TIME_UPDATE':
+            timer_logger.info(f"Broadcasting mensaje tipo '{message.get('type')}' a {len(self.connections)} conexiones")
         
         for connection in self.connections:
             if connection == exclude:
@@ -361,6 +363,7 @@ class TimerManager:
     async def tick_timers(self):
         """Actualizar todos los timers activos cada segundo"""
         save_counter = 0
+        log_counter = 0
         timer_logger.info("tick_timers iniciado - comenzando loop de actualización")
         while self.running:
             try:
@@ -398,7 +401,10 @@ class TimerManager:
                 
                 # Enviar actualizaciones para todos los timers activos
                 if updated_timers:
-                    timer_logger.info(f"Enviando {len(updated_timers)} actualizaciones de timer a {len(self.connections)} clientes")
+                    # Solo log cada 10 segundos para evitar spam
+                    if log_counter % 10 == 0:
+                        timer_logger.info(f"Enviando {len(updated_timers)} actualizaciones de timer a {len(self.connections)} clientes")
+                    
                     for update in updated_timers:
                         await self.broadcast({
                             "type": "TIMER_TIME_UPDATE",
@@ -411,9 +417,11 @@ class TimerManager:
                     self.save_timers_to_file()
                     save_counter = 0
                 
-                # Log periódico cada 10 segundos para confirmar que el loop funciona
-                if save_counter % 10 == 0:
+                # Log periódico cada 30 segundos para reducir spam
+                log_counter += 1
+                if log_counter % 30 == 0:
                     timer_logger.info(f"tick_timers activo - {len(self.timers)} timers, {len(self.connections)} conexiones")
+                    log_counter = 0
                 
                 await asyncio.sleep(1)  # Actualizar cada segundo
                 

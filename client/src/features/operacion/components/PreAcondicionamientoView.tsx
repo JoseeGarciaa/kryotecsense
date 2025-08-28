@@ -478,7 +478,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
           // Crear nuevo timer para el siguiente estado
           const tipoOperacion = siguienteSubEstado.toLowerCase() as 'congelamiento' | 'atemperamiento' | 'envio';
           const timerId = crearTimer(
-            `TIC ${rfid}`,
+            rfid, // Usar solo el RFID sin "TIC"
             tipoOperacion,
             tiempoNuevo
           );
@@ -502,6 +502,56 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     } catch (error) {
       console.error('❌ Error al completar TIC:', error);
       alert(`Error al completar el TIC ${rfid}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
+  };
+
+  // Función para limpiar timer y recargar datos
+  const limpiarTimer = async (timerId: string) => {
+    try {
+      console.log(`🧹 Limpiando timer ${timerId}`);
+      
+      // Eliminar el timer
+      eliminarTimer(timerId);
+      
+      // Esperar un poco y luego recargar datos
+      setTimeout(async () => {
+        console.log('🔄 Recargando datos después de limpiar timer...');
+        await cargarDatos();
+      }, 500);
+      
+    } catch (error) {
+      console.error('❌ Error al limpiar timer:', error);
+    }
+  };
+
+  // Función para limpiar todos los timers completados
+  const limpiarTodosLosTimersCompletados = async () => {
+    try {
+      const timersCompletados = timers.filter((t: any) => t.completado);
+      
+      if (timersCompletados.length === 0) {
+        alert('No hay timers completados para limpiar');
+        return;
+      }
+
+      const confirmar = window.confirm(`¿Limpiar todos los ${timersCompletados.length} timer(s) completado(s)?`);
+      if (!confirmar) return;
+
+      console.log(`🧹 Limpiando ${timersCompletados.length} timers completados`);
+      
+      // Eliminar todos los timers completados
+      timersCompletados.forEach(timer => {
+        eliminarTimer(timer.id);
+      });
+      
+      // Recargar datos después de un breve delay
+      setTimeout(async () => {
+        console.log('🔄 Recargando datos después de limpiar todos los timers...');
+        await cargarDatos();
+      }, 1000);
+      
+    } catch (error) {
+      console.error('❌ Error al limpiar todos los timers:', error);
     }
   };
   
@@ -535,12 +585,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
               </button>
             )}
             <button
-              onClick={async () => {
-                // Eliminar el timer completado
-                eliminarTimer(timerCompletado.id);
-                // Recargar datos para actualizar la interfaz
-                await cargarDatos();
-              }}
+              onClick={() => limpiarTimer(timerCompletado.id)}
               className="flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-md text-xs transition-colors"
               title="Limpiar registro"
             >
@@ -686,6 +731,26 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-6">Registrar Pre Acondicionamiento</h1>
+      
+      {/* Botones de acción global */}
+      {timers.filter((t: any) => t.completado).length > 0 && (
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-yellow-700 text-sm">
+                Hay {timers.filter((t: any) => t.completado).length} timer(s) completado(s)
+              </span>
+            </div>
+            <button
+              onClick={limpiarTodosLosTimersCompletados}
+              className="flex items-center gap-2 px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm transition-colors"
+            >
+              <X size={14} />
+              Limpiar Todos
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Sección de TICs para Congelamiento */}
       <div className="bg-white rounded-lg shadow-md mb-8 overflow-hidden">
