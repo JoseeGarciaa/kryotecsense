@@ -258,6 +258,12 @@ class TimerManager:
         """Enviar mensaje a todos los clientes conectados"""
         disconnected = set()
         
+        if not self.connections:
+            timer_logger.info("No hay conexiones WebSocket activas para broadcast")
+            return
+            
+        timer_logger.info(f"Broadcasting mensaje tipo '{message.get('type')}' a {len(self.connections)} conexiones")
+        
         for connection in self.connections:
             if connection == exclude:
                 continue
@@ -265,7 +271,7 @@ class TimerManager:
             try:
                 await connection.send_text(json.dumps(message))
             except Exception as e:
-                timer_logger.error(f"Error en broadcast: {e}")
+                timer_logger.error(f"Error en broadcast a conexión: {e}")
                 disconnected.add(connection)
                 
         # Remover conexiones desconectadas
@@ -423,7 +429,9 @@ timer_manager = TimerManager()
 @app.websocket("/ws/timers")
 async def websocket_endpoint(websocket: WebSocket):
     """Endpoint principal de WebSocket para timers"""
+    timer_logger.info("Nueva conexión WebSocket intentando conectarse")
     await websocket.accept()
+    timer_logger.info("Conexión WebSocket aceptada")
     await timer_manager.add_connection(websocket)
     
     try:
@@ -431,6 +439,7 @@ async def websocket_endpoint(websocket: WebSocket):
             # Recibir mensaje del cliente
             data = await websocket.receive_text()
             message = json.loads(data)
+            timer_logger.info(f"Mensaje recibido del cliente: {message.get('type')}")
             
             # Procesar mensaje según tipo
             message_type = message.get("type")
@@ -469,10 +478,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 timer_logger.warning(f"Tipo de mensaje no reconocido: {message_type}")
                 
     except WebSocketDisconnect:
-        timer_logger.info("Cliente desconectado")
+        timer_logger.info("Cliente desconectado normalmente")
     except Exception as e:
-        timer_logger.error(f"Error en WebSocket: {e}")
+        timer_logger.error(f"Error en WebSocket que causa desconexión: {e}")
+        import traceback
+        timer_logger.error(f"Traceback completo: {traceback.format_exc()}")
     finally:
+        timer_logger.info("Limpiando conexión WebSocket")
         await timer_manager.remove_connection(websocket)
 
 
@@ -2551,7 +2563,12 @@ def who_am_i(current_user: dict = Depends(get_current_user_from_token)):
 @app.on_event("startup")
 async def startup_event():
     """Iniciar el loop de actualización de timers"""
-    asyncio.create_task(timer_manager.tick_timers())
+    timer_logger.info("=== STARTUP EVENT EJECUTADO ===")
+    timer_logger.info(f"Timer manager inicializado: {timer_manager is not None}")
+    timer_logger.info(f"Timer manager timers: {len(timer_manager.timers) if timer_manager else 0}")
+    
+    task = asyncio.create_task(timer_manager.tick_timers())
+    timer_logger.info("=== BACKGROUND TASK CREADO ===")
     timer_logger.info("Servicio de timers iniciado con background task")
 
 # Health check endpoint for timers
