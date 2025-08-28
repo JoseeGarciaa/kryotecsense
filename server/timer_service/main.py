@@ -106,7 +106,7 @@ class TimerManager:
         logger.info(f"Nueva conexión WebSocket. Total: {len(self.connections)}")
         
         # SINCRONIZACIÓN INMEDIATA: Enviar timers existentes al cliente recién conectado
-        # Recalcular todos los tiempos para garantizar precisión
+        # Recalcular todos los tiempos para garantizar precisión ABSOLUTA
         current_time = get_utc_now()
         timers_actualizados = []
         
@@ -115,7 +115,7 @@ class TimerManager:
             tiempo_restante_ms = (timer.fechaFin - current_time).total_seconds()
             nuevo_tiempo_restante = max(0, int(tiempo_restante_ms))
             
-            # Actualizar timer con tiempo preciso
+            # Actualizar timer con tiempo preciso INMEDIATAMENTE
             timer.tiempoRestanteSegundos = nuevo_tiempo_restante
             timer.completado = nuevo_tiempo_restante == 0
             timer.activo = timer.activo and not timer.completado
@@ -129,6 +129,20 @@ class TimerManager:
                 "server_time": current_time.isoformat()
             }
         })
+        
+        # Luego enviar inmediatamente una actualización de tiempos individuales
+        # para garantizar que el frontend se actualice correctamente
+        for timer in timers_actualizados:
+            if timer["activo"] and not timer["completado"]:
+                await self.send_to_client(websocket, {
+                    "type": "TIMER_TIME_UPDATE",
+                    "data": {
+                        "timerId": timer["id"],
+                        "tiempoRestanteSegundos": timer["tiempoRestanteSegundos"],
+                        "completado": timer["completado"],
+                        "activo": timer["activo"]
+                    }
+                })
         
     async def remove_connection(self, websocket: WebSocket):
         """Remover conexión WebSocket"""

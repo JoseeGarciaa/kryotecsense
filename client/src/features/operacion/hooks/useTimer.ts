@@ -214,33 +214,34 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   // Estado para manejar sincronización (simplificado)
   const [syncRequested, setSyncRequested] = useState(false);
 
-  // Solicitar sincronización SOLO una vez al conectar (ULTRA SIMPLIFICADO)
+  // Solicitar sincronización SOLO una vez al conectar
   useEffect(() => {
-    // Solo si conectó y no se ha pedido sincronización
+    // Solo si conectó, está inicializado y no se ha pedido sincronización
     if (isConnected && isInitialized && !syncRequested) {
-      // Solo log una vez y luego silenciar
-      if (!localStorage.getItem('sync_logged')) {
-        console.log('🔄 WebSocket conectado, sincronización inicial');
-        localStorage.setItem('sync_logged', 'true');
-      }
+      console.log('🔄 WebSocket conectado - Sincronización inicial');
       
       setSyncRequested(true);
       
-      // Enviar sincronización después de un pequeño delay
+      // NO enviar timers locales al servidor en la conexión inicial
+      // El servidor ya enviará todos sus timers al conectarse
+      
+      // Solo solicitar sincronización si han pasado más de 2 segundos desde la conexión
       setTimeout(() => {
-        if (isConnected) {
+        if (isConnected && !localStorage.getItem('initial_sync_done')) {
           sendMessage({
             type: 'REQUEST_SYNC'
           });
+          localStorage.setItem('initial_sync_done', 'true');
         }
-      }, 200);
+      }, 500);
     }
     
     // Reset cuando se desconecta
     if (!isConnected && syncRequested) {
       setSyncRequested(false);
+      localStorage.removeItem('initial_sync_done');
     }
-  }, [isConnected, isInitialized]); // Solo dependencias esenciales
+  }, [isConnected, isInitialized, syncRequested, sendMessage]);
 
   // Cargar timers del localStorage cuando no hay conexión WebSocket (fallback)
   useEffect(() => {
@@ -282,82 +283,43 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     }
   }, [timers, isInitialized]);
 
-  // Detectar cambios de pestaña y sincronizar FORZADAMENTE para garantizar sincronización perfecta
+  // Detectar cambios de pestaña y sincronizar SOLO cuando es necesario
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isConnected) {
-        // SINCRONIZACIÓN FORZADA cuando la pestaña se vuelve visible
-        console.log('👁️ Pestaña visible - Forzando sincronización');
-        sendMessage({
-          type: 'REQUEST_SYNC'
-        });
-      }
-    };
-
-    const handlePageShow = () => {
-      if (isConnected) {
-        // SINCRONIZACIÓN FORZADA cuando la página se muestra
-        console.log('🔄 Página mostrada - Forzando sincronización');
-        sendMessage({
-          type: 'REQUEST_SYNC'
-        });
-      }
-    };
-
-    const handleFocus = () => {
-      if (isConnected) {
-        // SINCRONIZACIÓN FORZADA cuando la ventana recibe foco
-        console.log('🎯 Ventana enfocada - Forzando sincronización');
-        sendMessage({
-          type: 'REQUEST_SYNC'
-        });
+      if (document.visibilityState === 'visible' && isConnected && !syncRequested) {
+        // Solo sincronizar si la pestaña estuvo oculta por más de 5 segundos
+        const lastVisibilityChange = Date.now() - (localStorage.getItem('last_visibility_hidden') ? parseInt(localStorage.getItem('last_visibility_hidden')!) : 0);
+        if (lastVisibilityChange > 5000) {
+          console.log('�️ Pestaña visible después de estar oculta - Sincronizando');
+          sendMessage({
+            type: 'REQUEST_SYNC'
+          });
+        }
+      } else if (document.visibilityState === 'hidden') {
+        localStorage.setItem('last_visibility_hidden', Date.now().toString());
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pageshow', handlePageShow);
-    window.addEventListener('focus', handleFocus);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('pageshow', handlePageShow);
-      window.removeEventListener('focus', handleFocus);
     };
-  }, [isConnected, sendMessage]);
+  }, [isConnected, sendMessage, syncRequested]);
 
-  // Actualizar timers cada segundo - PRIORIDAD AL WEBSOCKET PARA SINCRONIZACIÓN PERFECTA
+  // Actualizar timers cada segundo - SOLO cuando NO hay WebSocket
   useEffect(() => {
     const interval = setInterval(() => {
       setTimers(prevTimers => 
         prevTimers.map(timer => {
           if (!timer.activo || timer.completado) return timer;
           
-          // NUEVA LÓGICA: Si estamos conectados al WebSocket, SOLO permitir actualizaciones del servidor
-          // Esto garantiza sincronización perfecta entre dispositivos
+          // SI WEBSOCKET ESTÁ CONECTADO: NO TOCAR NADA - El servidor maneja todo
           if (isConnected) {
-            // WebSocket conectado: NO actualizar localmente, esperar actualizaciones del servidor
-            // Solo verificar si el timer debería estar completado por seguridad
-            const ahora = getDeviceTimeAsUtcDate();
-            const fechaFin = new Date(timer.fechaFin);
-            const tiempoRestanteMs = fechaFin.getTime() - ahora.getTime();
-            const tiempoRestanteCalculado = Math.max(0, Math.floor(tiempoRestanteMs / 1000));
-            
-            // Solo actualizar si el tiempo calculado es muy diferente (error de más de 5 segundos)
-            if (Math.abs(tiempoRestanteCalculado - timer.tiempoRestanteSegundos) > 5) {
-              console.log(`⚠️ Corrección de sincronización para timer ${timer.id}: ${timer.tiempoRestanteSegundos} -> ${tiempoRestanteCalculado}`);
-              return {
-                ...timer,
-                tiempoRestanteSegundos: tiempoRestanteCalculado,
-                completado: tiempoRestanteCalculado === 0,
-                activo: tiempoRestanteCalculado > 0 && timer.activo
-              };
-            }
-            
-            // Si estamos conectados, mantener el timer tal como está
-            return timer;
+            return timer; // Mantener exactamente como está, sin verificaciones ni correcciones
           }
           
-          // WebSocket desconectado: Actualizar localmente basado en fechas
+          // SOLO si WebSocket NO está conectado: Actualizar localmente basado en fechas
           const ahora = getDeviceTimeAsUtcDate();
           const fechaFin = new Date(timer.fechaFin);
           const tiempoRestanteMs = fechaFin.getTime() - ahora.getTime();
@@ -461,6 +423,15 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
           }
         }
       });
+      
+      // Forzar sincronización inmediata para que otros dispositivos lo vean instantáneamente
+      setTimeout(() => {
+        if (isConnected) {
+          sendMessage({
+            type: 'REQUEST_SYNC'
+          });
+        }
+      }, 100);
     }
     
     // Solicitar permisos de notificación si no están concedidos
