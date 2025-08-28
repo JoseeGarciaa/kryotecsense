@@ -66,7 +66,8 @@ def _normalize_origin(value: str) -> str:
     return v.rstrip("/")
 
 
-allow_all = os.getenv("CORS_ALLOW_ALL", "false").lower() == "true"
+allow_all_env = os.getenv("CORS_ALLOW_ALL", "false").lower() == "true"
+allow_all = allow_all_env
 if allow_all:
     cors_allow_origins = ["*"]
     cors_allow_credentials = False  # Requisito de FastAPI cuando origin es '*'
@@ -90,6 +91,13 @@ else:
             if o and o not in cors_allow_origins:
                 cors_allow_origins.append(o)
 
+    # Si no hay orígenes explícitos configurados, activar allow_all como fallback seguro
+    if not allow_all and not env_origin and not env_origins_csv:
+        allow_all = True
+        cors_allow_origins = ["*"]
+        cors_allow_credentials = False
+        print("[CORS] Activado allow_all como fallback: no se configuró FRONTEND_ORIGIN ni CORS_ALLOW_ORIGINS")
+
 print(f"CORS configured. allow_all={allow_all}, origins={cors_allow_origins}")
 
 app.add_middleware(
@@ -108,6 +116,7 @@ def cors_config():
         "env": {
             "FRONTEND_ORIGIN": os.getenv("FRONTEND_ORIGIN"),
             "CORS_ALLOW_ORIGINS": os.getenv("CORS_ALLOW_ORIGINS"),
+            "CORS_ALLOW_ALL": os.getenv("CORS_ALLOW_ALL"),
         },
     }
 
