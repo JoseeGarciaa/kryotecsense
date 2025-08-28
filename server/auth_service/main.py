@@ -41,30 +41,42 @@ app = FastAPI(
 import os
 DEFAULT_TENANT_SCHEMA = os.getenv("DEFAULT_TENANT_SCHEMA", "tenant_base")
 
-# Configuración de CORS
-origins = [
-    "http://localhost",
-    "http://localhost:5173", # Asume el puerto por defecto de Vite
-    "http://127.0.0.1",
-    "http://127.0.0.1:5173",
-]
+"""
+CORS flexible:
+ - FRONTEND_ORIGIN: un origen exacto (sin slash final)
+ - CORS_ALLOW_ORIGINS: lista separada por comas
+ - CORS_ALLOW_ALL=true: permite cualquier origen (Access-Control-Allow-Origin: *)
+"""
 
-# Permitir orígenes adicionales desde entorno: FRONTEND_ORIGIN (uno) o CORS_ALLOW_ORIGINS (lista separada por comas)
-env_origin = os.getenv("FRONTEND_ORIGIN")
-if env_origin:
-    safe_origin = env_origin.strip().rstrip("/")
-    if safe_origin not in origins:
-        origins.append(safe_origin)
-env_origins_csv = os.getenv("CORS_ALLOW_ORIGINS")
-if env_origins_csv:
-    for o in [x.strip().rstrip("/") for x in env_origins_csv.split(",") if x.strip()]:
-        if o and o not in origins:
-            origins.append(o)
+allow_all = os.getenv("CORS_ALLOW_ALL", "false").lower() == "true"
+if allow_all:
+    cors_allow_origins = ["*"]
+    cors_allow_credentials = False  # Requisito de FastAPI cuando origin es '*'
+else:
+    cors_allow_credentials = True
+    cors_allow_origins = [
+        "http://localhost",
+        "http://localhost:5173",  # Vite dev
+        "http://127.0.0.1",
+        "http://127.0.0.1:5173",
+    ]
+    env_origin = os.getenv("FRONTEND_ORIGIN")
+    if env_origin:
+        safe_origin = env_origin.strip().rstrip("/")
+        if safe_origin not in cors_allow_origins:
+            cors_allow_origins.append(safe_origin)
+    env_origins_csv = os.getenv("CORS_ALLOW_ORIGINS")
+    if env_origins_csv:
+        for o in [x.strip().rstrip("/") for x in env_origins_csv.split(",") if x.strip()]:
+            if o and o not in cors_allow_origins:
+                cors_allow_origins.append(o)
+
+print(f"CORS configured. allow_all={allow_all}, origins={cors_allow_origins}")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=cors_allow_origins,
+    allow_credentials=cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -139,15 +151,15 @@ async def websocket_timers(websocket: WebSocket):
                 await manager.send_personal_message(json.dumps({"error": "Invalid JSON", "details": str(e)}), websocket)
                 continue
 
-            # Eco/respuesta básica + opción broadcast
-            response = {"status": "received", "data": message}
-            await manager.send_personal_message(json.dumps(response), websocket)
-
+            # Lógica de mensajes esperados
             if message.get("type") == "REQUEST_SYNC":
                 # Aquí podrías recuperar timers persistidos si existiera almacenamiento en servidor
                 await manager.send_personal_message(json.dumps({"type": "TIMER_SYNC", "data": {"timers": []}}), websocket)
             elif message.get("broadcast"):
                 await manager.broadcast(json.dumps({"type": "broadcast", "data": message}))
+            else:
+                # ACK tipado para que el cliente no lo marque como desconocido
+                await manager.send_personal_message(json.dumps({"type": "ACK", "data": message}), websocket)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception as e:
