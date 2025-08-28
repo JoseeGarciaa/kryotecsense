@@ -13,21 +13,20 @@ export interface Timer {
   fechaFin: Date;
   activo: boolean;
   completado: boolean;
+  server_timestamp?: number; // Timestamp del servidor para sincronización
 }
 
 export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   const [timers, setTimers] = useState<Timer[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [serverTimeDiff, setServerTimeDiff] = useState<number>(0);
   
-  // WebSocket para sincronización en tiempo real (configurable por env)
-  // Preferir VITE_TIMER_WS_URL; si no existe, derivar de VITE_API_URL cambiando http->ws y anexando /ws/timers.
+  // WebSocket para sincronización en tiempo real
   const derivedWsFromApi = (() => {
     const api = import.meta.env.VITE_API_URL as string | undefined;
     if (!api) return undefined;
     try {
-      // limpiar slash final y convertir esquema
       const base = api.replace(/\/$/, "");
-      // Usar wss para https y ws para http
       const wsBase = base.replace(/^https/, "wss").replace(/^http/, "ws");
       return `${wsBase}/ws/timers`;
     } catch {
@@ -38,35 +37,21 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   
   const { isConnected, sendMessage, lastMessage } = useWebSocket(timerWsUrl);
 
-  // Cargar timers del localStorage al inicializar
+  // Cargar timers del localStorage al inicializar (SOLO como respaldo)
   useEffect(() => {
     const cargarTimersLocales = () => {
       const timersGuardados = localStorage.getItem('kryotec_timers');
-      if (timersGuardados) {
+      if (timersGuardados && !isConnected) {
         try {
           const timersParseados = JSON.parse(timersGuardados);
-          // Recalcular tiempo restante basado en la fecha actual
-          const timersActualizados = timersParseados.map((timer: Timer) => {
-            const ahora = getDeviceTimeAsUtcDate();
-            const fechaFin = new Date(timer.fechaFin);
-            const tiempoRestanteMs = fechaFin.getTime() - ahora.getTime();
-            const tiempoRestanteSegundos = Math.max(0, Math.floor(tiempoRestanteMs / 1000));
-            
-            return {
-              ...timer,
-              fechaInicio: new Date(timer.fechaInicio),
-              fechaFin: new Date(timer.fechaFin),
-              tiempoRestanteSegundos,
-              completado: tiempoRestanteSegundos === 0,
-              activo: tiempoRestanteSegundos > 0 && timer.activo
-            };
-          });
-          setTimers(timersActualizados);
-          // Solo log inicial, no en cada carga
-          if (timersActualizados.length > 0) {
-            console.log('💾 Timers cargados desde localStorage:', timersActualizados.length);
-          }
-          return timersActualizados;
+          const timersConFechas = timersParseados.map((timer: Timer) => ({
+            ...timer,
+            fechaInicio: new Date(timer.fechaInicio),
+            fechaFin: new Date(timer.fechaFin)
+          }));
+          setTimers(timersConFechas);
+          console.log('💾 Timers cargados desde localStorage (respaldo):', timersConFechas.length);
+          return timersConFechas;
         } catch (error) {
           console.error('Error al cargar timers:', error);
         }
@@ -74,104 +59,98 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       return [];
     };
 
-    const timersLocales = cargarTimersLocales();
+    cargarTimersLocales();
     setIsInitialized(true);
+  }, [isConnected]);
 
-    // Si hay timers locales y WebSocket está conectado, sincronizar con servidor
-    if (timersLocales.length > 0 && isConnected) {
-      timersLocales.forEach((timer: Timer) => {
-        sendMessage({
-          type: 'CREATE_TIMER',
-          data: { timer }
-        });
-      });
-    }
-  }, []);
-
-  // Escuchar mensajes de WebSocket para sincronización
+  // Escuchar mensajes de WebSocket - EL SERVIDOR ES LA ÚNICA FUENTE DE VERDAD
   useEffect(() => {
     if (!lastMessage) return;
 
-    // console.log('📨 Mensaje WebSocket recibido:', lastMessage);
-
     switch (lastMessage.type) {
       case 'TIMER_SYNC':
-        // Sincronizar todos los timers desde el servidor (ABSOLUTA PRIORIDAD)
+        // Sincronización completa desde el servidor
         console.log('✅ Sincronización recibida del servidor');
-        
-        // Resetear estado de sincronización
-        setSyncRequested(false);
         
         if (lastMessage.data.timers) {
           const timersDelServidor = lastMessage.data.timers.map((timer: any) => ({
             ...timer,
             fechaInicio: new Date(timer.fechaInicio),
-            fechaFin: new Date(timer.fechaFin)
+            fechaFin: new Date(timer.fechaFin),
+            // Usar tiempo del servidor directamente
+            tiempoRestanteSegundos: timer.server_remaining_time || timer.tiempoRestanteSegundos,
+            server_timestamp: timer.server_timestamp
           }));
           
-          // REEMPLAZAR COMPLETAMENTE los timers locales con los del servidor
-          // El servidor es la fuente de verdad absoluta
+          // REEMPLAZAR COMPLETAMENTE - El servidor es la autoridad
           setTimers(timersDelServidor);
-          
-          // Actualizar localStorage inmediatamente
           localStorage.setItem('kryotec_timers', JSON.stringify(timersDelServidor));
           
-          console.log(`🔄 ${timersDelServidor.length} timers sincronizados desde servidor`);
-          
-          // Si hay server_time, almacenar la diferencia para corrección futura
-          if (lastMessage.data.server_time) {
-            const serverTime = new Date(lastMessage.data.server_time);
-            const localTime = new Date();
-            const timeDiff = serverTime.getTime() - localTime.getTime();
-            localStorage.setItem('server_time_diff', timeDiff.toString());
+          // Almacenar diferencia de tiempo del servidor
+          if (lastMessage.data.server_timestamp) {
+            const serverTime = lastMessage.data.server_timestamp;
+            const localTime = Date.now();
+            setServerTimeDiff(serverTime - localTime);
           }
+          
+          console.log(`🔄 ${timersDelServidor.length} timers sincronizados desde servidor`);
         } else {
-          console.log('📭 Sin timers en el servidor - limpiando locales');
+          console.log('📭 Sin timers en el servidor');
           setTimers([]);
           localStorage.setItem('kryotec_timers', JSON.stringify([]));
         }
         break;
 
       case 'TIMER_CREATED':
-        // Agregar nuevo timer desde otro dispositivo
+        // Nuevo timer desde otro dispositivo
         if (lastMessage.data.timer) {
           const nuevoTimer = {
             ...lastMessage.data.timer,
             fechaInicio: new Date(lastMessage.data.timer.fechaInicio),
-            fechaFin: new Date(lastMessage.data.timer.fechaFin)
+            fechaFin: new Date(lastMessage.data.timer.fechaFin),
+            server_timestamp: lastMessage.data.timer.server_timestamp
           };
           setTimers(prev => {
-            // Evitar duplicados
             if (prev.find(t => t.id === nuevoTimer.id)) return prev;
-            return [...prev, nuevoTimer];
+            const nuevos = [...prev, nuevoTimer];
+            localStorage.setItem('kryotec_timers', JSON.stringify(nuevos));
+            return nuevos;
           });
+          console.log('➕ Timer creado desde otro dispositivo:', nuevoTimer.nombre);
         }
         break;
 
       case 'TIMER_UPDATED':
-        // Actualizar timer desde otro dispositivo
+        // Timer actualizado desde otro dispositivo
         if (lastMessage.data.timer) {
           const timerActualizado = {
             ...lastMessage.data.timer,
             fechaInicio: new Date(lastMessage.data.timer.fechaInicio),
             fechaFin: new Date(lastMessage.data.timer.fechaFin)
           };
-          setTimers(prev => prev.map(timer => 
-            timer.id === timerActualizado.id ? timerActualizado : timer
-          ));
+          setTimers(prev => {
+            const nuevos = prev.map(timer => 
+              timer.id === timerActualizado.id ? timerActualizado : timer
+            );
+            localStorage.setItem('kryotec_timers', JSON.stringify(nuevos));
+            return nuevos;
+          });
         }
         break;
 
       case 'TIMER_DELETED':
-        // Eliminar timer desde otro dispositivo
+        // Timer eliminado desde otro dispositivo
         if (lastMessage.data.timerId) {
-          setTimers(prev => prev.filter(timer => timer.id !== lastMessage.data.timerId));
+          setTimers(prev => {
+            const nuevos = prev.filter(timer => timer.id !== lastMessage.data.timerId);
+            localStorage.setItem('kryotec_timers', JSON.stringify(nuevos));
+            return nuevos;
+          });
         }
         break;
 
       case 'TIMER_TIME_UPDATE':
-        // Actualización de tiempo en tiempo real desde el servidor
-        // PRIORIDAD ABSOLUTA: WebSocket siempre actualiza el tiempo para perfecta sincronización
+        // Actualización de tiempo desde el servidor - AUTORIDAD ABSOLUTA
         if (lastMessage.data.timerId && lastMessage.data.tiempoRestanteSegundos !== undefined) {
           setTimers(prev => prev.map(timer => {
             if (timer.id === lastMessage.data.timerId) {
@@ -197,7 +176,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
                 ...timer,
                 tiempoRestanteSegundos: nuevoTiempoRestante,
                 completado,
-                activo
+                activo,
+                server_timestamp: lastMessage.data.server_timestamp
               };
             }
             return timer;
@@ -206,40 +186,30 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         break;
 
       default:
-        // Silenciar mensajes no reconocidos para reducir spam
         break;
     }
   }, [lastMessage, onTimerComplete]);
 
-  // Estado para manejar sincronización (simplificado)
+  // Estado para manejar sincronización
   const [syncRequested, setSyncRequested] = useState(false);
 
-  // Solicitar sincronización SOLO una vez al conectar
+  // Solicitar sincronización inicial al conectar
   useEffect(() => {
-    // Solo si conectó, está inicializado y no se ha pedido sincronización
     if (isConnected && isInitialized && !syncRequested) {
-      console.log('🔄 WebSocket conectado - Sincronización inicial');
-      
+      console.log('🔄 WebSocket conectado - Solicitando sincronización');
       setSyncRequested(true);
       
-      // NO enviar timers locales al servidor en la conexión inicial
-      // El servidor ya enviará todos sus timers al conectarse
-      
-      // Solo solicitar sincronización si han pasado más de 2 segundos desde la conexión
       setTimeout(() => {
-        if (isConnected && !localStorage.getItem('initial_sync_done')) {
+        if (isConnected) {
           sendMessage({
             type: 'REQUEST_SYNC'
           });
-          localStorage.setItem('initial_sync_done', 'true');
         }
       }, 500);
     }
     
-    // Reset cuando se desconecta
-    if (!isConnected && syncRequested) {
+    if (!isConnected) {
       setSyncRequested(false);
-      localStorage.removeItem('initial_sync_done');
     }
   }, [isConnected, isInitialized, syncRequested, sendMessage]);
 
@@ -388,58 +358,43 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio',
     tiempoMinutos: number
   ): string => {
-    const ahora = getDeviceTimeAsUtcDate();
-    const fechaFin = new Date(ahora.getTime() + (tiempoMinutos * 60 * 1000));
+    const timerId = `timer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    const nuevoTimer: Timer = {
-      id: `timer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      nombre,
-      tipoOperacion,
-      tiempoInicialMinutos: tiempoMinutos,
-      tiempoRestanteSegundos: tiempoMinutos * 60,
-      fechaInicio: ahora,
-      fechaFin,
-      activo: true,
-      completado: false
-    };
-
-    // Actualizar estado local inmediatamente
-    setTimers(prev => {
-      const nuevosTimers = [...prev, nuevoTimer];
-      // Guardar inmediatamente en localStorage
-      localStorage.setItem('kryotec_timers', JSON.stringify(nuevosTimers));
-      return nuevosTimers;
-    });
+    console.log(`🚀 Creando timer: ${nombre} - ${tiempoMinutos} minutos`);
     
-    // Enviar al WebSocket si está conectado
+    // ENVIAR DIRECTAMENTE AL SERVIDOR - él maneja las fechas y tiempos
     if (isConnected) {
       sendMessage({
         type: 'CREATE_TIMER',
         data: { 
           timer: {
-            ...nuevoTimer,
-            fechaInicio: nuevoTimer.fechaInicio.toISOString(),
-            fechaFin: nuevoTimer.fechaFin.toISOString()
+            id: timerId,
+            nombre,
+            tipoOperacion,
+            tiempoInicialMinutos: tiempoMinutos,
+            tiempoRestanteSegundos: tiempoMinutos * 60,
+            activo: true,
+            completado: false
           }
         }
       });
       
-      // Forzar sincronización inmediata para que otros dispositivos lo vean instantáneamente
+      // Solicitar sincronización para asegurar que se vea en otros dispositivos
       setTimeout(() => {
         if (isConnected) {
-          sendMessage({
-            type: 'REQUEST_SYNC'
-          });
+          sendMessage({ type: 'REQUEST_SYNC' });
         }
-      }, 100);
+      }, 200);
+    } else {
+      console.warn('⚠️ WebSocket no conectado - Timer no será sincronizado');
     }
     
-    // Solicitar permisos de notificación si no están concedidos
+    // Solicitar permisos de notificación
     if (Notification.permission === 'default') {
       Notification.requestPermission();
     }
     
-    return nuevoTimer.id;
+    return timerId;
   }, [isConnected, sendMessage]);
 
   const pausarTimer = useCallback((id: string) => {
