@@ -565,32 +565,33 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     if (timerCompletado) {
       // Timer completado - mostrar estado completado
       return (
-        <div className="flex flex-col items-center justify-center space-y-2 py-2">
+        <div className="flex flex-col items-center justify-center space-y-2 py-2 min-w-0">
           <span className="text-green-600 text-xs font-medium flex items-center gap-1">
-            <CheckCircle className="w-3 h-3" />
-            Tiempo completado
+            <CheckCircle className="w-3 h-3 flex-shrink-0" />
+            <span className="hidden sm:inline">Tiempo completado</span>
+            <span className="sm:hidden">Completo</span>
           </span>
           <div className="text-xs text-gray-500 text-center">
             {timerCompletado.tipoOperacion === 'congelamiento' ? 'Congelación' : 'Atemperamiento'} - {timerCompletado.tiempoInicialMinutos} min
           </div>
-          <div className="flex gap-1">
+          <div className="flex flex-col sm:flex-row gap-1 w-full">
             {!esAtemperamiento && (
               <button
                 onClick={() => completarTIC(rfid, timerCompletado)}
-                className="flex items-center gap-1 px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md text-xs transition-colors"
+                className="flex items-center justify-center gap-1 px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md text-xs transition-colors w-full sm:w-auto"
                 title="Completar proceso y mover al siguiente estado"
               >
-                <CheckCircle className="w-3 h-3" />
-                Completar
+                <CheckCircle className="w-3 h-3 flex-shrink-0" />
+                <span className="hidden sm:inline">Completar</span>
               </button>
             )}
             <button
               onClick={() => limpiarTimer(timerCompletado.id)}
-              className="flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-md text-xs transition-colors"
+              className="flex items-center justify-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-md text-xs transition-colors w-full sm:w-auto"
               title="Limpiar registro"
             >
-              <X className="w-3 h-3" />
-              Limpiar
+              <X className="w-3 h-3 flex-shrink-0" />
+              <span className="hidden sm:inline">Limpiar</span>
             </button>
           </div>
         </div>
@@ -600,9 +601,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     if (!timer) {
       // Sin temporizador - mostrar botón para iniciar
       return (
-        <div className="flex flex-col items-center justify-center space-y-2 py-2">
-          <span className="text-gray-400 text-xs mb-1">
-            Sin temporizador
+        <div className="flex flex-col items-center justify-center space-y-2 py-2 min-w-0">
+          <span className="text-gray-400 text-xs mb-1 text-center">
+            <span className="hidden sm:inline">Sin temporizador</span>
+            <span className="sm:hidden">Sin timer</span>
           </span>
           <button
             onClick={() => {
@@ -620,11 +622,11 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
               
               setMostrarModalTimer(true);
             }}
-            className="flex items-center gap-1 px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded-md text-xs transition-colors"
+            className="flex items-center justify-center gap-1 px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded-md text-xs transition-colors w-full max-w-20"
             title="Iniciar temporizador"
           >
-            <Play className="w-3 h-3" />
-            Iniciar
+            <Play className="w-3 h-3 flex-shrink-0" />
+            <span className="hidden sm:inline">Iniciar</span>
           </button>
         </div>
       );
@@ -634,22 +636,22 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     const esUrgente = timer.tiempoRestanteSegundos < 300; // Menos de 5 minutos
     
     return (
-      <div className="flex flex-col items-center justify-center space-y-2 py-2">
-        <div className="flex items-center justify-center gap-2">
-          <span className={`font-mono text-sm font-medium ${
+      <div className="flex flex-col items-center justify-center space-y-2 py-2 min-w-0">
+        <div className="flex items-center justify-center gap-1">
+          <span className={`font-mono text-xs sm:text-sm font-medium ${
             esUrgente ? 'text-red-600' : 
             timer.tipoOperacion === 'congelamiento' ? 'text-blue-600' : 'text-orange-600'
           }`}>
             {tiempoFormateado}
           </span>
           {!timer.activo && (
-            <span className="text-xs text-gray-500">(Pausado)</span>
+            <span className="text-xs text-gray-500 hidden sm:inline">(Pausado)</span>
           )}
         </div>
-        <div className="flex items-center justify-center gap-1">
+        <div className="flex items-center justify-center gap-1 w-full">
           <button
             onClick={() => timer.activo ? pausarTimer(timer.id) : reanudarTimer(timer.id)}
-            className={`p-1 rounded-md text-xs transition-colors ${
+            className={`p-1 rounded-md text-xs transition-colors flex-shrink-0 ${
               timer.activo 
                 ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700' 
                 : 'bg-green-100 hover:bg-green-200 text-green-700'
@@ -673,14 +675,14 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
               }
               setMostrarModalTimer(true);
             }}
-            className="p-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md text-xs transition-colors"
+            className="p-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md text-xs transition-colors flex-shrink-0"
             title="Editar"
           >
             <Edit className="w-3 h-3" />
           </button>
           <button
             onClick={() => eliminarTimer(timer.id)}
-            className="p-1 bg-red-100 hover:bg-red-200 text-red-700 rounded-md text-xs transition-colors"
+            className="p-1 bg-red-100 hover:bg-red-200 text-red-700 rounded-md text-xs transition-colors flex-shrink-0"
             title="Eliminar"
           >
             <Trash2 className="w-3 h-3" />
@@ -729,13 +731,15 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   const totalPaginasAtemperamiento = calcularTotalPaginas(ticsAtemperamientoFiltrados.length);
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-6">Registrar Pre Acondicionamiento</h1>
+    <div className="p-2 sm:p-4 max-w-full">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Registrar Pre Acondicionamiento</h1>
+      </div>
       
       {/* Botones de acción global */}
       {timers.filter((t: any) => t.completado).length > 0 && (
-        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div className="flex items-center justify-between">
+        <div className="mb-4 p-3 sm:p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="text-yellow-700 text-sm">
                 Hay {timers.filter((t: any) => t.completado).length} timer(s) completado(s)
@@ -743,7 +747,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             </div>
             <button
               onClick={limpiarTodosLosTimersCompletados}
-              className="flex items-center gap-2 px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm transition-colors"
+              className="flex items-center justify-center gap-2 px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm transition-colors w-full sm:w-auto"
             >
               <X size={14} />
               Limpiar Todos
@@ -753,94 +757,103 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       )}
       
       {/* Sección de TICs para Congelamiento */}
-      <div className="bg-white rounded-lg shadow-md mb-8 overflow-hidden">
-        <div className="bg-blue-50 p-4 border-b border-blue-100 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-blue-800">
-            TICs para Congelamiento 
-            <span className="ml-2 text-sm font-normal text-blue-600">
-              ({ticsCongelamientoFiltrados.length} de {ticsCongelamiento.length})
-            </span>
-          </h2>
-          <div className="flex gap-2">            
-            {/* Botón para iniciar temporizadores de todos los TICs sin temporizador */}
-            {ticsCongelamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length > 0 && (
-              <button
-                onClick={() => {
-                  const ticsSinTimer = ticsCongelamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid));
-                  setRfidsPendientesTimer(ticsSinTimer.map(tic => tic.rfid));
-                  setTipoOperacionTimer('congelamiento');
-                  setMostrarModalTimer(true);
-                }}
-                className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm transition-colors"
-                title="Iniciar temporizador para todos los TICs sin temporizador"
-              >
-                <Play size={16} />
-                Iniciar Todos ({ticsCongelamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length})
-              </button>
-            )}
-            <button 
-              className={`p-2 rounded-full transition-colors ${
-                cargando 
-                  ? 'bg-blue-100 text-blue-400 cursor-not-allowed' 
-                  : 'hover:bg-blue-100 text-blue-600'
-              }`}
-              title="Actualizar lista"
-              onClick={cargarDatos}
-              disabled={cargando}
-            >
-              <Loader size={18} className={cargando ? 'animate-spin' : ''} />
-            </button>
-            <div className="relative" ref={dropdownRefCongelacion}>
-              <button 
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md flex items-center gap-2"
-                onClick={() => setShowDropdownCongelacion(!showDropdownCongelacion)}
-              >
-                <Plus size={18} />
-                Agregar TICs
-                <ChevronDown size={16} />
-              </button>
-              
-              {showDropdownCongelacion && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
-                  <div className="py-1">
-                    <button
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                      onClick={() => {
-                        setRfidsEscaneados([]);
-                        setRfidInput('');
-                        abrirModalEscaneo('congelamiento');
-                        setShowDropdownCongelacion(false);
-                      }}
-                    >
-                      <Scan size={16} />
-                      Escanear TICs
-                    </button>
-                    <button
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                      onClick={() => {
-                        setTipoEscaneoActual('congelamiento');
-                        setMostrarModalLotes(true);
-                        setShowDropdownCongelacion(false);
-                      }}
-                    >
-                      <Menu size={16} />
-                      Seleccionar por lote
-                    </button>
-                  </div>
-                </div>
+      <div className="bg-white rounded-lg shadow-md mb-6 sm:mb-8 overflow-hidden">
+        <div className="bg-blue-50 p-3 sm:p-4 border-b border-blue-100">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-blue-800">
+                TICs para Congelamiento 
+              </h2>
+              <span className="text-sm font-normal text-blue-600">
+                ({ticsCongelamientoFiltrados.length} de {ticsCongelamiento.length})
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">            
+              {/* Botón para iniciar temporizadores de todos los TICs sin temporizador */}
+              {ticsCongelamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length > 0 && (
+                <button
+                  onClick={() => {
+                    const ticsSinTimer = ticsCongelamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid));
+                    setRfidsPendientesTimer(ticsSinTimer.map(tic => tic.rfid));
+                    setTipoOperacionTimer('congelamiento');
+                    setMostrarModalTimer(true);
+                  }}
+                  className="flex items-center justify-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm transition-colors w-full sm:w-auto"
+                  title="Iniciar temporizador para todos los TICs sin temporizador"
+                >
+                  <Play size={16} />
+                  <span className="hidden sm:inline">Iniciar Todos</span>
+                  <span className="sm:hidden">Todos</span>
+                  ({ticsCongelamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length})
+                </button>
               )}
+              <div className="flex gap-2">
+                <button 
+                  className={`p-2 rounded-full transition-colors ${
+                    cargando 
+                      ? 'bg-blue-100 text-blue-400 cursor-not-allowed' 
+                      : 'hover:bg-blue-100 text-blue-600'
+                  }`}
+                  title="Actualizar lista"
+                  onClick={cargarDatos}
+                  disabled={cargando}
+                >
+                  <Loader size={18} className={cargando ? 'animate-spin' : ''} />
+                </button>
+                <div className="relative" ref={dropdownRefCongelacion}>
+                  <button 
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md flex items-center gap-2 w-full sm:w-auto justify-center"
+                    onClick={() => setShowDropdownCongelacion(!showDropdownCongelacion)}
+                  >
+                    <Plus size={18} />
+                    <span className="hidden sm:inline">Agregar TICs</span>
+                    <span className="sm:hidden">Agregar</span>
+                    <ChevronDown size={16} />
+                  </button>
+                  
+                  {showDropdownCongelacion && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                      <div className="py-1">
+                        <button
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                          onClick={() => {
+                            setRfidsEscaneados([]);
+                            setRfidInput('');
+                            abrirModalEscaneo('congelamiento');
+                            setShowDropdownCongelacion(false);
+                          }}
+                        >
+                          <Scan size={16} />
+                          Escanear TICs
+                        </button>
+                        <button
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                          onClick={() => {
+                            setTipoEscaneoActual('congelamiento');
+                            setMostrarModalLotes(true);
+                            setShowDropdownCongelacion(false);
+                          }}
+                        >
+                          <Menu size={16} />
+                          Seleccionar por lote
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
         
         {/* Barra de búsqueda */}
-        <div className="p-4 bg-gray-50 border-b border-gray-200">
+        <div className="p-3 sm:p-4 bg-gray-50 border-b border-gray-200">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
               placeholder="Buscar por RFID, nombre o lote..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               value={busquedaCongelamiento}
               onChange={(e) => {
                 setBusquedaCongelamiento(e.target.value);
@@ -850,31 +863,32 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
           </div>
         </div>
         
+        {/* Tabla responsiva */}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   RFID
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
                   NOMBRE
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   LOTE
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
                   ESTADO
                 </th>
-                <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  TEMPORIZADOR
+                <th scope="col" className="px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  TIMER
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {cargando ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center">
+                  <td colSpan={5} className="px-3 sm:px-6 py-8 text-center">
                     <div className="flex items-center justify-center space-x-2">
                       <Loader className="animate-spin h-5 w-5 text-blue-600" />
                       <span className="text-sm text-gray-500">Cargando TICs para congelamiento...</span>
@@ -884,25 +898,30 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
               ) : ticsCongelamientoPaginados.length > 0 ? (
                 ticsCongelamientoPaginados.map((tic: TicItem) => (
                   <tr key={tic.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{tic.rfid}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{tic.nombre_unidad}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{tic.lote}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-2 sm:px-4 py-3 whitespace-nowrap">
+                      <div className="text-xs sm:text-sm font-medium text-gray-900">{tic.rfid}</div>
+                      <div className="text-xs text-gray-500 sm:hidden">{tic.nombre_unidad}</div>
+                    </td>
+                    <td className="px-2 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 hidden sm:table-cell">
+                      {tic.nombre_unidad}
+                    </td>
+                    <td className="px-2 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{tic.lote}</td>
+                    <td className="px-2 sm:px-4 py-3 whitespace-nowrap hidden md:table-cell">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                         {tic.sub_estado}
                       </span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-center">
+                    <td className="px-2 sm:px-4 py-3 whitespace-nowrap text-center">
                       {renderizarTemporizador(tic.rfid)}
                     </td>
                   </tr>
                 ))
               ) : busquedaCongelamiento ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center">
+                  <td colSpan={5} className="px-3 sm:px-6 py-8 text-center">
                     <div className="text-gray-500">
                       <Search className="mx-auto h-8 w-8 mb-2 text-gray-400" />
-                      <p>No se encontraron TICs que coincidan con "{busquedaCongelamiento}"</p>
+                      <p className="text-sm">No se encontraron TICs que coincidan con "{busquedaCongelamiento}"</p>
                       <button 
                         onClick={() => setBusquedaCongelamiento('')}
                         className="mt-2 text-blue-600 hover:text-blue-700 text-sm"
@@ -914,10 +933,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center">
+                  <td colSpan={5} className="px-3 sm:px-6 py-8 text-center">
                     <div className="text-gray-500">
-                      <p>No hay TICs en congelamiento</p>
-                      <p className="text-sm mt-1">Agregue TICs usando los botones de arriba</p>
+                      <p className="text-sm">No hay TICs en congelamiento</p>
+                      <p className="text-xs mt-1">Agregue TICs usando los botones de arriba</p>
                     </div>
                   </td>
                 </tr>
@@ -928,124 +947,135 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         
         {/* Controles de paginación */}
         {ticsCongelamientoFiltrados.length > itemsPorPagina && (
-          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-gray-700">
-              Mostrando {((paginaActualCongelamiento - 1) * itemsPorPagina) + 1} a{' '}
-              {Math.min(paginaActualCongelamiento * itemsPorPagina, ticsCongelamientoFiltrados.length)} de{' '}
-              {ticsCongelamientoFiltrados.length} TICs
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setPaginaActualCongelamiento(paginaActualCongelamiento - 1)}
-                disabled={paginaActualCongelamiento === 1}
-                className="p-2 rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              >
-                ‹ Anterior
-              </button>
-              <span className="text-sm text-gray-600">
-                Página {paginaActualCongelamiento} de {totalPaginasCongelamiento}
-              </span>
-              <button
-                onClick={() => setPaginaActualCongelamiento(paginaActualCongelamiento + 1)}
-                disabled={paginaActualCongelamiento === totalPaginasCongelamiento}
-                className="p-2 rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              >
-                Siguiente ›
-              </button>
+          <div className="px-3 sm:px-4 py-3 bg-gray-50 border-t border-gray-200">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="text-xs sm:text-sm text-gray-700 text-center sm:text-left">
+                Mostrando {((paginaActualCongelamiento - 1) * itemsPorPagina) + 1} a{' '}
+                {Math.min(paginaActualCongelamiento * itemsPorPagina, ticsCongelamientoFiltrados.length)} de{' '}
+                {ticsCongelamientoFiltrados.length} TICs
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setPaginaActualCongelamiento(paginaActualCongelamiento - 1)}
+                  disabled={paginaActualCongelamiento === 1}
+                  className="px-3 py-1 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ‹ <span className="hidden sm:inline">Anterior</span>
+                </button>
+                <span className="text-xs sm:text-sm text-gray-600 px-2">
+                  {paginaActualCongelamiento} / {totalPaginasCongelamiento}
+                </span>
+                <button
+                  onClick={() => setPaginaActualCongelamiento(paginaActualCongelamiento + 1)}
+                  disabled={paginaActualCongelamiento === totalPaginasCongelamiento}
+                  className="px-3 py-1 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="hidden sm:inline">Siguiente</span> ›
+                </button>
+              </div>
             </div>
           </div>
         )}
       </div>
       
       {/* Sección de TICs para Atemperamiento */}
-      <div className="bg-white rounded-lg shadow-md mb-8 overflow-hidden">
-        <div className="bg-orange-50 p-4 border-b border-orange-100 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-orange-800">
-            TICs para Atemperamiento
-            <span className="ml-2 text-sm font-normal text-orange-600">
-              ({ticsAtemperamientoFiltrados.length} de {ticsAtemperamiento.length})
-            </span>
-          </h2>
-          <div className="flex gap-2">            
-            {/* Botón para iniciar temporizadores de todos los TICs sin temporizador */}
-            {ticsAtemperamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length > 0 && (
-              <button
-                onClick={() => {
-                  const ticsSinTimer = ticsAtemperamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid));
-                  setRfidsPendientesTimer(ticsSinTimer.map(tic => tic.rfid));
-                  setTipoOperacionTimer('atemperamiento');
-                  setMostrarModalTimer(true);
-                }}
-                className="flex items-center gap-2 px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm transition-colors"
-                title="Iniciar temporizador para todos los TICs sin temporizador"
-              >
-                <Play size={16} />
-                Iniciar Todos ({ticsAtemperamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length})
-              </button>
-            )}
-            <button 
-              className={`p-2 rounded-full transition-colors ${
-                cargando 
-                  ? 'bg-orange-100 text-orange-400 cursor-not-allowed' 
-                  : 'hover:bg-orange-100 text-orange-600'
-              }`}
-              title="Actualizar lista"
-              onClick={cargarDatos}
-              disabled={cargando}
-            >
-              <Loader size={18} className={cargando ? 'animate-spin' : ''} />
-            </button>
-            <div className="relative" ref={dropdownRefAtemperamiento}>
-              <button 
-                className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md flex items-center gap-2"
-                onClick={() => setShowDropdownAtemperamiento(!showDropdownAtemperamiento)}
-              >
-                <Plus size={18} />
-                Agregar TICs
-                <ChevronDown size={16} />
-              </button>
-              
-              {showDropdownAtemperamiento && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
-                  <div className="py-1">
-                    <button
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                      onClick={() => {
-                        setRfidsEscaneados([]);
-                        setRfidInput('');
-                        abrirModalEscaneo('atemperamiento');
-                        setShowDropdownAtemperamiento(false);
-                      }}
-                    >
-                      <Scan size={16} />
-                      Escanear TICs
-                    </button>
-                    <button
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                      onClick={() => {
-                        setTipoEscaneoActual('atemperamiento');
-                        setMostrarModalLotes(true);
-                        setShowDropdownAtemperamiento(false);
-                      }}
-                    >
-                      <Menu size={16} />
-                      Seleccionar por lote
-                    </button>
-                  </div>
-                </div>
+      <div className="bg-white rounded-lg shadow-md mb-6 sm:mb-8 overflow-hidden">
+        <div className="bg-orange-50 p-3 sm:p-4 border-b border-orange-100">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-orange-800">
+                TICs para Atemperamiento
+              </h2>
+              <span className="text-sm font-normal text-orange-600">
+                ({ticsAtemperamientoFiltrados.length} de {ticsAtemperamiento.length})
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">            
+              {/* Botón para iniciar temporizadores de todos los TICs sin temporizador */}
+              {ticsAtemperamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length > 0 && (
+                <button
+                  onClick={() => {
+                    const ticsSinTimer = ticsAtemperamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid));
+                    setRfidsPendientesTimer(ticsSinTimer.map(tic => tic.rfid));
+                    setTipoOperacionTimer('atemperamiento');
+                    setMostrarModalTimer(true);
+                  }}
+                  className="flex items-center justify-center gap-2 px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm transition-colors w-full sm:w-auto"
+                  title="Iniciar temporizador para todos los TICs sin temporizador"
+                >
+                  <Play size={16} />
+                  <span className="hidden sm:inline">Iniciar Todos</span>
+                  <span className="sm:hidden">Todos</span>
+                  ({ticsAtemperamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length})
+                </button>
               )}
+              <div className="flex gap-2">
+                <button 
+                  className={`p-2 rounded-full transition-colors ${
+                    cargando 
+                      ? 'bg-orange-100 text-orange-400 cursor-not-allowed' 
+                      : 'hover:bg-orange-100 text-orange-600'
+                  }`}
+                  title="Actualizar lista"
+                  onClick={cargarDatos}
+                  disabled={cargando}
+                >
+                  <Loader size={18} className={cargando ? 'animate-spin' : ''} />
+                </button>
+                <div className="relative" ref={dropdownRefAtemperamiento}>
+                  <button 
+                    className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md flex items-center gap-2 w-full sm:w-auto justify-center"
+                    onClick={() => setShowDropdownAtemperamiento(!showDropdownAtemperamiento)}
+                  >
+                    <Plus size={18} />
+                    <span className="hidden sm:inline">Agregar TICs</span>
+                    <span className="sm:hidden">Agregar</span>
+                    <ChevronDown size={16} />
+                  </button>
+                  
+                  {showDropdownAtemperamiento && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                      <div className="py-1">
+                        <button
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                          onClick={() => {
+                            setRfidsEscaneados([]);
+                            setRfidInput('');
+                            abrirModalEscaneo('atemperamiento');
+                            setShowDropdownAtemperamiento(false);
+                          }}
+                        >
+                          <Scan size={16} />
+                          Escanear TICs
+                        </button>
+                        <button
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                          onClick={() => {
+                            setTipoEscaneoActual('atemperamiento');
+                            setMostrarModalLotes(true);
+                            setShowDropdownAtemperamiento(false);
+                          }}
+                        >
+                          <Menu size={16} />
+                          Seleccionar por lote
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
         
         {/* Barra de búsqueda */}
-        <div className="p-4 bg-gray-50 border-b border-gray-200">
+        <div className="p-3 sm:p-4 bg-gray-50 border-b border-gray-200">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             <input
               type="text"
               placeholder="Buscar por RFID, nombre o lote..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               value={busquedaAtemperamiento}
               onChange={(e) => {
                 setBusquedaAtemperamiento(e.target.value);
@@ -1055,31 +1085,32 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
           </div>
         </div>
         
+        {/* Tabla responsiva */}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   RFID
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
                   NOMBRE
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   LOTE
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
                   ESTADO
                 </th>
-                <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  TEMPORIZADOR
+                <th scope="col" className="px-3 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  TIMER
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {cargando ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center">
+                  <td colSpan={5} className="px-3 sm:px-6 py-8 text-center">
                     <div className="flex items-center justify-center space-x-2">
                       <Loader className="animate-spin h-5 w-5 text-orange-600" />
                       <span className="text-sm text-gray-500">Cargando TICs para atemperamiento...</span>
@@ -1089,23 +1120,28 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
               ) : ticsAtemperamientoPaginados.length > 0 ? (
                 ticsAtemperamientoPaginados.map((tic: TicItem) => (
                   <tr key={tic.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{tic.rfid}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{tic.nombre_unidad}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{tic.lote}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-2 sm:px-4 py-3 whitespace-nowrap">
+                      <div className="text-xs sm:text-sm font-medium text-gray-900">{tic.rfid}</div>
+                      <div className="text-xs text-gray-500 sm:hidden">{tic.nombre_unidad}</div>
+                    </td>
+                    <td className="px-2 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900 hidden sm:table-cell">
+                      {tic.nombre_unidad}
+                    </td>
+                    <td className="px-2 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-900">{tic.lote}</td>
+                    <td className="px-2 sm:px-4 py-3 whitespace-nowrap hidden md:table-cell">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
                         {tic.sub_estado}
                       </span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-center">{renderizarTemporizador(tic.rfid, true)}</td>
+                    <td className="px-2 sm:px-4 py-3 whitespace-nowrap text-center">{renderizarTemporizador(tic.rfid, true)}</td>
                   </tr>
                 ))
               ) : busquedaAtemperamiento ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center">
+                  <td colSpan={5} className="px-3 sm:px-6 py-8 text-center">
                     <div className="text-gray-500">
                       <Search className="mx-auto h-8 w-8 mb-2 text-gray-400" />
-                      <p>No se encontraron TICs que coincidan con "{busquedaAtemperamiento}"</p>
+                      <p className="text-sm">No se encontraron TICs que coincidan con "{busquedaAtemperamiento}"</p>
                       <button 
                         onClick={() => setBusquedaAtemperamiento('')}
                         className="mt-2 text-orange-600 hover:text-orange-700 text-sm"
@@ -1117,10 +1153,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center">
+                  <td colSpan={5} className="px-3 sm:px-6 py-8 text-center">
                     <div className="text-gray-500">
-                      <p>No hay TICs en atemperamiento</p>
-                      <p className="text-sm mt-1">Agregue TICs usando los botones de arriba</p>
+                      <p className="text-sm">No hay TICs en atemperamiento</p>
+                      <p className="text-xs mt-1">Agregue TICs usando los botones de arriba</p>
                     </div>
                   </td>
                 </tr>
@@ -1131,30 +1167,32 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         
         {/* Controles de paginación */}
         {ticsAtemperamientoFiltrados.length > itemsPorPagina && (
-          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-gray-700">
-              Mostrando {((paginaActualAtemperamiento - 1) * itemsPorPagina) + 1} a{' '}
-              {Math.min(paginaActualAtemperamiento * itemsPorPagina, ticsAtemperamientoFiltrados.length)} de{' '}
-              {ticsAtemperamientoFiltrados.length} TICs
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setPaginaActualAtemperamiento(paginaActualAtemperamiento - 1)}
-                disabled={paginaActualAtemperamiento === 1}
-                className="p-2 rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              >
-                ‹ Anterior
-              </button>
-              <span className="text-sm text-gray-600">
-                Página {paginaActualAtemperamiento} de {totalPaginasAtemperamiento}
-              </span>
-              <button
-                onClick={() => setPaginaActualAtemperamiento(paginaActualAtemperamiento + 1)}
-                disabled={paginaActualAtemperamiento === totalPaginasAtemperamiento}
-                className="p-2 rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              >
-                Siguiente ›
-              </button>
+          <div className="px-3 sm:px-4 py-3 bg-gray-50 border-t border-gray-200">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="text-xs sm:text-sm text-gray-700 text-center sm:text-left">
+                Mostrando {((paginaActualAtemperamiento - 1) * itemsPorPagina) + 1} a{' '}
+                {Math.min(paginaActualAtemperamiento * itemsPorPagina, ticsAtemperamientoFiltrados.length)} de{' '}
+                {ticsAtemperamientoFiltrados.length} TICs
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setPaginaActualAtemperamiento(paginaActualAtemperamiento - 1)}
+                  disabled={paginaActualAtemperamiento === 1}
+                  className="px-3 py-1 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ‹ <span className="hidden sm:inline">Anterior</span>
+                </button>
+                <span className="text-xs sm:text-sm text-gray-600 px-2">
+                  {paginaActualAtemperamiento} / {totalPaginasAtemperamiento}
+                </span>
+                <button
+                  onClick={() => setPaginaActualAtemperamiento(paginaActualAtemperamiento + 1)}
+                  disabled={paginaActualAtemperamiento === totalPaginasAtemperamiento}
+                  className="px-3 py-1 text-xs sm:text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="hidden sm:inline">Siguiente</span> ›
+                </button>
+              </div>
             </div>
           </div>
         )}
