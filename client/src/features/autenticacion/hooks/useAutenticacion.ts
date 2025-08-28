@@ -17,9 +17,10 @@ export const useAutenticacion = () => {
         setEstado({
           estaAutenticado: true,
           usuario: {
-            id: '1',
-            email,
-            nombre: 'Usuario Demo'
+            id: 1,
+            correo: email,
+            nombre: 'Usuario Demo',
+            rol: 'admin'
           },
           cargando: false
         });

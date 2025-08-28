@@ -57,15 +57,14 @@ export const useOperaciones = () => {
   
   // Hook de WebSocket para actualizaciones en tiempo real
   const { isConnected: wsConnected, connectionError: wsError } = useWebSocket((message) => {
-    // Solo mostrar logs importantes
+    // Solo mostrar logs de cambios importantes
     if (message.type === 'activity_created' || message.type === 'inventory_updated') {
       console.log('🔄 Actualizando por WebSocket:', message.type);
       actualizarColumnasDesdeBackend();
     }
     
-    // Manejar completación de timer
+    // Manejar completación de timer sin log (ya maneja el hook de timer)
     if (message.type === 'timer_completed') {
-      console.log('⏰ Timer completado:', message.data?.inventario_id);
       // El hook de pre-acondicionamiento ya maneja esto
     }
   });

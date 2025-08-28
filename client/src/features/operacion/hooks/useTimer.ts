@@ -27,13 +27,16 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     try {
       // limpiar slash final y convertir esquema
       const base = api.replace(/\/$/, "");
-      const wsBase = base.replace(/^http/, "ws");
+      // Usar wss para https y ws para http
+      const wsBase = base.replace(/^https/, "wss").replace(/^http/, "ws");
       return `${wsBase}/ws/timers`;
     } catch {
       return undefined;
     }
   })();
   const timerWsUrl = (import.meta.env.VITE_TIMER_WS_URL as string) || derivedWsFromApi || 'ws://localhost:8006/ws/timers';
+  
+  console.log('🔌 Timer WebSocket URL:', timerWsUrl);
   const { isConnected, sendMessage, lastMessage } = useWebSocket(timerWsUrl);
 
   // Cargar timers del localStorage al inicializar
@@ -60,7 +63,10 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             };
           });
           setTimers(timersActualizados);
-          console.log('💾 Timers cargados desde localStorage:', timersActualizados.length);
+          // Solo log inicial, no en cada carga
+          if (timersActualizados.length > 0) {
+            console.log('💾 Timers cargados desde localStorage:', timersActualizados.length);
+          }
           return timersActualizados;
         } catch (error) {
           console.error('Error al cargar timers:', error);
@@ -110,7 +116,10 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             });
             
             const timersFinal = [...timersActualizados, ...timersNuevos];
-            console.log('🔄 Timers sincronizados desde servidor:', timersFinal.length);
+            // Solo log si hay cambios significativos
+            if (timersFinal.length !== prevTimers.length || timersNuevos.length > 0) {
+              console.log('🔄 Timers sincronizados desde servidor:', timersFinal.length);
+            }
             return timersFinal;
           });
         }
@@ -127,6 +136,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
           setTimers(prev => {
             // Evitar duplicados
             if (prev.find(t => t.id === nuevoTimer.id)) return prev;
+            // Solo log de timers nuevos importantes
             console.log('➕ Timer agregado desde otro dispositivo:', nuevoTimer.nombre);
             return [...prev, nuevoTimer];
           });
@@ -144,7 +154,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
           setTimers(prev => prev.map(timer => 
             timer.id === timerActualizado.id ? timerActualizado : timer
           ));
-          console.log('🔄 Timer actualizado desde otro dispositivo:', timerActualizado.nombre);
+          // Solo log actualizaciones importantes
+          console.log('🔄 Timer actualizado:', timerActualizado.nombre);
         }
         break;
 
@@ -152,13 +163,17 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         // Eliminar timer desde otro dispositivo
         if (lastMessage.data.timerId) {
           setTimers(prev => prev.filter(timer => timer.id !== lastMessage.data.timerId));
-          console.log('🗑️ Timer eliminado desde otro dispositivo:', lastMessage.data.timerId);
+          // Solo log eliminaciones importantes
+          console.log('🗑️ Timer eliminado:', lastMessage.data.timerId);
         }
         break;
 
       case 'TIMER_TIME_UPDATE':
         // Actualización de tiempo en tiempo real desde el servidor
         if (lastMessage.data.timerId && lastMessage.data.tiempoRestanteSegundos !== undefined) {
+          // Log temporal para debugging
+          console.log(`⏱️ Timer update: ${lastMessage.data.timerId} -> ${lastMessage.data.tiempoRestanteSegundos}s`);
+          
           setTimers(prev => prev.map(timer => {
             if (timer.id === lastMessage.data.timerId) {
               const nuevoTiempoRestante = lastMessage.data.tiempoRestanteSegundos;
@@ -206,6 +221,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       // Enviar timers locales que puedan no estar en el servidor
       const timersLocales = JSON.parse(localStorage.getItem('kryotec_timers') || '[]');
       if (timersLocales.length > 0) {
+        // Solo log si hay timers locales
         console.log('📤 Enviando timers locales al servidor...');
         timersLocales.forEach((timer: Timer) => {
           sendMessage({
@@ -242,7 +258,10 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             };
           });
           setTimers(timersActualizados);
-          console.log('🔄 Timers actualizados desde localStorage (fallback):', timersActualizados.length);
+          // Solo log si hay cambios importantes
+          if (timersActualizados.length > 0) {
+            console.log('🔄 Timers actualizados desde localStorage:', timersActualizados.length);
+          }
         } catch (error) {
           console.error('Error al cargar timers:', error);
         }
@@ -290,8 +309,13 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   // Actualizar timers cada segundo (solo si no hay conexión WebSocket activa)
   useEffect(() => {
     // Si estamos conectados al WebSocket, el servidor maneja las actualizaciones
-    if (isConnected) return;
+    // PERO mantener backup local por si el WebSocket falla
+    if (isConnected) {
+      console.log('🔗 WebSocket conectado - usando actualizaciones del servidor');
+      return;
+    }
 
+    console.log('📱 WebSocket desconectado - usando timer local como fallback');
     const interval = setInterval(() => {
       setTimers(prevTimers => 
         prevTimers.map(timer => {
@@ -402,7 +426,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       Notification.requestPermission();
     }
     
-    console.log('✅ Timer creado:', nuevoTimer.nombre, nuevoTimer.id);
+    // Solo log de timer creado, no detalles internos
+    console.log('✅ Timer creado:', nuevoTimer.nombre);
     return nuevoTimer.id;
   }, [isConnected, sendMessage]);
 

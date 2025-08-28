@@ -8,6 +8,8 @@ import httpx
 import os
 import json
 import asyncio
+import websockets
+import websockets.exceptions
 from typing import List, Dict
 from pydantic import BaseModel
 
@@ -117,6 +119,7 @@ SERVICE_URLS = {
     "alerts": _service_url("alerts", "alerts_service", "8003"),
     "activities": _service_url("activities", "activities_service", "8004"),
     "reports": _service_url("reports", "reports_service", "8005"),
+    "timer": _service_url("timer", "timer_service", "8006"),
     # Dashboard usa inventario
     "dashboard": _service_url("inventory", "inventory_service", "8002"),
 }
@@ -203,6 +206,82 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         print(f"❌ Error en WebSocket: {e}")
         manager.disconnect(websocket)
+
+# WebSocket proxy para Timer Service
+@app.websocket("/ws/timers")
+async def timer_websocket_proxy(websocket: WebSocket):
+    """Proxy WebSocket para conectar al Timer Service"""
+    timer_service_url = SERVICE_URLS.get("timer")
+    if not timer_service_url:
+        await websocket.close(code=1003, reason="Timer service not configured")
+        return
+    
+    # Convertir HTTP URL a WebSocket URL
+    timer_ws_url = timer_service_url.replace("http://", "ws://").replace("https://", "wss://") + "/ws/timers"
+    print(f"🔗 Proxying WebSocket to timer service: {timer_ws_url}")
+    
+    # Aceptar conexión del cliente
+    await websocket.accept()
+    
+    timer_ws = None
+    try:
+        # Conectar al timer service
+        timer_ws = await websockets.connect(timer_ws_url)
+        print(f"✅ Conectado al timer service WebSocket")
+        
+        # Crear tareas para proxy bidireccional
+        async def proxy_client_to_timer():
+            try:
+                while True:
+                    message = await websocket.receive_text()
+                    await timer_ws.send(message)
+                    # Solo mostrar tipo de mensaje para reducir logs
+                    try:
+                        msg_data = json.loads(message)
+                        print(f"📤 Cliente -> Timer: {msg_data.get('type', 'UNKNOWN')}")
+                    except:
+                        print(f"📤 Cliente -> Timer: [mensaje no JSON]")
+            except (WebSocketDisconnect, websockets.exceptions.ConnectionClosed):
+                print("🔌 Cliente desconectado del proxy")
+            except Exception as e:
+                print(f"❌ Error cliente->timer: {e}")
+        
+        async def proxy_timer_to_client():
+            try:
+                async for message in timer_ws:
+                    await websocket.send_text(message)
+                    # Solo mostrar tipo de mensaje para reducir logs
+                    try:
+                        msg_data = json.loads(message)
+                        print(f"📥 Timer -> Cliente: {msg_data.get('type', 'UNKNOWN')}")
+                    except:
+                        print(f"📥 Timer -> Cliente: [mensaje no JSON]")
+            except (WebSocketDisconnect, websockets.exceptions.ConnectionClosed):
+                print("🔌 Timer service desconectado del proxy")
+            except Exception as e:
+                print(f"❌ Error timer->cliente: {e}")
+        
+        # Ejecutar ambos proxies concurrentemente
+        await asyncio.gather(
+            proxy_client_to_timer(),
+            proxy_timer_to_client(),
+            return_exceptions=True
+        )
+        
+    except Exception as e:
+        print(f"❌ Error conectando al timer service: {e}")
+        # Enviar error al cliente
+        try:
+            await websocket.send_text(json.dumps({
+                "type": "ERROR",
+                "data": {"message": f"No se pudo conectar al servicio de timers: {e}"}
+            }))
+        except:
+            pass
+    finally:
+        if timer_ws:
+            await timer_ws.close()
+        print("🔌 Cerrando conexión proxy timer WebSocket")
 
 # Método para enviar notificaciones a través de WebSocket desde otros servicios
 # Este método puede ser llamado por otros endpoints cuando ocurren eventos importantes

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { PropiedadesDashboard } from '../../../shared/types';
 import Navbar from '../../../shared/components/Navbar';
 import Inicio from './Inicio';
-import RegistroMejorado from '../../registro/components/RegistroMejorado';
+import RegistroMejorado from '../../registro/components/Registro';
 import Inventario from '../../inventario/components/Inventario';
 import Operacion from '../../operacion/components/Operacion';
 import { Devolucion } from '../../devolucion';

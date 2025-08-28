@@ -84,18 +84,37 @@ const Inventario: React.FC = () => {
     setEliminandoItems(true);
     
     try {
-      // Eliminar cada item seleccionado
-      const promesasEliminacion = Array.from(itemsSeleccionados).map(id =>
-        apiServiceClient.delete(`/inventory/inventario/${id}`)
+      // Eliminar cada item seleccionado con mejor manejo de errores
+      const resultados = await Promise.allSettled(
+        Array.from(itemsSeleccionados).map(async (id) => {
+          try {
+            await apiServiceClient.delete(`/inventory/inventario/${id}`);
+            return { id, success: true };
+          } catch (error) {
+            console.error(`Error eliminando item ${id}:`, error);
+            return { id, success: false, error };
+          }
+        })
       );
       
-      await Promise.all(promesasEliminacion);
+      // Analizar resultados
+      const exitosos = resultados.filter(r => r.status === 'fulfilled' && r.value.success).length;
+      const fallidos = resultados.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)).length;
       
-      // Limpiar selecciones y recargar inventario
-      setItemsSeleccionados(new Set());
-      setMostrarConfirmacionEliminacion(false);
-      setError(null); // Limpiar cualquier error previo
-      await fetchInventario();
+      if (exitosos > 0) {
+        // Limpiar selecciones y recargar inventario
+        setItemsSeleccionados(new Set());
+        setMostrarConfirmacionEliminacion(false);
+        setError(null);
+        await fetchInventario();
+        
+        if (fallidos > 0) {
+          setError(`Se eliminaron ${exitosos} items. ${fallidos} items no pudieron ser eliminados.`);
+        }
+      } else {
+        setError('No se pudo eliminar ningún item. Verifique que los items no estén siendo utilizados en procesos activos.');
+      }
+      
     } catch (err) {
       console.error('Error eliminando items:', err);
       setError('Error al eliminar los items seleccionados. Por favor, inténtelo de nuevo.');

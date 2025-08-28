@@ -31,6 +31,7 @@ declare module 'lucide-react' {
   export const Wifi: LucideIcon;
   export const WifiOff: LucideIcon;
   export const AlertCircle: LucideIcon;
+  export const AlertTriangle: LucideIcon;
   export const Eye: LucideIcon;
   export const EyeOff: LucideIcon;
   export const Sun: LucideIcon;

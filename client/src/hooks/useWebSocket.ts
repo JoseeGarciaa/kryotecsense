@@ -31,6 +31,7 @@ export const useWebSocket = (url: string): UseWebSocketReturn => {
       ws.current = new WebSocket(url);
 
       ws.current.onopen = () => {
+        // Solo log inicial importante
         console.log('✅ WebSocket conectado');
         setIsConnected(true);
         reconnectAttempts.current = 0;
@@ -47,7 +48,10 @@ export const useWebSocket = (url: string): UseWebSocketReturn => {
       };
 
       ws.current.onclose = (event) => {
-        console.log('🔌 WebSocket desconectado:', event.code, event.reason);
+        // Solo log de desconexión si hay problema
+        if (event.code !== 1000) {
+          console.log('🔌 WebSocket desconectado:', event.code);
+        }
         setIsConnected(false);
         isReconnecting.current = false;
         
@@ -55,7 +59,11 @@ export const useWebSocket = (url: string): UseWebSocketReturn => {
         if (event.code !== 1000 && reconnectAttempts.current < maxReconnectAttempts) {
           reconnectAttempts.current++;
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current - 1), 30000);
-          console.log(`🔄 Intentando reconectar en ${delay}ms (intento ${reconnectAttempts.current}/${maxReconnectAttempts})`);
+          
+          // Solo log de reconexión cada 3 intentos para reducir spam
+          if (reconnectAttempts.current % 3 === 1) {
+            console.log(`🔄 Intentando reconectar en ${delay}ms (intento ${reconnectAttempts.current}/${maxReconnectAttempts})`);
+          }
           
           reconnectTimeoutRef.current = setTimeout(() => {
             if (reconnectAttempts.current <= maxReconnectAttempts) {

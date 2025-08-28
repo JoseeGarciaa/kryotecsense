@@ -40,7 +40,10 @@ export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) =>
       wsRef.current.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
-          console.log('📨 Mensaje WebSocket recibido:', message);
+          // Solo log mensajes importantes
+          if (message.type === 'activity_created' || message.type === 'inventory_updated') {
+            console.log('📨 Mensaje WebSocket:', message.type);
+          }
           
           if (onMessage) {
             onMessage(message);
@@ -51,13 +54,19 @@ export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) =>
       };
       
       wsRef.current.onclose = (event) => {
-        console.log('🔌 WebSocket desconectado:', event.code, event.reason);
+        // Solo log si es un cierre inesperado
+        if (event.code !== 1000) {
+          console.log('🔌 WebSocket desconectado:', event.code);
+        }
         setIsConnected(false);
         
         // Intentar reconectar si no fue un cierre intencional
         if (event.code !== 1000 && reconnectAttempts.current < maxReconnectAttempts) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
-          console.log(`🔄 Reintentando conexión en ${delay}ms (intento ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
+          // Solo log cada 3 intentos para reducir spam
+          if (reconnectAttempts.current % 3 === 0) {
+            console.log(`🔄 Reintentando conexión en ${delay}ms (intento ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
+          }
           
           reconnectTimeoutRef.current = window.setTimeout(() => {
             reconnectAttempts.current++;
@@ -97,7 +106,8 @@ export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) =>
   const sendMessage = (message: WebSocketMessage) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(message));
-      console.log('📤 Mensaje WebSocket enviado:', message);
+      // Solo log mensajes importantes
+      console.log('📤 Mensaje WebSocket enviado:', message.type);
     } else {
       console.warn('⚠️ WebSocket no está conectado, no se puede enviar mensaje');
     }

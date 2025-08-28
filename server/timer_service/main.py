@@ -318,6 +318,7 @@ class TimerManager:
                     tiempo_restante_ms = (timer.fechaFin - current_time).total_seconds()
                     nuevo_tiempo_restante = max(0, int(tiempo_restante_ms))
                     
+                    # Actualizar timer si hay cambio
                     if nuevo_tiempo_restante != timer.tiempoRestanteSegundos:
                         timer.tiempoRestanteSegundos = nuevo_tiempo_restante
                         timers_changed = True
@@ -327,15 +328,17 @@ class TimerManager:
                             timer.completado = True
                             timer.activo = False
                             logger.info(f"Timer completado: {timer.nombre} ({timer_id})")
-                            
-                        updated_timers.append({
-                            "timerId": timer_id,
-                            "tiempoRestanteSegundos": nuevo_tiempo_restante,
-                            "completado": timer.completado,
-                            "activo": timer.activo
-                        })
+                    
+                    # SIEMPRE enviar actualización para timers activos
+                    # Esto garantiza que el frontend se mantenga sincronizado
+                    updated_timers.append({
+                        "timerId": timer_id,
+                        "tiempoRestanteSegundos": timer.tiempoRestanteSegundos,
+                        "completado": timer.completado,
+                        "activo": timer.activo
+                    })
                 
-                # Enviar actualizaciones si hay cambios
+                # Enviar actualizaciones para todos los timers activos
                 if updated_timers:
                     for update in updated_timers:
                         await self.broadcast({
