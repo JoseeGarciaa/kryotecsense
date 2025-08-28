@@ -97,12 +97,22 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     switch (lastMessage.type) {
       case 'TIMER_SYNC':
         // Sincronizar todos los timers desde el servidor
+        console.log('✅ Respuesta de sincronización recibida del servidor');
+        
+        // Limpiar timeout de sincronización
+        if (syncTimeoutId) {
+          clearTimeout(syncTimeoutId);
+          setSyncTimeoutId(null);
+        }
+        
         if (lastMessage.data.timers) {
           const timersDelServidor = lastMessage.data.timers.map((timer: any) => ({
             ...timer,
             fechaInicio: new Date(timer.fechaInicio),
             fechaFin: new Date(timer.fechaFin)
           }));
+          
+          console.log(`📥 Sincronizando ${timersDelServidor.length} timers desde el servidor`);
           
           // Merge con timers locales (el servidor tiene prioridad)
           setTimers(prevTimers => {
@@ -114,8 +124,11 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             });
             
             const timersFinal = [...timersActualizados, ...timersNuevos];
+            console.log(`🔄 Timers después de sincronización: ${timersFinal.length}`);
             return timersFinal;
           });
+        } else {
+          console.log('📭 Sin timers en el servidor');
         }
         break;
 
@@ -198,6 +211,9 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     }
   }, [lastMessage, onTimerComplete]);
 
+  // Estado para manejar timeouts de sincronización
+  const [syncTimeoutId, setSyncTimeoutId] = useState<NodeJS.Timeout | null>(null);
+
   // Solicitar sincronización inicial cuando se conecte
   useEffect(() => {
     if (isConnected && isInitialized) {
@@ -211,21 +227,38 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         }))
       );
       
-      sendMessage({
-        type: 'REQUEST_SYNC'
-      });
-      
-      // Enviar timers locales que puedan no estar en el servidor
-      const timersLocales = JSON.parse(localStorage.getItem('kryotec_timers') || '[]');
-      if (timersLocales.length > 0) {
-        timersLocales.forEach((timer: Timer) => {
-          sendMessage({
-            type: 'CREATE_TIMER',
-            data: { timer }
-          });
-        });
+      // Limpiar timeout anterior si existe
+      if (syncTimeoutId) {
+        clearTimeout(syncTimeoutId);
       }
+      
+      // Esperar un poco antes de solicitar sincronización para evitar conflictos
+      setTimeout(() => {
+        console.log('📡 Enviando REQUEST_SYNC al servidor...');
+        sendMessage({
+          type: 'REQUEST_SYNC'
+        });
+        
+        // Configurar timeout para la sincronización
+        const timeoutId = setTimeout(() => {
+          console.log('⏰ Timeout de sincronización - continuando con timers locales');
+          // No hacer nada especial, los timers locales seguirán funcionando
+        }, 5000); // 5 segundos de timeout
+        
+        setSyncTimeoutId(timeoutId);
+      }, 500);
+      
+      // NO enviar timers locales automáticamente para evitar errores de formato
+      // Los timers se crearán manualmente cuando sea necesario
     }
+    
+    // Limpiar timeout al desconectar
+    return () => {
+      if (syncTimeoutId) {
+        clearTimeout(syncTimeoutId);
+        setSyncTimeoutId(null);
+      }
+    };
   }, [isConnected, isInitialized, sendMessage]);
 
   // Cargar timers del localStorage cuando no hay conexión WebSocket (fallback)
