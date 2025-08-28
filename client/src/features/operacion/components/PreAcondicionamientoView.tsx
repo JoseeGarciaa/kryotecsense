@@ -508,44 +508,48 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   // Estado para prevenir clics múltiples en botones de limpiar
   const [botonesLimpiandoSet, setBotonesLimpiandoSet] = useState<Set<string>>(new Set());
 
-  // Función para limpiar timer con debounce
+  // Función para limpiar timer con debounce (OPTIMIZADA)
   const limpiarTimerConDebounce = useCallback(async (timerId: string, rfid: string) => {
-    // Prevenir múltiples clics del mismo botón
-    if (botonesLimpiandoSet.has(timerId)) {
-      console.log(`⚠️ Timer ${timerId} ya está siendo limpiado, ignorando clic múltiple`);
-      return;
-    }
-
-    try {
-      // Marcar como "limpiando" para prevenir clics múltiples
-      setBotonesLimpiandoSet(prev => new Set(prev).add(timerId));
+    // Prevenir múltiples clics usando ref para verificar estado actual
+    setBotonesLimpiandoSet(prev => {
+      if (prev.has(timerId)) {
+        console.log(`⚠️ Timer ${timerId} ya está siendo limpiado, ignorando clic múltiple`);
+        return prev; // No cambiar el estado
+      }
       
+      // Marcar como "limpiando" inmediatamente
       console.log(`🧹 Limpiando timer individual: ${timerId} - ${rfid}`);
       
-      // Eliminar el timer
-      eliminarTimer(timerId);
+      // Iniciar proceso de eliminación en el siguiente tick
+      setTimeout(async () => {
+        try {
+          eliminarTimer(timerId);
+          console.log('✅ Timer limpiado exitosamente');
+          
+          // Limpiar estado después de un breve delay
+          setTimeout(() => {
+            setBotonesLimpiandoSet(current => {
+              const nuevo = new Set(current);
+              nuevo.delete(timerId);
+              return nuevo;
+            });
+          }, 500); // Reducido de 1000ms a 500ms
+          
+        } catch (error) {
+          console.error('❌ Error al limpiar timer:', error);
+          // Limpiar estado en caso de error
+          setBotonesLimpiandoSet(current => {
+            const nuevo = new Set(current);
+            nuevo.delete(timerId);
+            return nuevo;
+          });
+        }
+      }, 0);
       
-      console.log('✅ Timer limpiado exitosamente');
-      
-      // Limpiar estado después de un breve delay
-      setTimeout(() => {
-        setBotonesLimpiandoSet(prev => {
-          const nuevo = new Set(prev);
-          nuevo.delete(timerId);
-          return nuevo;
-        });
-      }, 1000);
-      
-    } catch (error) {
-      console.error('❌ Error al limpiar timer:', error);
-      // Limpiar estado en caso de error también
-      setBotonesLimpiandoSet(prev => {
-        const nuevo = new Set(prev);
-        nuevo.delete(timerId);
-        return nuevo;
-      });
-    }
-  }, [eliminarTimer, botonesLimpiandoSet]);
+      // Agregar al set inmediatamente para prevenir clics múltiples
+      return new Set(prev).add(timerId);
+    });
+  }, [eliminarTimer]); // Solo depende de eliminarTimer
 
   // Función para limpiar todos los timers completados
   const limpiarTodosLosTimersCompletados = async () => {

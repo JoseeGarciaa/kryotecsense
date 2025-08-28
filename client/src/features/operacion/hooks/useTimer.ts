@@ -96,11 +96,15 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
 
     switch (lastMessage.type) {
       case 'TIMER_SYNC':
-        // Sincronizar todos los timers desde el servidor
-        console.log('✅ Respuesta de sincronización recibida del servidor');
+        // Sincronizar todos los timers desde el servidor (SILENCIOSO)
+        // Solo log una vez para evitar spam
+        if (!localStorage.getItem('sync_response_logged')) {
+          console.log('✅ Respuesta de sincronización recibida');
+          localStorage.setItem('sync_response_logged', 'true');
+        }
         
         // Resetear estado de sincronización
-        setSyncRequested(false); // Permitir nueva sincronización si es necesario
+        setSyncRequested(false);
         
         if (lastMessage.data.timers) {
           const timersDelServidor = lastMessage.data.timers.map((timer: any) => ({
@@ -208,27 +212,33 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   // Estado para manejar sincronización (simplificado)
   const [syncRequested, setSyncRequested] = useState(false);
 
-  // Solicitar sincronización SOLO una vez al conectar (SIMPLIFICADO)
+  // Solicitar sincronización SOLO una vez al conectar (ULTRA SIMPLIFICADO)
   useEffect(() => {
-    // Evitar múltiples sincronizaciones
-    if (!isConnected || !isInitialized || syncRequested) return;
+    // Solo si conectó y no se ha pedido sincronización
+    if (isConnected && isInitialized && !syncRequested) {
+      // Solo log una vez y luego silenciar
+      if (!localStorage.getItem('sync_logged')) {
+        console.log('🔄 WebSocket conectado, sincronización inicial');
+        localStorage.setItem('sync_logged', 'true');
+      }
+      
+      setSyncRequested(true);
+      
+      // Enviar sincronización después de un pequeño delay
+      setTimeout(() => {
+        if (isConnected) {
+          sendMessage({
+            type: 'REQUEST_SYNC'
+          });
+        }
+      }, 200);
+    }
     
-    console.log('🔄 WebSocket conectado, solicitando sincronización única...');
-    setSyncRequested(true);
-    
-    // Solicitar sincronización inmediatamente
-    sendMessage({
-      type: 'REQUEST_SYNC'
-    });
-    
-  }, [isConnected, isInitialized, syncRequested, sendMessage]);
-
-  // Reset sync state cuando se desconecta
-  useEffect(() => {
+    // Reset cuando se desconecta
     if (!isConnected && syncRequested) {
       setSyncRequested(false);
     }
-  }, [isConnected, syncRequested]);
+  }, [isConnected, isInitialized]); // Solo dependencias esenciales
 
   // Cargar timers del localStorage cuando no hay conexión WebSocket (fallback)
   useEffect(() => {
