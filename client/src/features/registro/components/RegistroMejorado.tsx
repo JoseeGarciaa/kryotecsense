@@ -23,11 +23,10 @@ const RegistroMejorado: React.FC = () => {
   const [mostrarModalExito, setMostrarModalExito] = useState(false);
   const [itemsRegistrados, setItemsRegistrados] = useState<number>(0);
   const [ultimoInputProcesado, setUltimoInputProcesado] = useState('');
-  const [lecturasIgnoradas, setLecturasIgnoradas] = useState<number>(0);
   const rfidInputRef = useRef<HTMLInputElement>(null);
 
-  // Sistema anti-duplicados con debouncing de 2 segundos
-  const { isDuplicate, clearHistory } = useAntiDuplicate(2000);
+  // Sistema anti-duplicados con delay muy corto (100ms) solo para evitar doble-procesamiento accidental
+  const { isDuplicate, clearHistory } = useAntiDuplicate(100);
 
   // Función debounced para verificar RFID en base de datos
   const verificarRfidDebounced = useDebouncedCallback(async (rfid: string) => {
@@ -107,18 +106,17 @@ const RegistroMejorado: React.FC = () => {
     return rfids;
   };
 
-  // Función común para procesar un RFID con protección anti-duplicados
+  // Función común para procesar un RFID - SOLO evita duplicados reales, NO bloquea escaneos rápidos
   const procesarRfid = async (rfidLimpio: string) => {
-    // Verificar duplicados rápidos (mismo código en corto tiempo)
+    // Verificar duplicados accidentales (doble-click en <100ms) - MUY RESTRICTIVO
     if (isDuplicate(rfidLimpio)) {
-      setLecturasIgnoradas((prev: number) => prev + 1);
-      console.log(`⚠️ Código duplicado ignorado (lectura rápida): ${rfidLimpio}`);
-      setError(`Código ${rfidLimpio.substring(0, 8)}... ignorado (lectura muy rápida)`);
+      console.log(`⚠️ Doble-procesamiento evitado: ${rfidLimpio}`);
+      // NO mostrar error ni incrementar contador - es transparente al usuario
       setRfidInput('');
       return;
     }
 
-    // Verificar que no esté duplicado localmente
+    // Verificar que no esté duplicado localmente en esta sesión
     if (lecturasRfid.some((lectura: any) => lectura.rfid === rfidLimpio)) {
       setError(`RFID ${rfidLimpio} ya fue escaneado en esta sesión`);
       setRfidInput('');
@@ -204,7 +202,6 @@ const RegistroMejorado: React.FC = () => {
     setLecturasRfid([]);
     setError('');
     setUltimoInputProcesado('');
-    setLecturasIgnoradas(0);
     clearHistory(); // Limpiar historial anti-duplicados
     console.log('🧹 Todas las lecturas limpiadas');
   };
@@ -299,7 +296,6 @@ const RegistroMejorado: React.FC = () => {
       setLecturasRfid([]);
       setError('');
       setUltimoInputProcesado('');
-      setLecturasIgnoradas(0);
       clearHistory();
       
     } catch (err: any) {
@@ -423,16 +419,9 @@ const RegistroMejorado: React.FC = () => {
                   autoComplete="off"
                 />
                 <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-                    <p>
-                      Escaneados: <span className="font-medium text-green-600">{lecturasRfid.length}</span> elementos
-                    </p>
-                    {lecturasIgnoradas > 0 && (
-                      <p className="text-orange-600">
-                        Ignorados: <span className="font-medium">{lecturasIgnoradas}</span> (lecturas muy rápidas)
-                      </p>
-                    )}
-                  </div>
+                  <p>
+                    Escaneados: <span className="font-medium text-green-600">{lecturasRfid.length}</span> elementos
+                  </p>
                   <p className="text-blue-600">
                     🚀 Auto-procesamiento: Se procesa automáticamente al llegar a 24 caracteres
                   </p>
@@ -440,7 +429,7 @@ const RegistroMejorado: React.FC = () => {
                     ✅ Se verifican automáticamente los códigos duplicados en el sistema
                   </p>
                   <p className="text-orange-600">
-                    ⚡ Protección anti-duplicados: Los códigos repetidos en 2 segundos se ignoran
+                    ⚡ Escaneos rápidos permitidos: Solo se evitan duplicados reales
                   </p>
                 </div>
               </div>
@@ -524,11 +513,6 @@ const RegistroMejorado: React.FC = () => {
               {lecturasRfid.length > 0 && (
                 <span>Listo para registrar {lecturasRfid.length} item(s)</span>
               )}
-              {lecturasIgnoradas > 0 && (
-                <span className="block text-orange-600 mt-1">
-                  Se ignoraron {lecturasIgnoradas} lecturas duplicadas rápidas
-                </span>
-              )}
             </div>
             <button
               type="button"
@@ -570,7 +554,7 @@ const RegistroMejorado: React.FC = () => {
           </div>
           <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
             <p><strong>Nota:</strong> El lote se asignará posteriormente en la sección de Pre-acondicionamiento</p>
-            <p><strong>Protección anti-duplicados:</strong> Los códigos escaneados muy rápidamente (menos de 2 segundos) se ignoran automáticamente para evitar duplicaciones accidentales</p>
+            <p><strong>Escaneos rápidos:</strong> ¡Escanee tan rápido como desee! Solo se evitan duplicados reales (códigos ya escaneados o registrados)</p>
           </div>
         </div>
       </div>
