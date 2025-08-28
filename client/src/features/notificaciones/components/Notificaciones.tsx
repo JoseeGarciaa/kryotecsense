@@ -50,7 +50,7 @@ const Notificaciones: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-light-text dark:text-dark-text">Notificaciones</h1>
           <p className="text-gray-600 dark:text-gray-400">
@@ -67,47 +67,47 @@ const Notificaciones: React.FC = () => {
       </div>
 
       {/* Estadísticas rápidas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-light-card dark:bg-dark-card p-6 rounded-lg border border-light-border dark:border-dark-border">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="bg-light-card dark:bg-dark-card p-4 md:p-6 rounded-lg border border-light-border dark:border-dark-border">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Total de Alertas</p>
-              <p className="text-2xl font-bold text-blue-600">{alertas.length}</p>
+              <p className="text-xl md:text-2xl font-bold text-blue-600">{alertas.length}</p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-              <Bell className="w-6 h-6 text-blue-600" />
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+              <Bell className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-light-card dark:bg-dark-card p-6 rounded-lg border border-light-border dark:border-dark-border">
+        <div className="bg-light-card dark:bg-dark-card p-4 md:p-6 rounded-lg border border-light-border dark:border-dark-border">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">No Leídas</p>
-              <p className="text-2xl font-bold text-orange-600">{cantidadNoLeidas}</p>
+              <p className="text-xl md:text-2xl font-bold text-orange-600">{cantidadNoLeidas}</p>
             </div>
-            <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
-              <AlertCircle className="w-6 h-6 text-orange-600" />
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+              <AlertCircle className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-light-card dark:bg-dark-card p-6 rounded-lg border border-light-border dark:border-dark-border">
+        <div className="bg-light-card dark:bg-dark-card p-4 md:p-6 rounded-lg border border-light-border dark:border-dark-border sm:col-span-2 lg:col-span-1">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Resueltas</p>
-              <p className="text-2xl font-bold text-green-600">{alertas.filter(a => a.resuelta).length}</p>
+              <p className="text-xl md:text-2xl font-bold text-green-600">{alertas.filter((a: any) => a.resuelta).length}</p>
             </div>
-            <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
-              <CheckCircle className="w-6 h-6 text-green-600" />
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+              <CheckCircle className="w-5 h-5 md:w-6 md:h-6 text-green-600" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Lista de Notificaciones */}
-      <div className="bg-light-card dark:bg-dark-card rounded-lg border border-light-border dark:border-dark-border">
-        <div className="p-6 border-b border-light-border dark:border-dark-border">
+      <div className="bg-light-card dark:bg-dark-card rounded-lg border border-light-border dark:border-dark-border overflow-hidden">
+        <div className="p-4 md:p-6 border-b border-light-border dark:border-dark-border">
           <h2 className="text-lg font-semibold text-light-text dark:text-dark-text">
             Todas las Notificaciones
           </h2>
@@ -126,67 +126,68 @@ const Notificaciones: React.FC = () => {
               <p className="text-sm text-gray-500">Cuando recibas alertas aparecerán aquí</p>
             </div>
           ) : (
-            alertas.map((alerta) => {
+            alertas.map((alerta: any) => {
               const Icon = getAlertIcon(alerta.tipo_alerta);
               const colorClass = getAlertColor(alerta.tipo_alerta);
               
               return (
                 <div
                   key={alerta.id}
-                  className={`p-6 ${colorClass} border-l-4 ${!alerta.resuelta ? 'font-medium' : 'opacity-75'}`}
+                  className={`p-4 md:p-6 ${colorClass} border-l-4 ${!alerta.resuelta ? 'font-medium' : 'opacity-75'}`}
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
                     <div className="flex-shrink-0">
                       <Icon size={20} className="text-gray-600 dark:text-gray-400 mt-1" />
                     </div>
                     
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-                            {alerta.descripcion}
-                          </p>
-                          
-                          <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                            <span>{formatearFecha(alerta.fecha_creacion)}</span>
-                            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full">
-                              {alerta.tipo_alerta}
-                            </span>
-                            {alerta.inventario_id && (
-                              <span>ID Inventario: {alerta.inventario_id}</span>
-                            )}
-                          </div>
-                        </div>
+                    <div className="flex-1 min-w-0 w-full">
+                      {/* Contenido principal */}
+                      <div className="mb-3">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white mb-2 break-words">
+                          {alerta.descripcion}
+                        </p>
                         
-                        <div className="flex items-center gap-2 ml-4">
-                          {alerta.resuelta ? (
-                            <div className="flex items-center gap-1 text-green-600">
-                              <CheckCircle size={16} />
-                              <span className="text-xs">Resuelta</span>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => handleMarcarResuelta(alerta.id)}
-                              className="flex items-center gap-1 px-3 py-1 text-xs text-green-600 hover:text-green-800 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-green-500"
-                              title="Marcar como resuelta"
-                            >
-                              <CheckCircle size={14} />
-                              Resolver
-                            </button>
-                          )}
-                          
-                          {/* Botón de eliminar solo para administradores */}
-                          {esAdministrador && (
-                            <button
-                              onClick={() => handleEliminarAlerta(alerta.id)}
-                              className="flex items-center gap-1 px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
-                              title="Eliminar alerta (solo administradores)"
-                            >
-                              <Trash2 size={14} />
-                              Eliminar
-                            </button>
+                        {/* Metadatos en móvil - formato vertical */}
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs text-gray-500 dark:text-gray-400">
+                          <span className="break-words">{formatearFecha(alerta.fecha_creacion)}</span>
+                          <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full inline-block w-fit">
+                            {alerta.tipo_alerta}
+                          </span>
+                          {alerta.inventario_id && (
+                            <span className="break-words">ID: {alerta.inventario_id}</span>
                           )}
                         </div>
+                      </div>
+                      
+                      {/* Botones de acción */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+                        {alerta.resuelta ? (
+                          <div className="flex items-center gap-1 text-green-600">
+                            <CheckCircle size={16} />
+                            <span className="text-xs">Resuelta</span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleMarcarResuelta(alerta.id)}
+                            className="flex items-center gap-1 px-3 py-2 text-xs text-green-600 hover:text-green-800 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 w-full sm:w-auto justify-center sm:justify-start"
+                            title="Marcar como resuelta"
+                          >
+                            <CheckCircle size={14} />
+                            Resolver
+                          </button>
+                        )}
+                        
+                        {/* Botón de eliminar solo para administradores */}
+                        {esAdministrador && (
+                          <button
+                            onClick={() => handleEliminarAlerta(alerta.id)}
+                            className="flex items-center gap-1 px-3 py-2 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 w-full sm:w-auto justify-center sm:justify-start"
+                            title="Eliminar alerta (solo administradores)"
+                          >
+                            <Trash2 size={14} />
+                            Eliminar
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -23,6 +23,7 @@ const RegistroMejorado: React.FC = () => {
   const [mostrarModalExito, setMostrarModalExito] = useState(false);
   const [itemsRegistrados, setItemsRegistrados] = useState<number>(0);
   const [ultimoInputProcesado, setUltimoInputProcesado] = useState('');
+  const [mostrarCodigosDuplicados, setMostrarCodigosDuplicados] = useState(false);
   const rfidInputRef = useRef<HTMLInputElement>(null);
 
   // Sistema anti-duplicados con delay muy corto (100ms) solo para evitar doble-procesamiento accidental
@@ -202,6 +203,7 @@ const RegistroMejorado: React.FC = () => {
     setLecturasRfid([]);
     setError('');
     setUltimoInputProcesado('');
+    setMostrarCodigosDuplicados(false);
     clearHistory(); // Limpiar historial anti-duplicados
     console.log('🧹 Todas las lecturas limpiadas');
   };
@@ -296,6 +298,7 @@ const RegistroMejorado: React.FC = () => {
       setLecturasRfid([]);
       setError('');
       setUltimoInputProcesado('');
+      setMostrarCodigosDuplicados(false);
       clearHistory();
       
     } catch (err: any) {
@@ -330,7 +333,7 @@ const RegistroMejorado: React.FC = () => {
         </p>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 sm:p-6 max-w-none lg:max-w-4xl mx-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 sm:p-6 max-w-none lg:max-w-4xl lg:mx-0">
         <div className="flex items-center mb-4 sm:mb-6">
           <Package className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600 mr-3" />
           <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
@@ -494,15 +497,47 @@ const RegistroMejorado: React.FC = () => {
               <div className="flex items-start">
                 <AlertTriangle className="h-5 w-5 text-yellow-400 mr-2 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <span className="text-yellow-800 dark:text-yellow-200 font-medium">
-                    {duplicadosDetectados.length} código(s) duplicado(s) detectado(s)
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-yellow-800 dark:text-yellow-200 font-medium">
+                      {duplicadosDetectados.length} código(s) duplicado(s) detectado(s)
+                    </span>
+                    <button
+                      onClick={() => setMostrarCodigosDuplicados(!mostrarCodigosDuplicados)}
+                      className="ml-2 text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200 transition-colors"
+                      title={mostrarCodigosDuplicados ? "Ocultar códigos" : "Mostrar códigos"}
+                    >
+                      <div className="flex items-center text-sm">
+                        <span className="mr-1">{mostrarCodigosDuplicados ? "Ocultar" : "Ver"}</span>
+                        <div className={`transform transition-transform ${mostrarCodigosDuplicados ? "rotate-45" : "rotate-0"}`}>
+                          <Plus className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </button>
+                  </div>
                   <div className="mt-1 text-sm text-yellow-700 dark:text-yellow-300">
                     Los siguientes códigos ya están registrados en el sistema:
                   </div>
-                  <div className="mt-1 text-xs font-mono text-yellow-600 dark:text-yellow-400 break-all">
-                    {duplicadosDetectados.join(', ')}
-                  </div>
+                  {mostrarCodigosDuplicados && (
+                    <div className="mt-2 max-h-32 overflow-y-auto bg-yellow-100/50 dark:bg-yellow-900/30 rounded-md p-2">
+                      <div className="text-xs font-mono text-yellow-600 dark:text-yellow-400 space-y-1">
+                        {duplicadosDetectados.map((codigo, index) => (
+                          <div key={index} className="break-all bg-white dark:bg-gray-800 rounded px-2 py-1 border border-yellow-200 dark:border-yellow-700">
+                            {codigo}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {!mostrarCodigosDuplicados && duplicadosDetectados.length > 3 && (
+                    <div className="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
+                      {duplicadosDetectados.slice(0, 2).join(', ')}... y {duplicadosDetectados.length - 2} más
+                    </div>
+                  )}
+                  {!mostrarCodigosDuplicados && duplicadosDetectados.length <= 3 && (
+                    <div className="mt-1 text-xs font-mono text-yellow-600 dark:text-yellow-400 break-all">
+                      {duplicadosDetectados.join(', ')}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

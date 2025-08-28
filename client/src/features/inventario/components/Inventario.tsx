@@ -13,6 +13,8 @@ const Inventario: React.FC = () => {
   const [credocubeSeleccionado, setCredocubeSeleccionado] = useState<Credocube | null>(null);
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
   const [paginaActual, setPaginaActual] = useState(1);
+  const [itemsSeleccionados, setItemsSeleccionados] = useState<Set<number>>(new Set());
+  const [mostrarConfirmacionEliminacion, setMostrarConfirmacionEliminacion] = useState(false);
   const registrosPorPagina = 100;
 
   const fetchInventario = async () => {
@@ -32,18 +34,20 @@ const Inventario: React.FC = () => {
     }
   };
 
-  // Función de búsqueda
+  // Función de búsqueda con truncamiento a 24 caracteres
   const manejarBusqueda = (termino: string) => {
-    setTerminoBusqueda(termino);
+    // Truncar a 24 caracteres máximo
+    const terminoTruncado = termino.slice(0, 24);
+    setTerminoBusqueda(terminoTruncado);
     setPaginaActual(1); // Resetear a la primera página
     
-    if (!termino.trim()) {
+    if (!terminoTruncado.trim()) {
       setInventarioFiltrado(inventario);
       return;
     }
 
-    const terminoLower = termino.toLowerCase();
-    const resultados = inventario.filter(item => 
+    const terminoLower = terminoTruncado.toLowerCase();
+    const resultados = inventario.filter((item: Credocube) => 
       item.nombre_unidad?.toLowerCase().includes(terminoLower) ||
       item.rfid?.toLowerCase().includes(terminoLower) ||
       item.lote?.toLowerCase().includes(terminoLower) ||
@@ -51,6 +55,47 @@ const Inventario: React.FC = () => {
     );
     
     setInventarioFiltrado(resultados);
+  };
+
+  // Funciones de selección múltiple
+  const toggleSeleccionItem = (id: number) => {
+    const nuevasSelecciones = new Set(itemsSeleccionados);
+    if (nuevasSelecciones.has(id)) {
+      nuevasSelecciones.delete(id);
+    } else {
+      nuevasSelecciones.add(id);
+    }
+    setItemsSeleccionados(nuevasSelecciones);
+  };
+
+  const seleccionarTodos = () => {
+    const todosLosIds = new Set(registrosActuales.map((item: Credocube) => item.id));
+    setItemsSeleccionados(todosLosIds);
+  };
+
+  const limpiarSeleccion = () => {
+    setItemsSeleccionados(new Set());
+  };
+
+  const eliminarSeleccionados = async () => {
+    if (itemsSeleccionados.size === 0) return;
+    
+    try {
+      // Eliminar cada item seleccionado
+      const promesasEliminacion = Array.from(itemsSeleccionados).map(id =>
+        apiServiceClient.delete(`/inventory/inventario/${id}`)
+      );
+      
+      await Promise.all(promesasEliminacion);
+      
+      // Limpiar selecciones y recargar inventario
+      setItemsSeleccionados(new Set());
+      setMostrarConfirmacionEliminacion(false);
+      fetchInventario();
+    } catch (err) {
+      console.error('Error eliminando items:', err);
+      setError('Error al eliminar los items seleccionados. Por favor, inténtelo de nuevo.');
+    }
   };
 
   // Cálculos de paginación
@@ -116,16 +161,44 @@ const Inventario: React.FC = () => {
 
       {/* Búsqueda */}
       <div className="bg-light-card dark:bg-dark-card p-4 rounded-lg border border-light-border dark:border-dark-border">
-        <div className="relative w-full max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input 
-            type="text" 
-            value={terminoBusqueda}
-            onChange={(e) => manejarBusqueda(e.target.value)}
-            placeholder="Buscar por nombre, RFID, lote o estado..." 
-            className="w-full pl-10 pr-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" 
-          />
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input 
+              type="text" 
+              value={terminoBusqueda}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => manejarBusqueda(e.target.value)}
+              placeholder="Buscar por nombre, RFID, lote o estado..." 
+              className="w-full pl-10 pr-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" 
+              maxLength={24}
+            />
+            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {terminoBusqueda.length}/24 caracteres
+            </div>
+          </div>
+          
+          {/* Controles de selección múltiple */}
+          {itemsSeleccionados.size > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {itemsSeleccionados.size} seleccionado{itemsSeleccionados.size !== 1 ? 's' : ''}
+              </span>
+              <button
+                onClick={limpiarSeleccion}
+                className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+              >
+                Limpiar
+              </button>
+              <button
+                onClick={() => setMostrarConfirmacionEliminacion(true)}
+                className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+              >
+                Eliminar
+              </button>
+            </div>
+          )}
         </div>
+        
         {terminoBusqueda && (
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             {inventarioFiltrado.length} resultado{inventarioFiltrado.length !== 1 ? 's' : ''} encontrado{inventarioFiltrado.length !== 1 ? 's' : ''}
@@ -148,7 +221,22 @@ const Inventario: React.FC = () => {
           <table className="min-w-full text-sm text-left text-gray-500 dark:text-gray-400 table-fixed">
             <thead className="text-xs text-light-text uppercase bg-primary-50 dark:bg-primary-900 dark:text-dark-text">
               <tr>
-
+                <th scope="col" className="px-3 py-3 w-12">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={registrosActuales.length > 0 && registrosActuales.every((item: Credocube) => itemsSeleccionados.has(item.id))}
+                      onChange={() => {
+                        if (registrosActuales.every((item: Credocube) => itemsSeleccionados.has(item.id))) {
+                          limpiarSeleccion();
+                        } else {
+                          seleccionarTodos();
+                        }
+                      }}
+                      className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                    />
+                  </div>
+                </th>
                 <th scope="col" className="px-3 py-3 w-32">Nombre Unidad</th>
                 <th scope="col" className="px-3 py-3 w-24">Modelo ID</th>
                 <th scope="col" className="px-3 py-3 w-24">RFID</th>
@@ -167,7 +255,14 @@ const Inventario: React.FC = () => {
             <tbody>
               {registrosActuales.map((item: Credocube) => (
                 <tr key={item.id} className="bg-light-card border-b dark:bg-dark-card dark:border-dark-border hover:bg-primary-50 dark:hover:bg-primary-900">
-
+                  <td className="px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={itemsSeleccionados.has(item.id)}
+                      onChange={() => toggleSeleccionItem(item.id)}
+                      className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                    />
+                  </td>
                   <td className="px-3 py-3 whitespace-nowrap">{item.nombre_unidad}</td>
                   <td className="px-3 py-3 whitespace-nowrap">{item.modelo_id}</td>
                   <td className="px-3 py-3 font-mono text-xs whitespace-nowrap">{item.rfid}</td>
@@ -274,6 +369,34 @@ const Inventario: React.FC = () => {
             setCredocubeSeleccionado(null);
           }} 
         />
+      )}
+
+      {/* Modal de confirmación para eliminación múltiple */}
+      {mostrarConfirmacionEliminacion && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Confirmar eliminación múltiple
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              ¿Está seguro de que desea eliminar {itemsSeleccionados.size} registro{itemsSeleccionados.size !== 1 ? 's' : ''} seleccionado{itemsSeleccionados.size !== 1 ? 's' : ''}? Esta acción no se puede deshacer.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setMostrarConfirmacionEliminacion(false)}
+                className="px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={eliminarSeleccionados}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+              >
+                Eliminar {itemsSeleccionados.size} registro{itemsSeleccionados.size !== 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

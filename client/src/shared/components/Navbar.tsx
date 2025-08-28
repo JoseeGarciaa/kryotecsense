@@ -441,32 +441,133 @@ const Navbar: React.FC<NavbarProps> = ({ seccionActiva, onSeccionChange, onCerra
           </div>
         </div>
 
-        {/* Mobile Menu */}
+        {/* Mobile Menu - Sidebar lateral */}
         {menuAbierto && (
-          <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-light-bg dark:bg-dark-bg border-b border-light-border dark:border-dark-border">
-              {elementosMenu.map((item) => {
-                const IconoComponente = item.icono;
-                return (
+          <>
+            {/* Overlay para cerrar al hacer clic fuera */}
+            <div 
+              className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+              onClick={() => setMenuAbierto(false)}
+            />
+            
+            {/* Sidebar móvil */}
+            <div className={`fixed top-0 left-0 z-50 h-full w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out md:hidden ${menuAbierto ? 'translate-x-0' : '-translate-x-full'}`}>
+              {/* Header del sidebar móvil */}
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">K</span>
+                  </div>
+                  <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white">KryoTecSense</span>
+                </div>
+                <button
+                  onClick={() => setMenuAbierto(false)}
+                  className="p-2 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              
+              {/* Navigation del sidebar móvil */}
+              <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+                {elementosMenu.map((item) => {
+                  const IconoComponente = item.icono;
+                  return (
+                    <div key={item.id} className="relative">
+                      <button
+                        onClick={() => item.tieneSubmenu ? toggleSubmenu(item.id) : (onSeccionChange(item.id), setMenuAbierto(false))}
+                        className={`group flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md w-full text-left transition-colors duration-200 ${
+                          seccionActiva.startsWith(item.id)
+                            ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-200'
+                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center">
+                          <IconoComponente className="mr-3 h-5 w-5" />
+                          <span>{item.nombre}</span>
+                        </div>
+                        {item.tieneSubmenu && (
+                          <ChevronRight className={`h-4 w-4 transition-transform ${submenuAbierto === item.id ? 'transform rotate-90' : ''}`} />
+                        )}
+                      </button>
+                      
+                      {/* Submenú para elementos con submenu */}
+                      {item.tieneSubmenu && submenuAbierto === item.id && (
+                        <div className="pl-4 mt-1 space-y-1">
+                          {item.submenu?.map((subItem) => (
+                            <button
+                              key={subItem.id}
+                              onClick={() => {
+                                onSeccionChange(subItem.id);
+                                setMenuAbierto(false);
+                              }}
+                              className={`flex items-center px-3 py-2 text-sm font-medium rounded-md w-full text-left transition-colors duration-200 ${
+                                seccionActiva === subItem.id
+                                  ? 'bg-primary-50 dark:bg-primary-800 text-primary-700 dark:text-primary-200'
+                                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
+                              }`}
+                            >
+                              <span className="ml-2">{subItem.nombre}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </nav>
+              
+              {/* Footer del sidebar móvil - Información del usuario */}
+              <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+                <div className="flex items-center">
+                  <div className="h-10 w-10 rounded-full bg-primary-100 dark:bg-primary-800 flex items-center justify-center">
+                    <User className="h-6 w-6 text-primary-600 dark:text-primary-300" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{nombreUsuario}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{usuario.correo}</p>
+                  </div>
+                </div>
+                
+                {/* Botones de acción rápida en el sidebar móvil */}
+                <div className="mt-3 space-y-1">
                   <button
-                    key={item.id}
-                    onClick={() => {
-                      onSeccionChange(item.id);
-                      setMenuAbierto(false);
+                    onClick={() => { 
+                      onSeccionChange('configuracion'); 
+                      setMenuAbierto(false); 
                     }}
-                    className={`group flex items-center px-3 py-2 text-base font-medium rounded-md w-full text-left transition-colors duration-200 ${
-                      seccionActiva === item.id
-                        ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-200'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
-                    }`}
+                    className="flex items-center w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded-md"
                   >
-                    <IconoComponente className="mr-3 h-6 w-6" />
-                    {item.nombre}
+                    <Settings className="h-4 w-4 mr-3" />
+                    Configuración
                   </button>
-                );
-              })}
+                  <button
+                    onClick={() => { 
+                      alternarTema(); 
+                      setMenuUsuarioAbierto(false); 
+                    }}
+                    className="flex items-center w-full px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded-md"
+                  >
+                    {tema === 'claro' ? 
+                      <Sun className="h-4 w-4 mr-3" /> : 
+                      <Moon className="h-4 w-4 mr-3" />
+                    }
+                    Modo {tema === 'claro' ? 'oscuro' : 'claro'}
+                  </button>
+                  <button
+                    onClick={() => { 
+                      onCerrarSesion(); 
+                      setMenuAbierto(false); 
+                    }}
+                    className="flex items-center w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-700 dark:hover:text-red-300 rounded-md"
+                  >
+                    <LogOut className="h-4 w-4 mr-3" />
+                    Cerrar sesión
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </>
