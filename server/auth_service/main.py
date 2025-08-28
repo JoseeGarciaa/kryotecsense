@@ -52,11 +52,13 @@ origins = [
 # Permitir orígenes adicionales desde entorno: FRONTEND_ORIGIN (uno) o CORS_ALLOW_ORIGINS (lista separada por comas)
 env_origin = os.getenv("FRONTEND_ORIGIN")
 if env_origin:
-    origins.append(env_origin)
+    safe_origin = env_origin.strip().rstrip("/")
+    if safe_origin not in origins:
+        origins.append(safe_origin)
 env_origins_csv = os.getenv("CORS_ALLOW_ORIGINS")
 if env_origins_csv:
-    for o in [x.strip() for x in env_origins_csv.split(",") if x.strip()]:
-        if o not in origins:
+    for o in [x.strip().rstrip("/") for x in env_origins_csv.split(",") if x.strip()]:
+        if o and o not in origins:
             origins.append(o)
 
 app.add_middleware(

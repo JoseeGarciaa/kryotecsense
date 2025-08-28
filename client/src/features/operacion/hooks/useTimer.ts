@@ -20,7 +20,20 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   const [isInitialized, setIsInitialized] = useState(false);
   
   // WebSocket para sincronización en tiempo real (configurable por env)
-  const timerWsUrl = import.meta.env.VITE_TIMER_WS_URL || 'ws://localhost:8006/ws/timers';
+  // Preferir VITE_TIMER_WS_URL; si no existe, derivar de VITE_API_URL cambiando http->ws y anexando /ws/timers.
+  const derivedWsFromApi = (() => {
+    const api = import.meta.env.VITE_API_URL as string | undefined;
+    if (!api) return undefined;
+    try {
+      // limpiar slash final y convertir esquema
+      const base = api.replace(/\/$/, "");
+      const wsBase = base.replace(/^http/, "ws");
+      return `${wsBase}/ws/timers`;
+    } catch {
+      return undefined;
+    }
+  })();
+  const timerWsUrl = (import.meta.env.VITE_TIMER_WS_URL as string) || derivedWsFromApi || 'ws://localhost:8006/ws/timers';
   const { isConnected, sendMessage, lastMessage } = useWebSocket(timerWsUrl);
 
   // Cargar timers del localStorage al inicializar
