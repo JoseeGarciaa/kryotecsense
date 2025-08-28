@@ -1069,16 +1069,6 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             </div>
           </div>
         </div>
-                          Seleccionar por lote
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
         
         {/* Barra de búsqueda */}
         <div className="p-3 sm:p-4 bg-gray-50 border-b border-gray-200">
