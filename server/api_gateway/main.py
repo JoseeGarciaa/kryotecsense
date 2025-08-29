@@ -618,7 +618,7 @@ class TimerManager:
         timer_logger.info("tick_timers iniciado - comenzando loop de actualización")
         while self.running:
             try:
-                current_time = datetime.utcnow()
+                current_time = get_utc_now()  # Usar get_utc_now() para consistencia de timezone
                 updated_timers = []
                 timers_changed = False
                 
