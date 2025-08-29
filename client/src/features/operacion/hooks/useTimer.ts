@@ -21,19 +21,10 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [serverTimeDiff, setServerTimeDiff] = useState<number>(0);
   
-  // WebSocket para sincronización en tiempo real
-  const derivedWsFromApi = (() => {
-    const api = import.meta.env.VITE_API_URL as string | undefined;
-    if (!api) return undefined;
-    try {
-      const base = api.replace(/\/$/, "");
-      const wsBase = base.replace(/^https/, "wss").replace(/^http/, "ws");
-      return `${wsBase}/ws/timers`;
-    } catch {
-      return undefined;
-    }
-  })();
-  const timerWsUrl = (import.meta.env.VITE_TIMER_WS_URL as string) || derivedWsFromApi || 'ws://localhost:8006/ws/timers';
+  // WebSocket para sincronización en tiempo real - CONFIGURACIÓN SIMPLIFICADA
+  const timerWsUrl = import.meta.env.VITE_TIMER_WS_URL || 'wss://kryotecsense-production.up.railway.app/ws/timers';
+  
+  console.log('🔌 Conectando WebSocket:', timerWsUrl);
   
   const { isConnected, sendMessage, lastMessage } = useWebSocket(timerWsUrl);
 

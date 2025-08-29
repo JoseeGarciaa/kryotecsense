@@ -15,11 +15,11 @@ COPY . .
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Comando configurable por variable de entorno START_CMD; por defecto levanta auth_service
+# Comando configurable por variable de entorno START_CMD; por defecto levanta api_gateway
 # Puedes sobrescribirlo en Railway añadiendo la variable START_CMD, por ejemplo:
+#  - START_CMD="python -m auth_service.main"
 #  - START_CMD="python -m inventory_service.main"
-#  - START_CMD="python -m api_gateway.main"
-ENV START_CMD="python -m auth_service.main"
+ENV START_CMD="python -m api_gateway.main"
 
 # Ejecutar el comando configurado (usa $PORT si tu script lo lee)
 CMD ["sh", "-c", "$START_CMD"]

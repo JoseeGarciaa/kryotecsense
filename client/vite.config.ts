@@ -6,9 +6,12 @@ export default defineConfig({
   plugins: [react()],
   base: '/',  // Usar rutas absolutas para los assets
   define: {
-  // Legacy WS constants kept for compatibility; actual WS URL now derives from VITE_API_URL -> /ws/timers
-  'import.meta.env.VITE_WS_URL': JSON.stringify(''),
-  'import.meta.env.VITE_WS_LOCAL_URL': JSON.stringify(''),
+    // Configuración explícita de variables de entorno
+    'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || 'https://kryotecsense-production.up.railway.app'),
+    'import.meta.env.VITE_TIMER_WS_URL': JSON.stringify(process.env.VITE_TIMER_WS_URL || 'wss://kryotecsense-production.up.railway.app/ws/timers'),
+    // Legacy WS constants kept for compatibility
+    'import.meta.env.VITE_WS_URL': JSON.stringify(''),
+    'import.meta.env.VITE_WS_LOCAL_URL': JSON.stringify(''),
   },
   build: {
     // Optimizaciones para reducir uso de memoria
