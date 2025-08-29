@@ -2866,6 +2866,30 @@ async def get_timers():
         "count": len(timer_manager.timers)
     }
 
+# REST API endpoint para crear timer
+@app.post("/api/timers")
+async def create_timer(timer_data: dict):
+    """Crear un timer via REST API"""
+    try:
+        # Validar datos mínimos
+        if not timer_data.get("nombre"):
+            raise HTTPException(status_code=400, detail="nombre es requerido")
+        if not timer_data.get("tipoOperacion"):
+            raise HTTPException(status_code=400, detail="tipoOperacion es requerido")
+        if not timer_data.get("tiempoInicialMinutos"):
+            raise HTTPException(status_code=400, detail="tiempoInicialMinutos es requerido")
+            
+        # Crear timer usando el timer_manager
+        await timer_manager.create_timer(timer_data, websocket=None)
+        
+        return {
+            "message": "Timer creado exitosamente",
+            "timer_id": timer_data.get("nombre"),
+            "timers_count": len(timer_manager.timers)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creando timer: {str(e)}")
+
 # Test endpoint sin autenticación
 @app.get("/api/test/simple")
 def test_simple():
