@@ -14,6 +14,7 @@ import logging
 import os
 import sys
 import jwt
+import uvicorn
 
 # Agregar el directorio padre al path para importar módulos
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -2686,13 +2687,18 @@ def who_am_i(current_user: dict = Depends(get_current_user_from_token)):
 @app.on_event("startup")
 async def startup_event():
     """Iniciar el loop de actualización de timers"""
-    timer_logger.info("=== STARTUP EVENT EJECUTADO ===")
-    timer_logger.info(f"Timer manager inicializado: {timer_manager is not None}")
-    timer_logger.info(f"Timer manager timers: {len(timer_manager.timers) if timer_manager else 0}")
-    
-    task = asyncio.create_task(timer_manager.tick_timers())
-    timer_logger.info("=== BACKGROUND TASK CREADO ===")
-    timer_logger.info("Servicio de timers iniciado con background task")
+    try:
+        timer_logger.info("=== STARTUP EVENT EJECUTADO ===")
+        timer_logger.info(f"Timer manager inicializado: {timer_manager is not None}")
+        timer_logger.info(f"Timer manager timers: {len(timer_manager.timers) if timer_manager else 0}")
+        
+        # Comentamos temporalmente el background task para diagnosticar
+        # task = asyncio.create_task(timer_manager.tick_timers())
+        # timer_logger.info("=== BACKGROUND TASK CREADO ===")
+        timer_logger.info("Servicio de timers iniciado (background task deshabilitado temporalmente)")
+    except Exception as e:
+        timer_logger.error(f"Error en startup event: {e}")
+        # No propagamos el error para permitir que la app arranque
 
 # Health check endpoint for timers
 @app.get("/api/timers/health")
