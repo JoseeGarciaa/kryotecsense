@@ -2879,12 +2879,30 @@ async def create_timer(timer_data: dict):
         if not timer_data.get("tiempoInicialMinutos"):
             raise HTTPException(status_code=400, detail="tiempoInicialMinutos es requerido")
             
+        # Completar datos faltantes para el modelo Timer
+        now = get_utc_now()
+        tiempo_inicial_minutos = timer_data["tiempoInicialMinutos"]
+        tiempo_restante_segundos = tiempo_inicial_minutos * 60
+        
+        timer_completo = {
+            "id": str(uuid.uuid4()),
+            "nombre": timer_data["nombre"],
+            "tipoOperacion": timer_data["tipoOperacion"],
+            "tiempoInicialMinutos": tiempo_inicial_minutos,
+            "tiempoRestanteSegundos": tiempo_restante_segundos,
+            "fechaInicio": now,
+            "fechaFin": now + timedelta(minutes=tiempo_inicial_minutos),
+            "activo": True,
+            "completado": False
+        }
+            
         # Crear timer usando el timer_manager
-        await timer_manager.create_timer(timer_data, websocket=None)
+        await timer_manager.create_timer(timer_completo, websocket=None)
         
         return {
             "message": "Timer creado exitosamente",
-            "timer_id": timer_data.get("nombre"),
+            "timer_id": timer_completo["id"],
+            "timer": timer_completo,
             "timers_count": len(timer_manager.timers)
         }
     except Exception as e:
