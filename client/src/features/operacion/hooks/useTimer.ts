@@ -58,6 +58,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   useEffect(() => {
     if (!lastMessage) return;
 
+    console.log('📨 Mensaje WebSocket recibido:', lastMessage.type, lastMessage.data);
+
     switch (lastMessage.type) {
       case 'TIMER_SYNC':
         // Sincronización completa desde el servidor
@@ -188,18 +190,24 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   useEffect(() => {
     if (isConnected && isInitialized && !syncRequested) {
       console.log('🔄 WebSocket conectado - Solicitando sincronización');
+      console.log('🔍 DEBUG: isConnected:', isConnected, 'isInitialized:', isInitialized, 'syncRequested:', syncRequested);
       setSyncRequested(true);
       
       setTimeout(() => {
         if (isConnected) {
+          console.log('📤 Enviando SYNC_REQUEST al servidor...');
           sendMessage({
             type: 'SYNC_REQUEST'
           });
+          console.log('✅ SYNC_REQUEST enviado');
+        } else {
+          console.log('⚠️ WebSocket desconectado antes de enviar SYNC_REQUEST');
         }
       }, 500);
     }
     
     if (!isConnected) {
+      console.log('🔌 WebSocket desconectado - reseteando syncRequested');
       setSyncRequested(false);
     }
   }, [isConnected, isInitialized, syncRequested, sendMessage]);
