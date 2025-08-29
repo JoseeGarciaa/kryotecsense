@@ -2876,6 +2876,19 @@ def test_simple():
 def test_alerts_no_auth():
     return {"status": "working", "message": "Test alertas sin autenticación", "data": []}
 
+# Debug endpoint para ver rutas registradas
+@app.get("/debug/routes")
+def debug_routes():
+    routes = []
+    for route in app.routes:
+        if hasattr(route, 'methods') and hasattr(route, 'path'):
+            routes.append({
+                "path": route.path,
+                "methods": list(route.methods),
+                "name": getattr(route, 'name', 'unnamed')
+            })
+    return {"routes": routes, "total": len(routes)}
+
 if __name__ == "__main__":
     import uvicorn
     import os
