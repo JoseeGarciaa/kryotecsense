@@ -22,7 +22,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   const [serverTimeDiff, setServerTimeDiff] = useState<number>(0);
   
   // WebSocket para sincronización en tiempo real - CONFIGURACIÓN SIMPLIFICADA
-  const timerWsUrl = import.meta.env.VITE_TIMER_WS_URL || 'wss://kryotecsense-production.up.railway.app/ws/timers';
+  const timerWsUrl = import.meta.env.VITE_TIMER_WS_URL || 'wss://auth-production-f64d.up.railway.app/ws/timers';
   
   console.log('🔌 Conectando WebSocket:', timerWsUrl);
   

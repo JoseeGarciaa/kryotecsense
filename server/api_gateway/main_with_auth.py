@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Servicio de Temporizadores - KryotecSense
-Gestiona temporizadores sincronizados en tiempo real vía WebSockets
+API Gateway Unificado - KryotecSense
+Gestiona autenticación y temporizadores desde un solo servicio
 """
 
 import asyncio
@@ -11,15 +11,57 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Set
 import uuid
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 import uvicorn
+
+# JWT imports
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+
+# Database imports
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Configuración JWT
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here-please-change-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# Configuración base de datos
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:pass@localhost/dbname")
+
+# Configuración de password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# Configurar base de datos
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Modelo de usuario para la base de datos
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# Crear tablas
+Base.metadata.create_all(bind=engine)
+
+# Funciones de utilidad para fechas
 def get_utc_now():
     """Obtener tiempo UTC actual con zona horaria"""
     return datetime.now(timezone.utc)
@@ -40,22 +82,26 @@ def parse_iso_datetime(iso_string):
         logger.error(f"Error parseando fecha {iso_string}: {e}")
         return get_utc_now()
 
-app = FastAPI(
-    title="Timer Service",
-    description="Servicio de temporizadores sincronizados en tiempo real",
-    version="1.0.0"
-)
+# Modelos Pydantic para autenticación
+class UserCreate(BaseModel):
+    username: str
+    email: str
+    password: str
 
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    is_active: bool
 
-# Modelos
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
+# Modelos para timers
 class Timer(BaseModel):
     id: str
     nombre: str
@@ -85,7 +131,61 @@ class WebSocketMessage(BaseModel):
     type: str
     data: Dict
 
-# Estado global de timers y conexiones
+# Funciones de autenticación
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def get_user(db: Session, username: str):
+    return db.query(User).filter(User.username == username).first()
+
+def authenticate_user(db: Session, username: str, password: str):
+    user = get_user(db, username)
+    if not user:
+        return False
+    if not verify_password(password, user.hashed_password):
+        return False
+    return user
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+    user = get_user(db, username=token_data.username)
+    if user is None:
+        raise credentials_exception
+    return user
+
+# Timer Manager (copiado del timer service)
 class TimerManager:
     def __init__(self):
         self.timers: Dict[str, Timer] = {}
@@ -302,21 +402,88 @@ class TimerManager:
                 logger.error(f"Error en tick_timers: {e}")
                 await asyncio.sleep(1)
 
-# Instancia global del manager
+# Crear la aplicación FastAPI
+app = FastAPI(
+    title="KryotecSense API Gateway",
+    description="API Gateway Unificado con Autenticación y Temporizadores",
+    version="1.0.0"
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Instancia global del timer manager
 timer_manager = TimerManager()
 
 @app.on_event("startup")
 async def startup_event():
     """Iniciar el loop de actualización de timers"""
     asyncio.create_task(timer_manager.tick_timers())
-    logger.info("Servicio de timers iniciado")
+    logger.info("API Gateway iniciado con servicio de timers y autenticación")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Detener el servicio"""
     timer_manager.running = False
-    logger.info("Servicio de timers detenido")
+    logger.info("API Gateway detenido")
 
+# Rutas de autenticación
+@app.post("/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.post("/register", response_model=UserResponse)
+async def register_user(user: UserCreate, db: Session = Depends(get_db)):
+    # Verificar si el usuario ya existe
+    db_user = get_user(db, user.username)
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    
+    # Crear nuevo usuario
+    hashed_password = get_password_hash(user.password)
+    db_user = User(
+        username=user.username,
+        email=user.email,
+        hashed_password=hashed_password
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    
+    return UserResponse(
+        id=db_user.id,
+        username=db_user.username,
+        email=db_user.email,
+        is_active=db_user.is_active
+    )
+
+@app.get("/users/me", response_model=UserResponse)
+async def read_users_me(current_user: User = Depends(get_current_user)):
+    return UserResponse(
+        id=current_user.id,
+        username=current_user.username,
+        email=current_user.email,
+        is_active=current_user.is_active
+    )
+
+# Rutas de timers
 @app.websocket("/ws/timers")
 async def websocket_endpoint(websocket: WebSocket):
     """Endpoint principal de WebSocket para timers"""
@@ -396,6 +563,7 @@ async def health_check():
     """Endpoint de salud"""
     return {
         "status": "healthy",
+        "service": "api_gateway",
         "timers_count": len(timer_manager.timers),
         "connections_count": len(timer_manager.connections),
         "timestamp": get_utc_now().isoformat()
@@ -463,7 +631,6 @@ async def force_sync():
 if __name__ == "__main__":
     # Allow PORT to be provided by the platform (e.g., Railway)
     port = int(os.environ.get("PORT", 8000))
-    # Ejecutar usando el objeto app directamente para evitar problemas de import
     uvicorn.run(
         app,
         host="0.0.0.0",
