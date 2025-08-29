@@ -11,7 +11,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Set
 import uuid
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
@@ -19,6 +19,16 @@ import uvicorn
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Modelos para login básico
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class User(BaseModel):
+    id: int
+    username: str
+    email: str
 
 def get_utc_now():
     """Obtener tiempo UTC actual con zona horaria"""
@@ -316,6 +326,24 @@ async def shutdown_event():
     """Detener el servicio"""
     timer_manager.running = False
     logger.info("Servicio de timers detenido")
+
+@app.post("/token", response_model=Token)
+async def login_for_access_token(username: str = Form(), password: str = Form()):
+    """Endpoint básico de login que acepta cualquier credencial"""
+    # Para desarrollo - acepta cualquier usuario/contraseña
+    return {
+        "access_token": f"token_for_{username}",
+        "token_type": "bearer"
+    }
+
+@app.get("/users/me", response_model=User)
+async def read_users_me():
+    """Endpoint básico de usuario actual"""
+    return {
+        "id": 1,
+        "username": "usuario",
+        "email": "usuario@ejemplo.com"
+    }
 
 @app.websocket("/ws/timers")
 async def websocket_endpoint(websocket: WebSocket):
