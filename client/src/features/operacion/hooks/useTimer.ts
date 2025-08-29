@@ -193,7 +193,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       setTimeout(() => {
         if (isConnected) {
           sendMessage({
-            type: 'REQUEST_SYNC'
+            type: 'SYNC_REQUEST'
           });
         }
       }, 500);
@@ -251,9 +251,9 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         // Solo sincronizar si la pestaña estuvo oculta por más de 5 segundos
         const lastVisibilityChange = Date.now() - (localStorage.getItem('last_visibility_hidden') ? parseInt(localStorage.getItem('last_visibility_hidden')!) : 0);
         if (lastVisibilityChange > 5000) {
-          console.log('�️ Pestaña visible después de estar oculta - Sincronizando');
+          console.log('👁️ Pestaña visible después de estar oculta - Sincronizando');
           sendMessage({
-            type: 'REQUEST_SYNC'
+            type: 'SYNC_REQUEST'
           });
         }
       } else if (document.visibilityState === 'hidden') {
@@ -373,7 +373,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       // Solicitar sincronización para asegurar que se vea en otros dispositivos
       setTimeout(() => {
         if (isConnected) {
-          sendMessage({ type: 'REQUEST_SYNC' });
+          sendMessage({ type: 'SYNC_REQUEST' });
         }
       }, 200);
     } else {
@@ -477,7 +477,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     if (isConnected) {
       console.log('🔄 Forzando sincronización manual');
       sendMessage({
-        type: 'REQUEST_SYNC'
+        type: 'SYNC_REQUEST'
       });
     } else {
       console.warn('⚠️ No se puede sincronizar - WebSocket desconectado');

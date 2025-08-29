@@ -2908,6 +2908,67 @@ async def create_timer(timer_data: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creando timer: {str(e)}")
 
+# Endpoint para iniciar timers masivos desde inventario
+@app.post("/api/inventory/iniciar-timers-masivo")
+async def iniciar_timers_masivo(
+    request: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_from_token),
+):
+    """Iniciar timers para múltiples items del inventario"""
+    try:
+        tenant_schema = _get_tenant_schema_from_user(current_user)
+        items_ids = request.get("items_ids", [])
+        tipo_operacion = request.get("tipoOperacion", "congelamiento")
+        tiempo_minutos = request.get("tiempoMinutos", 30)
+        
+        if not items_ids:
+            raise HTTPException(status_code=400, detail="Debe proporcionar items_ids")
+            
+        # Obtener información de los items
+        query = text(f"""
+            SELECT id, rfid, nombre_unidad 
+            FROM {tenant_schema}.inventario_credocubes 
+            WHERE id = ANY(:ids) AND activo = true
+        """)
+        items = db.execute(query, {"ids": items_ids}).fetchall()
+        
+        if not items:
+            raise HTTPException(status_code=404, detail="No se encontraron items válidos")
+            
+        # Crear timers para cada item
+        timers_creados = []
+        now = get_utc_now()
+        
+        for item in items:
+            timer_data = {
+                "id": str(uuid.uuid4()),
+                "nombre": f"Timer {item.nombre_unidad} - {item.rfid}",
+                "tipoOperacion": tipo_operacion,
+                "tiempoInicialMinutos": tiempo_minutos,
+                "tiempoRestanteSegundos": tiempo_minutos * 60,
+                "fechaInicio": now,
+                "fechaFin": now + timedelta(minutes=tiempo_minutos),
+                "activo": True,
+                "completado": False,
+                "inventario_id": item.id,  # Vincular con el item del inventario
+                "rfid": item.rfid
+            }
+            
+            # Crear timer usando el timer_manager
+            await timer_manager.create_timer(timer_data, websocket=None)
+            timers_creados.append(timer_data)
+        
+        return {
+            "message": f"Timers iniciados para {len(timers_creados)} items",
+            "timers_creados": len(timers_creados),
+            "timers_activos_total": len(timer_manager.timers),
+            "items": [{"id": item.id, "rfid": item.rfid, "nombre": item.nombre_unidad} for item in items]
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error iniciando timers masivos: {str(e)}")
+
 # Test endpoint sin autenticación
 @app.get("/api/test/simple")
 def test_simple():

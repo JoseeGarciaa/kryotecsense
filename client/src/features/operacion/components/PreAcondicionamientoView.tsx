@@ -357,30 +357,78 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       const hayTicsParaProcesar = rfidsPendientesTimer.length > 0;
       
       if (hayTicsParaProcesar && itemsActualizados > 0) {
-        // Crear timer para cada TIC
-        console.log('🔄 Creando temporizadores...');
-        const timersCreados: string[] = [];
+        // Crear timers masivos usando el nuevo endpoint optimizado
+        console.log('🔄 Creando temporizadores masivos...');
         
-        rfidsPendientesTimer.forEach((rfid, index) => {
-          console.log(`⏰ Creando timer ${index + 1}/${rfidsPendientesTimer.length} para RFID: ${rfid}`);
-          const timerId = crearTimer(
-            rfid,
-            tipoOperacionTimer,
-            tiempoMinutos
+        try {
+          // Obtener IDs de los items del inventario que corresponden a estos RFIDs
+          const itemsInventario = operaciones.inventarioCompleto.filter((item: any) => 
+            rfidsPendientesTimer.includes(item.rfid)
           );
-          timersCreados.push(timerId);
-          console.log(`✅ Timer creado con ID: ${timerId}`);
-        });
-        
-        console.log(`🎉 Temporizadores creados exitosamente para ${rfidsPendientesTimer.length} TICs por ${tiempoMinutos} minutos`);
-        console.log('🆔 IDs de timers creados:', timersCreados);
-        
-        // Limpiar estados ANTES de mostrar el mensaje de éxito
-        setMostrarModalTimer(false);
-        setRfidsPendientesTimer([]);
-        
-        // Mostrar mensaje con información del lote automático generado
-        alert(`✅ Procesamiento exitoso!\n\n🏷️ Lote automático asignado: ${loteGenerado}\n⏰ Temporizadores iniciados para ${itemsActualizados} TIC(s) por ${tiempoMinutos} minutos`);
+          
+          if (itemsInventario.length > 0) {
+            const timerResponse = await apiServiceClient.post('/inventory/iniciar-timers-masivo', {
+              items_ids: itemsInventario.map((item: any) => item.id),
+              tipoOperacion: tipoOperacionTimer,
+              tiempoMinutos: tiempoMinutos
+            });
+            
+            console.log('✅ Respuesta de timers masivos:', timerResponse.data);
+            
+            // Limpiar estados ANTES de mostrar el mensaje de éxito
+            setMostrarModalTimer(false);
+            setRfidsPendientesTimer([]);
+            
+            // Mostrar mensaje con información del lote automático generado
+            alert(`✅ Procesamiento exitoso!\n\n🏷️ Lote automático asignado: ${loteGenerado}\n⏰ Temporizadores iniciados para ${timerResponse.data.timers_creados} TIC(s) por ${tiempoMinutos} minutos\n🔄 Total de timers activos: ${timerResponse.data.timers_activos_total}`);
+          } else {
+            // Fallback al método individual si no encontramos items
+            console.warn('⚠️ No se encontraron items en inventario, usando método individual...');
+            const timersCreados: string[] = [];
+            
+            rfidsPendientesTimer.forEach((rfid, index) => {
+              console.log(`⏰ Creando timer ${index + 1}/${rfidsPendientesTimer.length} para RFID: ${rfid}`);
+              const timerId = crearTimer(
+                rfid,
+                tipoOperacionTimer,
+                tiempoMinutos
+              );
+              timersCreados.push(timerId);
+              console.log(`✅ Timer creado con ID: ${timerId}`);
+            });
+            
+            // Limpiar estados ANTES de mostrar el mensaje de éxito
+            setMostrarModalTimer(false);
+            setRfidsPendientesTimer([]);
+            
+            // Mostrar mensaje con información del lote automático generado
+            alert(`✅ Procesamiento exitoso!\n\n🏷️ Lote automático asignado: ${loteGenerado}\n⏰ Temporizadores iniciados para ${timersCreados.length} TIC(s) por ${tiempoMinutos} minutos`);
+          }
+        } catch (timerError) {
+          console.error('❌ Error creando timers masivos:', timerError);
+          
+          // Fallback al método individual
+          console.log('🔄 Fallback: Creando timers individualmente...');
+          const timersCreados: string[] = [];
+          
+          rfidsPendientesTimer.forEach((rfid, index) => {
+            console.log(`⏰ Creando timer ${index + 1}/${rfidsPendientesTimer.length} para RFID: ${rfid}`);
+            const timerId = crearTimer(
+              rfid,
+              tipoOperacionTimer,
+              tiempoMinutos
+            );
+            timersCreados.push(timerId);
+            console.log(`✅ Timer creado con ID: ${timerId}`);
+          });
+          
+          // Limpiar estados ANTES de mostrar el mensaje de éxito
+          setMostrarModalTimer(false);
+          setRfidsPendientesTimer([]);
+          
+          // Mostrar mensaje con información del lote automático generado
+          alert(`✅ Procesamiento exitoso!\n\n🏷️ Lote automático asignado: ${loteGenerado}\n⏰ Temporizadores iniciados para ${timersCreados.length} TIC(s) por ${tiempoMinutos} minutos`);
+        }
         
         // Recargar datos
         console.log('🔄 Recargando datos...');
