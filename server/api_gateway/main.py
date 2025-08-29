@@ -68,8 +68,8 @@ class Timer(BaseModel):
 
 from shared.database import get_db, get_engine
 from shared.utils import verify_password, get_password_hash, create_access_token, get_current_user_from_token
-from models import Usuario
-from schemas import UsuarioCreate, Usuario as UsuarioModel, UsuarioSchema, Token, LoginRequest, UsuarioUpdate
+from .models import Usuario
+from .schemas import UsuarioCreate, Usuario as UsuarioModel, UsuarioSchema, Token, LoginRequest, UsuarioUpdate
 
 # TimerManager integrado en auth_service
 class TimerManager:
