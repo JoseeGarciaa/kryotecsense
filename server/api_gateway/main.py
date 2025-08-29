@@ -13,9 +13,14 @@ import uuid
 import logging
 import os
 import sys
+import jwt
 
 # Agregar el directorio padre al path para importar módulos
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Configuración JWT
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
+ALGORITHM = "HS256"
 
 # Funciones de utilidad para timers (integradas directamente)
 def get_utc_now():
@@ -71,198 +76,54 @@ from shared.utils import verify_password, get_password_hash, create_access_token
 from .models import Usuario
 from .schemas import UsuarioCreate, Usuario as UsuarioModel, UsuarioSchema, Token, LoginRequest, UsuarioUpdate
 
-# TimerManager integrado en auth_service
-class TimerManager:
-    def __init__(self):
-        self.timers: Dict[str, Timer] = {}
-        self.connections: Set[WebSocket] = set()
-        self.running = True
-        
-    async def add_connection(self, websocket: WebSocket):
-        """Agregar nueva conexión WebSocket"""
-        self.connections.add(websocket)
-        print(f"Nueva conexión timer WebSocket. Total: {len(self.connections)}")
-        
-        # SINCRONIZACIÓN INMEDIATA: Enviar timers existentes al cliente recién conectado
-        current_time = get_utc_now()
-        timers_actualizados = []
-        
-        for timer in self.timers.values():
-            # Recalcular tiempo restante basado en tiempo actual para máxima precisión
-            tiempo_restante_ms = (timer.fechaFin - current_time).total_seconds()
-            nuevo_tiempo_restante = max(0, int(tiempo_restante_ms))
-            
-            # Actualizar timer con tiempo preciso INMEDIATAMENTE
-            timer.tiempoRestanteSegundos = nuevo_tiempo_restante
-            timer.completado = nuevo_tiempo_restante == 0
-            timer.activo = timer.activo and not timer.completado
-            
-            timers_actualizados.append(timer.to_dict())
-        
-        await self.send_to_client(websocket, {
-            "type": "TIMER_SYNC",
-            "data": {
-                "timers": timers_actualizados,
-                "server_time": current_time.isoformat()
-            }
-        })
-        
-    async def remove_connection(self, websocket: WebSocket):
-        """Remover conexión WebSocket"""
-        self.connections.discard(websocket)
-        print(f"Conexión timer WebSocket removida. Total: {len(self.connections)}")
-        
-    async def send_to_client(self, websocket: WebSocket, message: Dict):
-        """Enviar mensaje a un cliente específico"""
-        try:
-            await websocket.send_text(json.dumps(message))
-        except Exception as e:
-            print(f"Error enviando mensaje a cliente timer: {e}")
-            await self.remove_connection(websocket)
-            
-    async def broadcast(self, message: Dict, exclude: WebSocket = None):
-        """Enviar mensaje a todos los clientes conectados"""
-        disconnected = set()
-        
-        for connection in self.connections:
-            if connection == exclude:
-                continue
-                
-            try:
-                await connection.send_text(json.dumps(message))
-            except Exception as e:
-                print(f"Error en broadcast timer: {e}")
-                disconnected.add(connection)
-                
-        # Remover conexiones desconectadas
-        for conn in disconnected:
-            await self.remove_connection(conn)
-            
-    async def create_timer(self, timer_data: Dict, websocket: WebSocket = None):
-        """Crear nuevo temporizador"""
-        # Verificar si el timer ya existe para evitar duplicados
-        timer_id = timer_data.get('id')
-        if timer_id and timer_id in self.timers:
-            print(f"Timer ya existe, actualizando: {timer_id}")
-            await self.update_timer(timer_id, timer_data, websocket)
-            return
-        
-        # Convertir fechas string a datetime con zona horaria
-        if 'fechaInicio' in timer_data and isinstance(timer_data['fechaInicio'], str):
-            timer_data['fechaInicio'] = parse_iso_datetime(timer_data['fechaInicio'])
-        if 'fechaFin' in timer_data and isinstance(timer_data['fechaFin'], str):
-            timer_data['fechaFin'] = parse_iso_datetime(timer_data['fechaFin'])
-        
-        timer = Timer(**timer_data)
-        self.timers[timer.id] = timer
-        
-        print(f"Timer creado: {timer.nombre} ({timer.id})")
-        
-        # Broadcast a todos los clientes excepto el que envió
-        await self.broadcast({
-            "type": "TIMER_CREATED",
-            "data": {"timer": timer.to_dict()}
-        }, exclude=websocket)
-        
-    async def update_timer(self, timer_id: str, updates: Dict, websocket: WebSocket = None):
-        """Actualizar temporizador existente"""
-        if timer_id not in self.timers:
-            print(f"Timer no encontrado: {timer_id}")
-            return False
-            
-        timer = self.timers[timer_id]
-        for key, value in updates.items():
-            if hasattr(timer, key):
-                setattr(timer, key, value)
-                
-        print(f"Timer actualizado: {timer.nombre} ({timer_id})")
-        
-        # Broadcast a todos los clientes excepto el que envió
-        await self.broadcast({
-            "type": "TIMER_UPDATED",
-            "data": {"timer": timer.to_dict()}
-        }, exclude=websocket)
-        
-        return True
-        
-    async def delete_timer(self, timer_id: str, websocket: WebSocket = None):
-        """Eliminar temporizador"""
-        if timer_id in self.timers:
-            timer = self.timers.pop(timer_id)
-            
-            print(f"Timer eliminado: {timer.nombre} ({timer_id})")
-            
-            # Broadcast a todos los clientes excepto el que envió
-            await self.broadcast({
-                "type": "TIMER_DELETED",
-                "data": {"timerId": timer_id}
-            }, exclude=websocket)
-            
-            return True
-        return False
-        
-    async def pause_timer(self, timer_id: str, websocket: WebSocket = None):
-        """Pausar temporizador"""
-        return await self.update_timer(timer_id, {"activo": False}, websocket)
-        
-    async def resume_timer(self, timer_id: str, websocket: WebSocket = None):
-        """Reanudar temporizador"""
-        if timer_id not in self.timers:
-            return False
-            
-        timer = self.timers[timer_id]
-        if not timer.completado:
-            return await self.update_timer(timer_id, {"activo": True}, websocket)
-        return False
-        
-    async def tick_timers(self):
-        """Actualizar todos los timers activos cada segundo"""
-        while self.running:
-            try:
-                current_time = get_utc_now()
-                updated_timers = []
-                
-                for timer_id, timer in self.timers.items():
-                    if not timer.activo or timer.completado:
-                        continue
-                        
-                    # Calcular tiempo restante basado en fecha fin (UTC)
-                    tiempo_restante_ms = (timer.fechaFin - current_time).total_seconds()
-                    nuevo_tiempo_restante = max(0, int(tiempo_restante_ms))
-                    
-                    # SIEMPRE actualizar y enviar, sin importar si cambió
-                    timer.tiempoRestanteSegundos = nuevo_tiempo_restante
-                    
-                    # Verificar si se completó
-                    if nuevo_tiempo_restante == 0 and not timer.completado:
-                        timer.completado = True
-                        timer.activo = False
-                        print(f"Timer completado: {timer.nombre} ({timer_id})")
-                    
-                    # ENVIAR ACTUALIZACIÓN SIEMPRE para sincronización perfecta
-                    updated_timers.append({
-                        "timerId": timer_id,
-                        "tiempoRestanteSegundos": timer.tiempoRestanteSegundos,
-                        "completado": timer.completado,
-                        "activo": timer.activo
-                    })
-                
-                # Enviar actualizaciones para TODOS los timers activos, siempre
-                if updated_timers:
-                    for update in updated_timers:
-                        await self.broadcast({
-                            "type": "TIMER_TIME_UPDATE",
-                            "data": update
-                        })
-                
-                await asyncio.sleep(1)  # Actualizar cada segundo exacto
-                
-            except Exception as e:
-                print(f"Error en tick_timers: {e}")
-                await asyncio.sleep(1)
+from .schemas import UsuarioCreate, Usuario as UsuarioModel, UsuarioSchema, Token, LoginRequest, UsuarioUpdate
 
-# Instancia global del timer manager
-timer_manager = TimerManager()
+# Instancia global del timer manager (se define más abajo)
+# timer_manager se inicializa después de la clase TimerManager completa
+
+def get_user_by_email(db: Session, correo: str):
+    tenant_schemas = get_tenant_schemas(db)
+    for schema in tenant_schemas:
+        try:
+            text(f"SET search_path TO {schema}")
+            user = db.execute(text("SELECT * FROM usuarios WHERE correo = :correo"), {"correo": correo}).fetchone()
+            if user:
+                return user
+        except Exception as e:
+            print(f"Error buscando usuario en schema {schema}: {e}")
+            continue
+    return None
+
+def get_tenant_schemas(db: Session) -> List[str]:
+    """Obtener lista de schemas de inquilinos"""
+    try:
+        result = db.execute(text("""
+            SELECT schema_name 
+            FROM information_schema.schemata 
+            WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast', 'public')
+        """))
+        return [row[0] for row in result.fetchall()]
+    except Exception as e:
+        print(f"Error obteniendo schemas de inquilinos: {e}")
+        return []
+
+# Funciones de validación
+def validate_token(token: str) -> Dict:
+    """Validar token JWT y extraer información del usuario"""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return {"valid": True, "data": payload}
+    except jwt.ExpiredSignatureError:
+        return {"valid": False, "error": "Token expirado"}
+    except jwt.JWTError:
+        return {"valid": False, "error": "Token inválido"}
+
+def get_current_user(token: str) -> Dict:
+    """Obtener información del usuario actual desde el token"""
+    validation_result = validate_token(token)
+    if validation_result["valid"]:
+        return validation_result["data"]
+    return None
 
 def get_user_by_email(db: Session, correo: str):
     tenant_schemas = get_tenant_schemas(db)
@@ -681,7 +542,7 @@ class TimerManager:
                 await asyncio.sleep(1)
 
 
-# Variable global para el timer manager - Inicializar inmediatamente
+# Instancia global del timer manager - Inicializar después de la clase completa
 timer_manager = TimerManager()
 
 # Variable global para almacenar el background task
