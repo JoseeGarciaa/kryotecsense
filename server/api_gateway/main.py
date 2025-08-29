@@ -287,6 +287,11 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Test endpoint básico inmediatamente después de la definición de la app
+@app.get("/test-basic")
+def test_basic():
+    return {"message": "App funciona correctamente", "status": "ok"}
+
 # Esquema por defecto configurable por entorno
 import os
 DEFAULT_TENANT_SCHEMA = os.getenv("DEFAULT_TENANT_SCHEMA", "tenant_base")
