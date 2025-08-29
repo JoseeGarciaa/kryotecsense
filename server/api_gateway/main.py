@@ -73,26 +73,13 @@ class Timer(BaseModel):
 
 from shared.database import get_db, get_engine
 from shared.utils import verify_password, get_password_hash, create_access_token, get_current_user_from_token
-from .models import Usuario
-from .schemas import UsuarioCreate, Usuario as UsuarioModel, UsuarioSchema, Token, LoginRequest, UsuarioUpdate
-
-from .schemas import UsuarioCreate, Usuario as UsuarioModel, UsuarioSchema, Token, LoginRequest, UsuarioUpdate
+from api_gateway.models import Usuario
+from api_gateway.schemas import UsuarioCreate, Usuario as UsuarioModel, UsuarioSchema, Token, LoginRequest, UsuarioUpdate
 
 # Instancia global del timer manager (se define más abajo)
 # timer_manager se inicializa después de la clase TimerManager completa
 
-def get_user_by_email(db: Session, correo: str):
-    tenant_schemas = get_tenant_schemas(db)
-    for schema in tenant_schemas:
-        try:
-            text(f"SET search_path TO {schema}")
-            user = db.execute(text("SELECT * FROM usuarios WHERE correo = :correo"), {"correo": correo}).fetchone()
-            if user:
-                return user
-        except Exception as e:
-            print(f"Error buscando usuario en schema {schema}: {e}")
-            continue
-    return None
+# Funciones de validación
 
 def get_tenant_schemas(db: Session) -> List[str]:
     """Obtener lista de schemas de inquilinos"""
