@@ -2861,6 +2861,16 @@ async def get_timers():
         "count": len(timer_manager.timers)
     }
 
+# Test endpoint sin autenticación
+@app.get("/api/test/simple")
+def test_simple():
+    return {"status": "working", "message": "Endpoint sin autenticación funcionando"}
+
+# Test endpoint de alertas sin autenticación  
+@app.get("/api/test/alerts")
+def test_alerts_no_auth():
+    return {"status": "working", "message": "Test alertas sin autenticación", "data": []}
+
 if __name__ == "__main__":
     import uvicorn
     import os
