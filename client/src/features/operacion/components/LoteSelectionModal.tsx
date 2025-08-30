@@ -59,14 +59,12 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
       setCargando(true);
       setError(null);
 
-      // Normalizar objetivo (a dónde quiero mover)
-      const objetivo = (subEstado || '').toLowerCase();
-      // Para mover a atemperamiento, debo listar lotes que están hoy en congelación
-      const subEstadosFuente = objetivo === 'atemperamiento'
-        ? ['congelación', 'congelacion', 'congelamiento']
-        : [objetivo];
+  // Normalizar objetivo (a dónde quiero mover)
+  const objetivo = (subEstado || '').toLowerCase();
+  const objetivoNorm = objetivo.replace(/[^a-z]/g, ''); // e.g., 'atemperamiento'
+  const esObjetivoAtemperamiento = objetivoNorm === 'atemperamiento';
 
-      console.log('[Lotes] Cargando lotes para objetivo:', objetivo, 'subEstadosFuente:', subEstadosFuente);
+  console.log('[Lotes] Cargando lotes → objetivo:', objetivo, '(norm:', objetivoNorm, ')');
       
       // Obtener inventario
       const response = await apiServiceClient.get('/inventory/inventario/');
@@ -82,15 +80,32 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
       const estadoLoteMap = new Map<string, {estado: string, sub_estado: string}>();
       const itemsSinLoteArray: ItemSinLote[] = [];
 
+      let totalCandidatos = 0;
+      let totalConLote = 0;
+      let totalSinLote = 0;
+
       inventario.forEach((item: any) => {
         if (!item || typeof item !== 'object') return;
 
-        const categoriaOk = item.categoria === 'TIC';
-        const estadoOk = (item.estado || '').toLowerCase() === 'pre-acondicionamiento' || (item.estado || '').toLowerCase() === 'preacondicionamiento';
-        const subEstadoLower = (item.sub_estado || '').toLowerCase();
-        const subOk = subEstadosFuente.includes(subEstadoLower);
+        const categoriaLower = String(item.categoria || '').toLowerCase();
+        // Acepta cualquier variante que contenga 'tic' (e.g., 'TIC', 'tics', 'tic 3l')
+        const categoriaOk = categoriaLower.includes('tic');
+
+        const estadoLower = String(item.estado || '').toLowerCase();
+        const estadoNorm = estadoLower.replace(/[^a-z]/g, '');
+        const estadoOk = estadoNorm === 'preacondicionamiento';
+
+        const subLower = String(item.sub_estado || '').toLowerCase();
+        const subNorm = subLower.replace(/[^a-z]/g, '');
+        // Si voy a atemperamiento, tomar como fuente cualquier sub_estado que contenga 'congel'
+        // Si el objetivo es otro, usar contains del objetivo normalizado
+        const subOk = esObjetivoAtemperamiento
+          ? subLower.includes('congel') || subNorm.includes('congelacion') || subNorm.includes('congelamiento')
+          : subLower.includes(objetivo) || subNorm.includes(objetivoNorm);
 
         if (!categoriaOk || !estadoOk || !subOk) return;
+
+        totalCandidatos++;
 
         if (item.lote) {
           if (!loteMap.has(item.lote)) {
@@ -105,6 +120,7 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
             sub_estado: item.sub_estado,
             categoria: item.categoria
           });
+          totalConLote++;
         } else {
           itemsSinLoteArray.push({
             id: item.id,
@@ -114,6 +130,7 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
             sub_estado: item.sub_estado,
             categoria: item.categoria
           });
+          totalSinLote++;
         }
       });
 
@@ -130,7 +147,7 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
       setLotes(lotesArray);
       setItemsSinLote(itemsSinLoteArray);
 
-      console.log(`[Lotes] Resultado → ${lotesArray.length} lotes, ${itemsSinLoteArray.length} items sin lote`);
+  console.log(`[Lotes] Candidatos: ${totalCandidatos} → ${lotesArray.length} lotes, ${itemsSinLoteArray.length} items sin lote (con lote: ${totalConLote}, sin lote: ${totalSinLote})`);
       if (lotesArray.length > 0) {
         console.log('[Lotes] Ejemplo primer lote:', lotesArray[0]);
       }
