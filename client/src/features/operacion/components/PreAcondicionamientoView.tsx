@@ -442,7 +442,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                   crearTimer(rfid, tipoOperacionTimer, tiempoMinutos);
                 }
               });
-              // Pedir sync luego para asegurar reconciliación
+              // Pedir broadcast sync para asegurar reconciliación en todos los dispositivos
               setTimeout(() => {
                 forzarSincronizacion();
               }, 400);

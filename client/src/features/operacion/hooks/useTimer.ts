@@ -304,12 +304,19 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         prevTimers.map(timer => {
           if (!timer.activo || timer.completado) return timer;
           
-          // Regla: si WS está conectado y el timer NO es optimista, no tocamos (servidor es autoridad)
-          const debeActualizarLocal = !isConnected || timer.optimistic;
+          // Fallback inteligente:
+          // - Si no hay WS: tick local
+          // - Si es optimista: tick local
+          // - Si WS está conectado pero no llegan updates del servidor (stale > 2s): tick local
+          const nowLocal = Date.now();
+          const nowServerEst = nowLocal + (serverTimeDiff || 0);
+          const lastServerTs = timer.server_timestamp ?? 0;
+          const stalenessMs = lastServerTs ? (nowServerEst - lastServerTs) : Number.POSITIVE_INFINITY;
+          const debeActualizarLocal = !isConnected || timer.optimistic || stalenessMs > 2000;
           if (!debeActualizarLocal) return timer;
           
-          // Actualizar localmente basado en fechas (optimista o sin WS)
-          const ahora = getDeviceTimeAsUtcDate();
+          // Actualizar localmente basado en fechas (estimando con tiempo de servidor si se conoce)
+          const ahora = new Date(nowServerEst);
           const fechaFin = new Date(timer.fechaFin);
           const tiempoRestanteMs = fechaFin.getTime() - ahora.getTime();
           const nuevoTiempoRestante = Math.max(0, Math.floor(tiempoRestanteMs / 1000));
@@ -553,9 +560,12 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   const forzarSincronizacion = useCallback(() => {
     if (isConnected) {
       console.log('🔄 Forzando sincronización manual');
-      sendMessage({
-  type: 'REQUEST_SYNC'
-      });
+      // Sincronizar este cliente
+      sendMessage({ type: 'REQUEST_SYNC' });
+      // Y forzar broadcast para que todos los dispositivos se actualicen
+      setTimeout(() => {
+        sendMessage({ type: 'FORCE_BROADCAST_SYNC' });
+      }, 100);
     } else {
       console.warn('⚠️ No se puede sincronizar - WebSocket desconectado');
     }

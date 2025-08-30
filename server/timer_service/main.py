@@ -391,6 +391,28 @@ async def websocket_endpoint(websocket: WebSocket):
                 if timer_id:
                     await timer_manager.delete_timer(timer_id, websocket)
                     
+            elif message_type == "FORCE_BROADCAST_SYNC":
+                # Forzar un SYNC global a todos los clientes
+                server_timestamp = timer_manager.get_server_timestamp()
+                timers_data = []
+                for timer in timer_manager.timers.values():
+                    remaining_time = timer_manager.calculate_remaining_time(timer)
+                    timer.tiempoRestanteSegundos = remaining_time
+                    timer.completado = remaining_time == 0
+                    timer.activo = timer.activo and not timer.completado
+                    timers_data.append({
+                        **timer.to_dict(),
+                        "server_remaining_time": remaining_time,
+                        "server_timestamp": server_timestamp
+                    })
+                await timer_manager.broadcast({
+                    "type": "TIMER_SYNC",
+                    "data": {
+                        "timers": timers_data,
+                        "server_timestamp": server_timestamp
+                    }
+                })
+
             else:
                 logger.warning(f"Tipo de mensaje no reconocido: {message_type}")
                 
