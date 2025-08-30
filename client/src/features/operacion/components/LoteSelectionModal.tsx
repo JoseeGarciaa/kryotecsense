@@ -209,7 +209,7 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
       {/* Lista de lotes */}
       <div className="border rounded-md p-3">
         <h4 className="font-medium mb-2 text-gray-700 dark:text-gray-300">Lotes disponibles</h4>
-        <div className="max-h-60 overflow-y-auto">
+  <div className="max-h-48 sm:max-h-60 overflow-y-auto">
           {lotesFiltrados.length > 0 ? (
             lotesFiltrados.map((lote) => (
               <div 
@@ -269,7 +269,7 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
             </button>
           )}
         </div>
-        <div className="max-h-60 overflow-y-auto">
+  <div className="max-h-48 sm:max-h-60 overflow-y-auto">
           {loteSeleccionado ? (
             lotes.find(l => l.lote === loteSeleccionado)?.tics.map(tic => (
               <div key={tic.id} className="flex items-center p-2 border-b">
@@ -331,7 +331,7 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
             </button>
           )}
         </div>
-        <div className="max-h-96 overflow-y-auto">
+  <div className="max-h-64 sm:max-h-96 overflow-y-auto">
           {itemsSinLoteFiltrados.length > 0 ? (
             itemsSinLoteFiltrados.map(item => (
               <div key={item.id} className="flex items-center p-2 border-b">
@@ -381,8 +381,8 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
   if (!mostrarModal) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg w-[92vw] max-w-md sm:max-w-lg md:max-w-2xl p-4 sm:p-6 max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             Seleccionar items por lote
@@ -393,7 +393,7 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
             </span>
           )}
         </div>
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+  <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-blue-50 border border-blue-200 rounded-md">
           <p className="text-sm text-blue-800">
             ℹ️ Items disponibles: <span className="font-medium">{lotes.length}</span> lotes • <span className="font-medium">{itemsSinLote.length}</span> items sin lote
           </p>
@@ -426,14 +426,14 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
           </div>
         </div>
 
-        <div className="mb-4">
+    <div className="mb-3 sm:mb-4">
           <div className="relative">
             <input
               type="text"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder={vistaActual === 'lotes' ? "Buscar lote..." : "Buscar item..."}
-              className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+      className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white text-sm"
             />
             <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
           </div>
@@ -446,7 +446,7 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
         )}
         
         {cargando ? (
-          <div className="flex justify-center items-center p-8">
+          <div className="flex justify-center items-center p-6 sm:p-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
           </div>
         ) : (
