@@ -195,14 +195,30 @@ const Registro: React.FC = () => {
   const handleRfidChange = async (value: string) => {
     setRfidInput(value);
     
-    // Permitir auto-procesamiento para códigos de 8 a 50 caracteres alfanuméricos
-    if (value.length >= 8 && value.length <= 50) {
-      // Validar que contenga al menos algunos caracteres alfanuméricos
+    // Solo permitir auto-procesamiento para códigos de EXACTAMENTE 24 caracteres
+    if (value.length === 24) {
+      // Validar que contenga solo caracteres alfanuméricos
       const hasValidChars = /^[a-zA-Z0-9]+$/.test(value);
       if (hasValidChars) {
-        console.log(`🚀 Auto-procesando código alfanumérico de ${value.length} caracteres:`, value);
+        console.log(`🚀 Auto-procesando código RFID de 24 caracteres:`, value);
         const rfidLimpio = value.trim();
         await procesarRfid(rfidLimpio);
+      } else {
+        setError('El código RFID debe contener solo caracteres alfanuméricos');
+        setTimeout(() => setError(''), 3000);
+      }
+    } else if (value.length > 24) {
+      // Si supera 24 caracteres, truncar y mostrar advertencia
+      const truncated = value.substring(0, 24);
+      setRfidInput(truncated);
+      setError('El código RFID se ha truncado a 24 caracteres máximo');
+      setTimeout(() => setError(''), 3000);
+      
+      // Auto-procesar si el código truncado es válido
+      const hasValidChars = /^[a-zA-Z0-9]+$/.test(truncated);
+      if (hasValidChars) {
+        console.log(`🚀 Auto-procesando código RFID truncado a 24 caracteres:`, truncated);
+        await procesarRfid(truncated);
       }
     }
   };
@@ -527,11 +543,11 @@ const Registro: React.FC = () => {
                   value={rfidInput}
                   onChange={(e: any) => handleRfidChange(e.target.value)}
                   onKeyDown={handleRfidInput}
-                  maxLength={50}
+                  maxLength={24}
                   placeholder={
                     !tipoSeleccionado || !litrajeSeleccionado 
                       ? "Complete tipo y litraje primero..." 
-                      : `DataWedge: Escanee RFID de ${tipoSeleccionado} ${litrajeSeleccionado}L (alfanumérico, 8-50 chars)...`
+                      : `DataWedge: Escanee RFID de ${tipoSeleccionado} ${litrajeSeleccionado}L (exactamente 24 caracteres)...`
                   }
                   className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 dark:text-white text-sm"
                   disabled={!tipoSeleccionado || !litrajeSeleccionado}
@@ -542,13 +558,13 @@ const Registro: React.FC = () => {
                     Escaneados: <span className="font-medium text-green-600">{lecturasRfid.length}</span> elementos
                   </p>
                   <p className="text-blue-600">
-                    🚀 Auto-procesamiento: Se procesa automáticamente al llegar a 24 caracteres
+                    🚀 Auto-procesamiento: Se procesa automáticamente al llegar a exactamente 24 caracteres
                   </p>
                   <p className="text-green-600">
                     ✅ Se verifican automáticamente los códigos duplicados en el sistema
                   </p>
-                  <p className="text-orange-600">
-                    ⚡ Escaneos rápidos permitidos: Solo se evitan duplicados reales
+                  <p className="text-red-600">
+                    ⚠️ Límite estricto: Máximo 24 caracteres alfanuméricos
                   </p>
                 </div>
               </div>
@@ -705,7 +721,8 @@ const Registro: React.FC = () => {
           </div>
           <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
             <p><strong>Nota:</strong> El lote se asignará posteriormente en la sección de Pre-acondicionamiento</p>
-            <p><strong>Escaneos rápidos:</strong> ¡Escanee tan rápido como desee! Solo se evitan duplicados reales (códigos ya escaneados o registrados)</p>
+            <p><strong>Códigos RFID:</strong> Deben tener exactamente 24 caracteres alfanuméricos</p>
+            <p><strong>Auto-procesamiento:</strong> Se procesa automáticamente al completar 24 caracteres</p>
           </div>
         </div>
       </div>
