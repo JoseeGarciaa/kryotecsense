@@ -374,14 +374,13 @@ const Registro: React.FC = () => {
       });
       setMostrarModalExito(true);
       
-      // Limpiar formulario
+      // Limpiar formulario (pero NO resetear conteoDetallado aquí)
       setTipoSeleccionado('');
       setLitrajeSeleccionado('');
       setLecturasRfid([]);
       setError('');
       setUltimoInputProcesado('');
       setMostrarCodigosDuplicados(false);
-      setConteoDetallado({vips: 0, tics: 0, cubes: 0});
       clearHistory();
       
     } catch (err: any) {
@@ -403,6 +402,12 @@ const Registro: React.FC = () => {
     } finally {
       setProcesandoRegistro(false);
     }
+  };
+
+  // Manejar cierre del modal de éxito
+  const handleCloseModal = () => {
+    setMostrarModalExito(false);
+    setConteoDetallado({vips: 0, tics: 0, cubes: 0});
   };
 
   return (
@@ -722,7 +727,7 @@ const Registro: React.FC = () => {
                 El lote se asignará durante el proceso de pre-acondicionamiento.
               </p>
               <button
-                onClick={() => setMostrarModalExito(false)}
+                onClick={handleCloseModal}
                 className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 text-sm sm:text-base"
               >
                 Continuar
