@@ -58,6 +58,25 @@ class Timer(BaseModel):
     activo: bool = True
     completado: bool = False
 
+    # Asegurar que se ignoren campos extra (compatibilidad con payloads enriquecidos)
+    model_config = {
+        "extra": "ignore"
+    }
+
+    def to_dict(self):
+        """Convertir a diccionario con fechas en ISO string"""
+        return {
+            "id": self.id,
+            "nombre": self.nombre,
+            "tipoOperacion": self.tipoOperacion,
+            "tiempoInicialMinutos": self.tiempoInicialMinutos,
+            "tiempoRestanteSegundos": self.tiempoRestanteSegundos,
+            "fechaInicio": self.fechaInicio.isoformat() if isinstance(self.fechaInicio, datetime) else self.fechaInicio,
+            "fechaFin": self.fechaFin.isoformat() if isinstance(self.fechaFin, datetime) else self.fechaFin,
+            "activo": self.activo,
+            "completado": self.completado,
+        }
+
     # Ignorar campos extra en creaciones (pydantic v2)
     model_config = {
         "extra": "ignore"
