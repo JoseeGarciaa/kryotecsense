@@ -2941,16 +2941,49 @@ async def iniciar_timers_masivo(
         
         if not items_ids:
             raise HTTPException(status_code=400, detail="Debe proporcionar items_ids")
-            
-        # Obtener información de los items
-        # Usar CSV para evitar problemas de binding de arrays con drivers
-        ids_csv = ",".join(str(i) for i in items_ids)
-        query = text(f"""
-            SELECT id, rfid, nombre_unidad 
-            FROM {tenant_schema}.inventario_credocubes 
-            WHERE id = ANY(STRING_TO_ARRAY(:ids_csv, ',')::int[]) AND activo = true
-        """)
-        items = db.execute(query, {"ids_csv": ids_csv}).fetchall()
+
+        # Aceptar IDs numéricos y/o RFIDs en la misma lista para mayor robustez
+        ids_int: list[int] = []
+        rfids: list[str] = []
+        for v in items_ids:
+            try:
+                # aceptar ints o strings numéricos
+                if isinstance(v, int):
+                    ids_int.append(int(v))
+                elif isinstance(v, str) and v.strip() != "" and v.strip().isdigit():
+                    ids_int.append(int(v.strip()))
+                elif isinstance(v, str) and v.strip() != "":
+                    rfids.append(v.strip())
+                else:
+                    # ignorar valores vacíos o inválidos
+                    pass
+            except Exception:
+                # si algo falla, tratarlo como RFID
+                if isinstance(v, str) and v.strip():
+                    rfids.append(v.strip())
+
+        if not ids_int and not rfids:
+            raise HTTPException(status_code=400, detail="items_ids no contiene IDs válidos ni RFIDs")
+
+        # Construir consulta dinámica segura
+        conditions = []
+        params: Dict[str, Any] = {}
+        if ids_int:
+            params["ids_csv"] = ",".join(str(i) for i in ids_int)
+            conditions.append("id = ANY(STRING_TO_ARRAY(:ids_csv, ',')::int[])")
+        if rfids:
+            params["rfids"] = rfids
+            conditions.append("rfid = ANY(:rfids)")
+
+        where_clause = " OR ".join(conditions)
+        query = text(
+            f"""
+            SELECT id, rfid, nombre_unidad
+            FROM {tenant_schema}.inventario_credocubes
+            WHERE ({where_clause}) AND activo = true
+            """
+        )
+        items = db.execute(query, params).fetchall()
         
         if not items:
             raise HTTPException(status_code=404, detail="No se encontraron items válidos")
@@ -2984,7 +3017,14 @@ async def iniciar_timers_masivo(
             "message": f"Timers iniciados para {len(timers_creados)} items",
             "timers_creados": len(timers_creados),
             "timers_activos_total": len(timer_manager.timers),
-            "items": [{"id": r._mapping["id"], "rfid": r._mapping["rfid"], "nombre": r._mapping["nombre_unidad"]} for r in items]
+            "items": [
+                {"id": r._mapping["id"], "rfid": r._mapping["rfid"], "nombre": r._mapping.get("nombre_unidad")}
+                for r in items
+            ],
+            "criterios": {
+                "ids": ids_int,
+                "rfids": rfids,
+            },
         }
         
     except Exception as e:
