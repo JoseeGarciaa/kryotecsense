@@ -2965,15 +2965,23 @@ async def iniciar_timers_masivo(
         if not ids_int and not rfids:
             raise HTTPException(status_code=400, detail="items_ids no contiene IDs válidos ni RFIDs")
 
-        # Construir consulta dinámica segura
+        # Construir consulta dinámica segura usando IN con parámetros nombrados
         conditions = []
         params: Dict[str, Any] = {}
         if ids_int:
-            params["ids_csv"] = ",".join(str(i) for i in ids_int)
-            conditions.append("id = ANY(STRING_TO_ARRAY(:ids_csv, ',')::int[])")
+            id_placeholders = []
+            for idx, val in enumerate(ids_int):
+                key = f"id_{idx}"
+                params[key] = val
+                id_placeholders.append(f":{key}")
+            conditions.append(f"id IN ({', '.join(id_placeholders)})")
         if rfids:
-            params["rfids_csv"] = ",".join(rfids)
-            conditions.append("rfid = ANY(STRING_TO_ARRAY(:rfids_csv, ',')::text[])")
+            rf_placeholders = []
+            for idx, val in enumerate(rfids):
+                key = f"rfid_{idx}"
+                params[key] = val
+                rf_placeholders.append(f":{key}")
+            conditions.append(f"rfid IN ({', '.join(rf_placeholders)})")
 
         where_clause = " OR ".join(conditions)
         query = text(
