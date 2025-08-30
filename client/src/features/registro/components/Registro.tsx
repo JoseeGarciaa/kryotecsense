@@ -280,7 +280,7 @@ const Registro: React.FC = () => {
       
       // Registrar cada item en el inventario y crear actividades de operación
       for (const lectura of lecturasRfid) {
-        // Determinar la categoría correcta basada en el tipo del modelo
+        // Determinar la categoría correcta basada SOLO en el tipo seleccionado por el usuario
         let categoriaFinal = 'Cube'; // Por defecto
         
         console.log('🔍 Debug categoría:', { 
@@ -289,17 +289,15 @@ const Registro: React.FC = () => {
           modelo: modelo.nombre_modelo 
         });
         
-        // Usar directamente el tipo seleccionado como fuente principal de verdad
+        // Usar SIEMPRE el tipo seleccionado por el usuario como fuente de verdad
         if (tipoSeleccionado === 'VIP') {
           categoriaFinal = 'VIP';
         } else if (tipoSeleccionado === 'TIC') {
           categoriaFinal = 'TIC';
         } else if (tipoSeleccionado === 'CUBE') {
           categoriaFinal = 'Cube';
-        } else if (modelo.tipo) {
-          // Solo usar modelo.tipo como fallback si tipoSeleccionado no es reconocido
-          categoriaFinal = modelo.tipo;
         }
+        // Eliminar el fallback a modelo.tipo para evitar sobrescritura
         
         console.log('🎯 Categoría final determinada:', categoriaFinal);
         
