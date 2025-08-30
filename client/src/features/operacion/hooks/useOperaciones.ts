@@ -1225,7 +1225,8 @@ export const useOperaciones = () => {
               modelo_id: item.modelo_id || 1,
               nombre_unidad: item.nombre_unidad,
               rfid: item.rfid,
-              lote: item.lote || null,
+              // Al regresar a bodega, limpiar lote siempre
+              lote: null,
               estado: 'En bodega',
               sub_estado: null,
               validacion_limpieza: item.validacion_limpieza || null,
@@ -1441,10 +1442,11 @@ export const useOperaciones = () => {
       // Detener cronómetros de manera eficiente
       posiblesIdsTimer.forEach(id => detenerCronometro(id));
       
-      // Preparar datos para operaciones backend - solo cambio de estado
+      // Preparar datos para operaciones backend - regresar a bodega limpiando lote
       const estadoUpdate = {
         estado: 'En bodega',
-        sub_estado: 'Disponible'
+        sub_estado: 'Disponible',
+        lote: null // limpiar cualquier lote previo al volver a bodega
       };
 
       const nuevaActividad = {
@@ -1520,7 +1522,8 @@ export const useOperaciones = () => {
       // Preparar la actualización solo con estado y sub_estado
       const actualizacionItem = {
         estado: nuevoEstado,
-        sub_estado: nuevoSubEstado || item.sub_estado
+        sub_estado: nuevoSubEstado || item.sub_estado,
+        ...(nuevoEstado === 'En bodega' ? { lote: null } : {})
       };
 
       // Actualizar en el backend usando el nuevo endpoint específico

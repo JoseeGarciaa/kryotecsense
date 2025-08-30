@@ -161,7 +161,8 @@ export const useDevolucion = () => {
         const promesasEstado = idsValidos.map(itemId => 
           apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
             estado: 'Devolución',
-            sub_estado: 'Devuelto'
+            sub_estado: 'Devuelto',
+            lote: null // limpiar lote al devolverse
           })
         );
 

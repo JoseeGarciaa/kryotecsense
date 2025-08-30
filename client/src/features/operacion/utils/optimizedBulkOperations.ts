@@ -144,16 +144,18 @@ export class OptimizedBulkOperations {
     
     try {
       // Preparar datos para operación paralela
-      const updates = items.map(item => ({
+    const updates = items.map(item => ({
         id: item.id || item.inventario_id,
         inventory_data: {
-          estado: newState,
-          sub_estado: newSubState || 'En proceso'
+      estado: newState,
+      sub_estado: newSubState || 'En proceso',
+      // Cuando regresan a bodega, limpiar el lote anterior
+      ...(newState === 'En bodega' ? { lote: null } : {})
         },
         activity_data: {
           inventario_id: item.id || item.inventario_id,
           usuario_id: 1,
-          descripcion: `${item.nombre_unidad || item.title} movido a ${newState}`,
+      descripcion: `${item.nombre_unidad || item.title} movido a ${newState}${newState === 'En bodega' ? ' (lote limpiado)' : ''}`,
           estado_nuevo: newState,
           sub_estado_nuevo: newSubState || 'En proceso'
         }
