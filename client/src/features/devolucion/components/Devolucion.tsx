@@ -91,17 +91,17 @@ export const Devolucion: React.FC = () => {
 
   return (
   <div className="flex-1 overflow-hidden bg-white">
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Devolución</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Gestión de Devolución</h1>
         </div>
       </div>
       
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
         {/* Instrucciones */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h2 className="text-lg font-semibold text-blue-900 mb-2">Proceso de Devolución</h2>
-          <ol className="list-decimal list-inside space-y-1 text-blue-800">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+          <h2 className="text-base sm:text-lg font-semibold text-blue-900 mb-2">Proceso de Devolución</h2>
+          <ol className="list-decimal list-inside space-y-1 text-blue-800 text-sm">
             <li>Los items completados en operación aparecen automáticamente como pendientes de devolución</li>
             <li>Separar físicamente los Cubes, VIPs y TICs que han llegado a bodega</li>
             <li>Usar el botón "Escanear Items" para confirmar la devolución</li>
@@ -110,18 +110,18 @@ export const Devolucion: React.FC = () => {
 
         {/* Items Pendientes de Devolución - Agrupados por Categoría */}
         <div className="bg-white rounded-lg border border-orange-200 overflow-hidden">
-          <div className="bg-orange-50 border-b border-orange-200 px-6 py-4">
-            <div className="flex items-center justify-between">
+          <div className="bg-orange-50 border-b border-orange-200 px-3 sm:px-6 py-3 sm:py-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h2 className="text-lg font-semibold text-orange-800">Items Pendientes de Devolución</h2>
-                <p className="text-sm text-orange-600">({itemsDevolucion.length} items listos para devolver)</p>
+                <h2 className="text-base sm:text-lg font-semibold text-orange-800">Items Pendientes de Devolución</h2>
+                <p className="text-xs sm:text-sm text-orange-600">({itemsDevolucion.length} items listos para devolver)</p>
               </div>
               {/* Botones de acción para items pendientes */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 {/* Botón de escaneo RFID - Siempre visible */}
                 <button
                   onClick={() => setMostrarModal(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                  className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-3 sm:px-4 py-2 bg-blue-600 text-white text-xs sm:text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
                   title="Escanear items para devolver"
                 >
                   <Scan className="w-4 h-4" />
@@ -143,7 +143,7 @@ export const Devolucion: React.FC = () => {
                         marcarItemsComoDevueltos(itemIds);
                       }
                     }}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
+                    className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-3 sm:px-4 py-2 bg-green-600 text-white text-xs sm:text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
                     title="Devolver todos los items en lote"
                   >
                     <CheckCircle className="w-4 h-4" />
@@ -155,39 +155,39 @@ export const Devolucion: React.FC = () => {
           </div>
 
           {itemsDevolucion.length === 0 ? (
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="text-center py-8 text-gray-500">
-                <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <Package className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50" />
                 <p>No hay items pendientes de devolución</p>
               </div>
             </div>
           ) : (
-            <div className="p-6 space-y-6">
+            <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
               {/* Cubes */}
               {cubesPendientes.length > 0 && (
                 <div className="bg-blue-50 rounded-lg border border-blue-200 overflow-hidden">
-                  <div className="bg-blue-100 px-4 py-3 border-b border-blue-200">
+                  <div className="bg-blue-100 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-blue-200">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Package className="h-5 w-5 text-blue-600" />
                         <h3 className="font-semibold text-blue-900">Cubes</h3>
-                        <span className="bg-blue-200 text-blue-800 px-2 py-1 rounded text-sm font-medium">
+                        <span className="bg-blue-200 text-blue-800 px-2 py-0.5 rounded text-xs sm:text-sm font-medium">
                           {cubesPendientes.length}
                         </span>
                       </div>
                     </div>
                   </div>
-                  <div className="p-4 space-y-2">
+                  <div className="p-3 sm:p-4 space-y-2">
                     {cubesPendientes.map((item) => (
                       <div key={item.id} className="bg-white rounded-lg p-3 flex items-center justify-between border border-blue-200">
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center gap-2 sm:gap-3">
                           <Package className="h-4 w-4 text-blue-600" />
                           <div>
                             <h4 className="text-sm font-medium text-gray-900">{item.nombre_unidad}</h4>
-                            <p className="text-xs text-gray-600">Lote: {item.lote} • RFID: {item.rfid || 'N/A'}</p>
+                            <p className="text-xs text-gray-600 break-all">Lote: {item.lote} • RFID: {item.rfid || 'N/A'}</p>
                           </div>
                         </div>
-                        <span className="text-xs text-blue-600 font-medium bg-blue-100 px-2 py-1 rounded">Pendiente</span>
+                        <span className="text-[10px] sm:text-xs text-blue-600 font-medium bg-blue-100 px-2 py-0.5 rounded">Pendiente</span>
                       </div>
                     ))}
                   </div>
@@ -197,28 +197,28 @@ export const Devolucion: React.FC = () => {
               {/* VIPs */}
               {vipsPendientes.length > 0 && (
                 <div className="bg-green-50 rounded-lg border border-green-200 overflow-hidden">
-                  <div className="bg-green-100 px-4 py-3 border-b border-green-200">
+                  <div className="bg-green-100 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-green-200">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Package className="h-5 w-5 text-green-600" />
                         <h3 className="font-semibold text-green-900">VIPs</h3>
-                        <span className="bg-green-200 text-green-800 px-2 py-1 rounded text-sm font-medium">
+                        <span className="bg-green-200 text-green-800 px-2 py-0.5 rounded text-xs sm:text-sm font-medium">
                           {vipsPendientes.length}
                         </span>
                       </div>
                     </div>
                   </div>
-                  <div className="p-4 space-y-2">
+                  <div className="p-3 sm:p-4 space-y-2">
                     {vipsPendientes.map((item) => (
                       <div key={item.id} className="bg-white rounded-lg p-3 flex items-center justify-between border border-green-200">
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center gap-2 sm:gap-3">
                           <Package className="h-4 w-4 text-green-600" />
                           <div>
                             <h4 className="text-sm font-medium text-gray-900">{item.nombre_unidad}</h4>
-                            <p className="text-xs text-gray-600">Lote: {item.lote} • RFID: {item.rfid || 'N/A'}</p>
+                            <p className="text-xs text-gray-600 break-all">Lote: {item.lote} • RFID: {item.rfid || 'N/A'}</p>
                           </div>
                         </div>
-                        <span className="text-xs text-green-600 font-medium bg-green-100 px-2 py-1 rounded">Pendiente</span>
+                        <span className="text-[10px] sm:text-xs text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">Pendiente</span>
                       </div>
                     ))}
                   </div>
@@ -228,28 +228,28 @@ export const Devolucion: React.FC = () => {
               {/* TICs */}
               {ticsPendientes.length > 0 && (
                 <div className="bg-yellow-50 rounded-lg border border-yellow-200 overflow-hidden">
-                  <div className="bg-yellow-100 px-4 py-3 border-b border-yellow-200">
+                  <div className="bg-yellow-100 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-yellow-200">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Package className="h-5 w-5 text-yellow-600" />
                         <h3 className="font-semibold text-yellow-900">TICs</h3>
-                        <span className="bg-yellow-200 text-yellow-800 px-2 py-1 rounded text-sm font-medium">
+                        <span className="bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded text-xs sm:text-sm font-medium">
                           {ticsPendientes.length}
                         </span>
                       </div>
                     </div>
                   </div>
-                  <div className="p-4 space-y-2">
+                  <div className="p-3 sm:p-4 space-y-2">
                     {ticsPendientes.map((item) => (
                       <div key={item.id} className="bg-white rounded-lg p-3 flex items-center justify-between border border-yellow-200">
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center gap-2 sm:gap-3">
                           <Package className="h-4 w-4 text-yellow-600" />
                           <div>
                             <h4 className="text-sm font-medium text-gray-900">{item.nombre_unidad}</h4>
-                            <p className="text-xs text-gray-600">Lote: {item.lote} • RFID: {item.rfid || 'N/A'}</p>
+                            <p className="text-xs text-gray-600 break-all">Lote: {item.lote} • RFID: {item.rfid || 'N/A'}</p>
                           </div>
                         </div>
-                        <span className="text-xs text-yellow-600 font-medium bg-yellow-100 px-2 py-1 rounded">Pendiente</span>
+                        <span className="text-[10px] sm:text-xs text-yellow-600 font-medium bg-yellow-100 px-2 py-0.5 rounded">Pendiente</span>
                       </div>
                     ))}
                   </div>
@@ -261,16 +261,16 @@ export const Devolucion: React.FC = () => {
 
         {/* Items Devueltos */}
         <div className="bg-white rounded-lg shadow border border-gray-200">
-          <div className="bg-green-50 border-b border-green-200 px-6 py-4">
-            <h3 className="text-lg font-semibold text-green-800 flex items-center">
+          <div className="bg-green-50 border-b border-green-200 px-4 sm:px-6 py-3 sm:py-4">
+            <h3 className="text-base sm:text-lg font-semibold text-green-800 flex items-center">
               <CheckCircle className="h-5 w-5 mr-2" />
               Items Devueltos
-              <span className="ml-2 bg-green-100 text-green-800 px-2 py-1 rounded text-sm">
+              <span className="ml-2 bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs sm:text-sm">
                 {itemsDevueltos.length}
               </span>
             </h3>
           </div>
-          <div className="p-6">
+          <div className="p-3 sm:p-6">
             {itemsDevueltos.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -279,22 +279,22 @@ export const Devolucion: React.FC = () => {
             ) : (
               <>
                 {/* Resumen agrupado por categoría */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div className="bg-blue-50 rounded-lg p-4 text-center">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
+                  <div className="bg-blue-50 rounded-lg p-3 sm:p-4 text-center">
                     <Package className="h-8 w-8 text-blue-600 mx-auto mb-2" />
                     <h4 className="font-semibold text-blue-900">Cubes</h4>
                     <p className="text-2xl font-bold text-blue-800">
                       {itemsDevueltos.filter(item => item.categoria === 'Cube').length}
                     </p>
                   </div>
-                  <div className="bg-green-50 rounded-lg p-4 text-center">
+                  <div className="bg-green-50 rounded-lg p-3 sm:p-4 text-center">
                     <Package className="h-8 w-8 text-green-600 mx-auto mb-2" />
                     <h4 className="font-semibold text-green-900">VIPs</h4>
                     <p className="text-2xl font-bold text-green-800">
                       {itemsDevueltos.filter(item => item.categoria === 'VIP').length}
                     </p>
                   </div>
-                  <div className="bg-yellow-50 rounded-lg p-4 text-center">
+                  <div className="bg-yellow-50 rounded-lg p-3 sm:p-4 text-center">
                     <Package className="h-8 w-8 text-yellow-600 mx-auto mb-2" />
                     <h4 className="font-semibold text-yellow-900">TICs</h4>
                     <p className="text-2xl font-bold text-yellow-800">
@@ -305,9 +305,9 @@ export const Devolucion: React.FC = () => {
                 
                 {/* Lista paginada de items devueltos */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-2 sm:mb-3">
                     <h4 className="font-medium text-gray-900">Items devueltos:</h4>
-                    <span className="text-sm text-gray-500">
+                    <span className="text-xs sm:text-sm text-gray-500">
                       {itemsDevueltos.length} total{itemsDevueltos.length !== 1 ? 'es' : ''}
                     </span>
                   </div>
