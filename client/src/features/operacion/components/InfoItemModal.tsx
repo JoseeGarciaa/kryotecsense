@@ -49,6 +49,15 @@ const InfoItemModal: React.FC<InfoItemModalProps> = ({
     }
   };
 
+  // Obtiene el primer valor de fecha disponible entre varias claves posibles
+  const getFirstDateValue = (item: any, keys: string[]): string | undefined => {
+    for (const key of keys) {
+      const value = item?.[key];
+      if (value) return value as string;
+    }
+    return undefined;
+  };
+
   const renderItemCard = (item: any, tipo: string) => (
     <div key={item.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
       <div className="flex items-center justify-between mb-2">
@@ -86,21 +95,35 @@ const InfoItemModal: React.FC<InfoItemModalProps> = ({
             Creado:
           </span>
           <p className="text-xs text-gray-700">
-            {formatDate(item.fecha_creacion)}
+            {formatDate(
+              getFirstDateValue(item, [
+                'fecha_ingreso',
+                'fecha_creacion',
+                'created_at',
+                'fecha'
+              ]) as any
+            )}
           </p>
         </div>
 
-        {item.fecha_actualizacion && (
-          <div>
-            <span className="text-gray-600 flex items-center gap-1">
-              <Clock size={14} />
-              Actualizado:
-            </span>
-            <p className="text-xs text-gray-700">
-              {formatDate(item.fecha_actualizacion)}
-            </p>
-          </div>
-        )}
+        {(() => {
+          const updated = getFirstDateValue(item, [
+            'ultima_actualizacion',
+            'fecha_actualizacion',
+            'updated_at'
+          ]);
+          return updated ? (
+            <div>
+              <span className="text-gray-600 flex items-center gap-1">
+                <Clock size={14} />
+                Actualizado:
+              </span>
+              <p className="text-xs text-gray-700">
+                {formatDate(updated)}
+              </p>
+            </div>
+          ) : null;
+        })()}
 
         {/* Validaciones */}
         <div className="border-t pt-2">
