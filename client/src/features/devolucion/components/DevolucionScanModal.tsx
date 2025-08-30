@@ -113,43 +113,45 @@ export const DevolucionScanModal: React.FC<DevolucionScanModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow-xl w-[92vw] max-w-md sm:max-w-2xl md:max-w-3xl max-h-[88vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-blue-50 border-b border-blue-200 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Scan className="h-6 w-6 text-blue-600" />
+        <div className="bg-blue-50 border-b border-blue-200 px-3 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-start sm:items-center gap-2 sm:gap-3">
+            <Scan className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 flex-shrink-0" />
             <div>
-              <h2 className="text-lg font-semibold text-blue-900">Escanear Items para Devolución</h2>
-              <p className="text-sm text-blue-600">Escanee los items que desea marcar como devueltos</p>
+              <h2 className="text-base sm:text-lg font-semibold text-blue-900">Escanear Items para Devolución</h2>
+              <p className="text-xs sm:text-sm text-blue-600">Escanee los items que desea marcar como devueltos</p>
             </div>
           </div>
           <button
             onClick={onClose}
             title="Cerrar modal"
-            className="text-gray-400 hover:text-gray-600"
+            aria-label="Cerrar"
+            className="text-gray-400 hover:text-gray-600 self-end sm:self-auto"
           >
-            <X className="h-6 w-6" />
+            <X className="h-5 w-5 sm:h-6 sm:w-6" />
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+        <div className="p-3 sm:p-6 overflow-y-auto flex-1">
           {/* Input de escaneo */}
-          <div className="mb-6">
-            <div className="flex items-center space-x-3 mb-3">
-              <label className="text-sm font-medium text-gray-700">
-                Código RFID o Nombre del Item:
-              </label>
-              <button
-                onClick={() => setModoEscaneo(!modoEscaneo)}
-                title={modoEscaneo ? 'Detener escaneo' : 'Iniciar escaneo'}
-                className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                <Scan className="h-5 w-5" />
-              </button>
+          <div className="mb-4 sm:mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+              <label className="text-sm font-medium text-gray-700">Código RFID o Nombre del Item:</label>
+              <div>
+                <button
+                  onClick={() => setModoEscaneo(!modoEscaneo)}
+                  title={modoEscaneo ? 'Detener escaneo' : 'Iniciar escaneo'}
+                  className="inline-flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                >
+                  <Scan className="h-4 w-4 mr-2" />
+                  {modoEscaneo ? 'Escanear' : 'Pausado'}
+                </button>
+              </div>
             </div>
-            
-            <div className="flex space-x-3">
+
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <input
                 ref={inputRef}
                 type="text"
@@ -157,13 +159,13 @@ export const DevolucionScanModal: React.FC<DevolucionScanModalProps> = ({
                 onChange={(e) => setCodigoEscaneado(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Escanee o escriba el código del item..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full sm:flex-1 px-3 sm:px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 disabled={procesando}
               />
               <button
                 onClick={() => handleEscanearCodigo(codigoEscaneado)}
                 disabled={!codigoEscaneado.trim() || procesando}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
                 Agregar
               </button>
@@ -174,17 +176,17 @@ export const DevolucionScanModal: React.FC<DevolucionScanModalProps> = ({
               <button
                 onClick={handleEscanearTodos}
                 disabled={procesando}
-                className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
               >
                 <Package className="h-4 w-4" />
-                <span>Agregar Todos los Items Pendientes ({itemsPendientes.length})</span>
+                <span>Agregar todos los pendientes ({itemsPendientes.length})</span>
               </button>
             </div>
           </div>
 
           {/* Error */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-center space-x-2">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0" />
               <span className="text-red-800 text-sm">{error}</span>
             </div>
@@ -192,15 +194,15 @@ export const DevolucionScanModal: React.FC<DevolucionScanModalProps> = ({
 
           {/* Lista de items escaneados */}
           <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">
+            <h3 className="text-sm font-medium text-gray-700 mb-2 sm:mb-3">
               Items Escaneados ({itemsEscaneados.length})
             </h3>
             
             {itemsEscaneados.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                <Scan className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <Scan className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50" />
                 <p>No hay items escaneados</p>
-                <p className="text-sm">Use la pistola RFID o escriba el código manualmente</p>
+                <p className="text-xs sm:text-sm">Use la pistola RFID o escriba el código manualmente</p>
               </div>
             ) : (
               <div className="space-y-2 max-h-60 overflow-y-auto">
@@ -228,22 +230,22 @@ export const DevolucionScanModal: React.FC<DevolucionScanModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t">
-          <div className="text-sm text-gray-600">
+        <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between border-t gap-2">
+          <div className="text-xs sm:text-sm text-gray-600">
             {itemsEscaneados.length} de {itemsPendientes.length} items escaneados
           </div>
-          <div className="flex space-x-3">
+          <div className="flex gap-2 sm:gap-3">
             <button
               onClick={onClose}
               disabled={procesando}
-              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50"
+              className="px-3 sm:px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               onClick={handleConfirmar}
               disabled={itemsEscaneados.length === 0 || procesando}
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              className="w-full sm:w-auto px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
             >
               {procesando ? (
                 <>
@@ -253,7 +255,7 @@ export const DevolucionScanModal: React.FC<DevolucionScanModalProps> = ({
               ) : (
                 <>
                   <CheckCircle className="h-4 w-4" />
-                  <span>Confirmar Devolución</span>
+                  <span>Confirmar</span>
                 </>
               )}
             </button>
