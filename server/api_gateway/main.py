@@ -734,10 +734,12 @@ async def websocket_endpoint(websocket: WebSocket):
             
             if message_type == "REQUEST_SYNC":
                 # Cliente solicita sincronización completa
+                server_ts = timer_manager.get_server_timestamp()
                 await timer_manager.send_to_client(websocket, {
                     "type": "TIMER_SYNC",
                     "data": {
-                        "timers": [timer.dict() for timer in timer_manager.timers.values()]
+                        "timers": [{**t.to_dict(), "server_timestamp": server_ts} for t in timer_manager.timers.values()],
+                        "server_timestamp": server_ts
                     }
                 })
                 
