@@ -283,19 +283,25 @@ const Registro: React.FC = () => {
         // Determinar la categoría correcta basada en el tipo del modelo
         let categoriaFinal = 'Cube'; // Por defecto
         
-        if (modelo.tipo) {
-          // Si el modelo tiene tipo definido, usarlo
+        console.log('🔍 Debug categoría:', { 
+          modeloTipo: modelo.tipo, 
+          tipoSeleccionado, 
+          modelo: modelo.nombre_modelo 
+        });
+        
+        // Usar directamente el tipo seleccionado como fuente principal de verdad
+        if (tipoSeleccionado === 'VIP') {
+          categoriaFinal = 'VIP';
+        } else if (tipoSeleccionado === 'TIC') {
+          categoriaFinal = 'TIC';
+        } else if (tipoSeleccionado === 'CUBE') {
+          categoriaFinal = 'Cube';
+        } else if (modelo.tipo) {
+          // Solo usar modelo.tipo como fallback si tipoSeleccionado no es reconocido
           categoriaFinal = modelo.tipo;
-        } else {
-          // Fallback basado en el tipo seleccionado
-          if (tipoSeleccionado === 'VIP') {
-            categoriaFinal = 'VIP';
-          } else if (tipoSeleccionado === 'TIC') {
-            categoriaFinal = 'TIC';
-          } else if (tipoSeleccionado === 'CUBE') {
-            categoriaFinal = 'Cube';
-          }
         }
+        
+        console.log('🎯 Categoría final determinada:', categoriaFinal);
         
         const inventarioData = {
           modelo_id: modelo.modelo_id,

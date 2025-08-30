@@ -269,7 +269,7 @@ export const useOperaciones = () => {
       const itemsEnBodega = inventario.filter((item: any) => {
         const categoria = (item.categoria || '').toLowerCase();
         const esEnBodega = item.estado === 'En bodega';
-        const categoriaValida = categoria === 'tic' || categoria === 'vip' || categoria === 'cube';
+        const categoriaValida = categoria === 'tic' || categoria === 'vip' || categoria === 'cube' || categoria === 'a' || categoria === 'b' || categoria === 'c';
         
         return item && item.estado && item.categoria &&
                esEnBodega && categoriaValida;
@@ -277,20 +277,20 @@ export const useOperaciones = () => {
       const itemsPreAcondicionamiento = inventario.filter((item: any) => {
         const categoria = (item.categoria || '').toLowerCase();
         return item && item.estado && item.categoria &&
-               item.estado === 'Pre-acondicionamiento' && 
-               (categoria === 'tic' || categoria === 'vip' || categoria === 'cube');
+               item.estado === 'Pre-acondicionamiento' &&
+               (categoria === 'tic' || categoria === 'vip' || categoria === 'cube' || categoria === 'a' || categoria === 'b' || categoria === 'c');
       });
       const itemsAcondicionamiento = inventario.filter((item: any) => {
         const categoria = (item.categoria || '').toLowerCase();
         return item && item.estado && item.categoria &&
-               item.estado === 'Acondicionamiento' && 
-               (categoria === 'tic' || categoria === 'vip' || categoria === 'cube');
+               item.estado === 'Acondicionamiento' &&
+               (categoria === 'tic' || categoria === 'vip' || categoria === 'cube' || categoria === 'a' || categoria === 'b' || categoria === 'c');
       });
       const itemsOperacion = inventario.filter((item: any) => {
         const categoria = (item.categoria || '').toLowerCase();
         return item && item.estado && item.categoria &&
                (item.estado === 'operación' || item.estado === 'Operación') && 
-               (categoria === 'tic' || categoria === 'vip' || categoria === 'cube');
+               (categoria === 'tic' || categoria === 'vip' || categoria === 'cube' || categoria === 'a' || categoria === 'b' || categoria === 'c');
       });
       const itemsDevolucion = inventario.filter((item: any) => {
         const categoria = (item.categoria || '').toLowerCase();
@@ -301,13 +301,13 @@ export const useOperaciones = () => {
                  // Items completados en operación (listos para devolver)
                  (item.estado === 'operación' && item.sub_estado === 'entregado')
                ) &&
-               (categoria === 'tic' || categoria === 'vip' || categoria === 'cube');
+               (categoria === 'tic' || categoria === 'vip' || categoria === 'cube' || categoria === 'a' || categoria === 'b' || categoria === 'c');
       });
       const itemsInspeccion = inventario.filter((item: any) => {
         const categoria = (item.categoria || '').toLowerCase();
         return item && item.estado && item.categoria &&
                item.estado === 'Inspección' && 
-               (categoria === 'tic' || categoria === 'vip' || categoria === 'cube');
+               (categoria === 'tic' || categoria === 'vip' || categoria === 'cube' || categoria === 'a' || categoria === 'b' || categoria === 'c');
       });
       
       // Solo mostrar log si hay cambios significativos
