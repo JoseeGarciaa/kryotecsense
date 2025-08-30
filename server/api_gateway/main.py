@@ -46,7 +46,7 @@ def parse_iso_datetime(iso_string):
         print(f"Error parseando fecha {iso_string}: {e}")
         return get_utc_now()
 
-# Modelo de Timer integrado
+# Modelo de Timer integrado (única definición)
 class Timer(BaseModel):
     id: str
     nombre: str
@@ -58,13 +58,11 @@ class Timer(BaseModel):
     activo: bool = True
     completado: bool = False
 
-    # Asegurar que se ignoren campos extra (compatibilidad con payloads enriquecidos)
-    model_config = {
-        "extra": "ignore"
-    }
+    # Ignorar campos extra (para permitir payloads enriquecidos como rfid, inventario_id)
+    model_config = {"extra": "ignore"}
 
-    def to_dict(self):
-        """Convertir a diccionario con fechas en ISO string"""
+    def to_dict(self) -> Dict[str, Any]:
+        """Representación serializable (fechas en ISO)."""
         return {
             "id": self.id,
             "nombre": self.nombre,
@@ -75,38 +73,6 @@ class Timer(BaseModel):
             "fechaFin": self.fechaFin.isoformat() if isinstance(self.fechaFin, datetime) else self.fechaFin,
             "activo": self.activo,
             "completado": self.completado,
-        }
-
-    # Ignorar campos extra en creaciones (pydantic v2)
-    model_config = {
-        "extra": "ignore"
-    }
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "nombre": self.nombre,
-            "tipoOperacion": self.tipoOperacion,
-            "tiempoInicialMinutos": self.tiempoInicialMinutos,
-            "tiempoRestanteSegundos": self.tiempoRestanteSegundos,
-            "fechaInicio": self.fechaInicio.isoformat() if isinstance(self.fechaInicio, datetime) else self.fechaInicio,
-            "fechaFin": self.fechaFin.isoformat() if isinstance(self.fechaFin, datetime) else self.fechaFin,
-            "activo": self.activo,
-            "completado": self.completado
-        }
-    
-    def to_dict(self):
-        """Convertir a diccionario con fechas en formato ISO string"""
-        return {
-            "id": self.id,
-            "nombre": self.nombre,
-            "tipoOperacion": self.tipoOperacion,
-            "tiempoInicialMinutos": self.tiempoInicialMinutos,
-            "tiempoRestanteSegundos": self.tiempoRestanteSegundos,
-            "fechaInicio": self.fechaInicio.isoformat() if isinstance(self.fechaInicio, datetime) else self.fechaInicio,
-            "fechaFin": self.fechaFin.isoformat() if isinstance(self.fechaFin, datetime) else self.fechaFin,
-            "activo": self.activo,
-            "completado": self.completado
         }
 
 from shared.database import get_db, get_engine
@@ -274,17 +240,6 @@ TIMERS_FILE = "timers_data.json"
 
 # Configurar logging específico para timers
 timer_logger = logging.getLogger("timer_service")
-
-class Timer(BaseModel):
-    id: str
-    nombre: str
-    tipoOperacion: str = Field(..., description="Tipo: congelamiento, atemperamiento, envio")
-    tiempoInicialMinutos: int
-    tiempoRestanteSegundos: int
-    fechaInicio: datetime
-    fechaFin: datetime
-    activo: bool = True
-    completado: bool = False
 
 class WebSocketMessage(BaseModel):
     type: str
