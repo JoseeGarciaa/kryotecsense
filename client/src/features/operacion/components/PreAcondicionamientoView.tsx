@@ -368,6 +368,13 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
           );
           
           if (itemsInventario.length > 0) {
+            console.log(`🔄 Creando timers masivos para ${itemsInventario.length} items:`, itemsInventario);
+            console.log(`📋 Parámetros del endpoint masivo:`, {
+              items_ids: itemsInventario.map((item: any) => item.id),
+              tipoOperacion: tipoOperacionTimer,
+              tiempoMinutos: tiempoMinutos
+            });
+            
             const timerResponse = await apiServiceClient.post('/inventory/iniciar-timers-masivo', {
               items_ids: itemsInventario.map((item: any) => item.id),
               tipoOperacion: tipoOperacionTimer,
@@ -389,6 +396,11 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             
             rfidsPendientesTimer.forEach((rfid, index) => {
               console.log(`⏰ Creando timer ${index + 1}/${rfidsPendientesTimer.length} para RFID: ${rfid}`);
+              console.log(`🎯 Parámetros del timer:`, {
+                rfid,
+                tipoOperacion: tipoOperacionTimer,
+                tiempoMinutos
+              });
               const timerId = crearTimer(
                 rfid,
                 tipoOperacionTimer,
@@ -396,6 +408,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
               );
               timersCreados.push(timerId);
               console.log(`✅ Timer creado con ID: ${timerId}`);
+              console.log(`📊 Estado actual de timers después de crear:`, timers.length);
             });
             
             // Limpiar estados ANTES de mostrar el mensaje de éxito
@@ -473,7 +486,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   
   // Función para obtener el temporizador de un TIC específico
   const obtenerTemporizadorTIC = (rfid: string) => {
-    return timers.find((timer: any) => timer.nombre === rfid && !timer.completado);
+    const timer = timers.find((timer: any) => timer.nombre === rfid && !timer.completado);
+    console.log(`🔍 Buscando timer para RFID ${rfid}:`, timer);
+    console.log(`📋 Todos los timers:`, timers);
+    return timer;
   };
 
   // Función para verificar si un TIC tiene temporizador activo
