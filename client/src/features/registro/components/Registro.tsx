@@ -253,6 +253,13 @@ const Registro: React.FC = () => {
   }, [tipoSeleccionado, litrajeSeleccionado]);
 
   const handleSubmit = async () => {
+    console.log('🚀 INICIANDO REGISTRO - Estado actual:', {
+      tipoSeleccionado,
+      litrajeSeleccionado,
+      totalItems: lecturasRfid.length,
+      timestamp: new Date().toISOString()
+    });
+    
     if (!tipoSeleccionado || !litrajeSeleccionado) {
       setError('Por favor, complete tipo y litraje.');
       return;
@@ -286,7 +293,8 @@ const Registro: React.FC = () => {
         console.log('🔍 Debug categoría:', { 
           modeloTipo: modelo.tipo, 
           tipoSeleccionado, 
-          modelo: modelo.nombre_modelo 
+          modelo: modelo.nombre_modelo,
+          timestamp: new Date().toISOString()
         });
         
         // Usar SIEMPRE el tipo seleccionado por el usuario como fuente de verdad
