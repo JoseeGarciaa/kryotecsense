@@ -2972,8 +2972,8 @@ async def iniciar_timers_masivo(
             params["ids_csv"] = ",".join(str(i) for i in ids_int)
             conditions.append("id = ANY(STRING_TO_ARRAY(:ids_csv, ',')::int[])")
         if rfids:
-            params["rfids"] = rfids
-            conditions.append("rfid = ANY(:rfids)")
+            params["rfids_csv"] = ",".join(rfids)
+            conditions.append("rfid = ANY(STRING_TO_ARRAY(:rfids_csv, ',')::text[])")
 
         where_clause = " OR ".join(conditions)
         query = text(
