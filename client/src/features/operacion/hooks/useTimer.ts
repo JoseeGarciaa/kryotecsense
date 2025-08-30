@@ -216,11 +216,11 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       
       setTimeout(() => {
         if (isConnected) {
-          console.log('📤 Enviando REQUEST_SYNC al servidor...');
-          sendMessage({
-            type: 'REQUEST_SYNC'
-          });
-          console.log('✅ REQUEST_SYNC enviado');
+          console.log('📤 Enviando REQUEST_SYNC y SYNC_REQUEST (compat) al servidor...');
+          sendMessage({ type: 'REQUEST_SYNC' });
+          // Compatibilidad con servidores antiguos
+          sendMessage({ type: 'SYNC_REQUEST' });
+          console.log('✅ Mensajes de sync enviados');
         } else {
           console.log('⚠️ WebSocket desconectado antes de enviar SYNC_REQUEST');
         }
@@ -281,9 +281,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         const lastVisibilityChange = Date.now() - (localStorage.getItem('last_visibility_hidden') ? parseInt(localStorage.getItem('last_visibility_hidden')!) : 0);
         if (lastVisibilityChange > 5000) {
           console.log('👁️ Pestaña visible después de estar oculta - Sincronizando');
-          sendMessage({
-            type: 'REQUEST_SYNC'
-          });
+          sendMessage({ type: 'REQUEST_SYNC' });
+          sendMessage({ type: 'SYNC_REQUEST' });
         }
       } else if (document.visibilityState === 'hidden') {
         localStorage.setItem('last_visibility_hidden', Date.now().toString());
@@ -424,7 +423,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     // Solicitar sincronización para asegurar que se vea en otros dispositivos
       setTimeout(() => {
         if (isConnected) {
-      sendMessage({ type: 'REQUEST_SYNC' });
+          sendMessage({ type: 'REQUEST_SYNC' });
+          sendMessage({ type: 'SYNC_REQUEST' });
         }
       }, 200);
     } else {
@@ -560,8 +560,9 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   const forzarSincronizacion = useCallback(() => {
     if (isConnected) {
       console.log('🔄 Forzando sincronización manual');
-      // Sincronizar este cliente
-      sendMessage({ type: 'REQUEST_SYNC' });
+  // Sincronizar este cliente (nueva y vieja forma)
+  sendMessage({ type: 'REQUEST_SYNC' });
+  sendMessage({ type: 'SYNC_REQUEST' });
       // Y forzar broadcast para que todos los dispositivos se actualicen
       setTimeout(() => {
         sendMessage({ type: 'FORCE_BROADCAST_SYNC' });
