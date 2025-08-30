@@ -253,34 +253,42 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   
   // Función para manejar el escaneo de RFID
   const manejarEscaneoRfid = () => {
-    if (!rfidInput.trim()) return;
+    const rfidTrimmed = rfidInput.trim();
+    if (!rfidTrimmed) return;
+    
+    // Si es un código de 24 caracteres, no procesarlo aquí porque ya fue auto-procesado
+    if (rfidTrimmed.length === 24) {
+      console.log(`⏭️ RFID de 24 caracteres ${rfidTrimmed} ya fue auto-procesado, omitiendo procesamiento manual`);
+      setRfidInput('');
+      return;
+    }
     
     // Verificar si el RFID existe en el inventario completo
     const itemEncontrado = operaciones.inventarioCompleto.find(item => 
-      item.rfid === rfidInput.trim() || item.nombre_unidad === rfidInput.trim()
+      item.rfid === rfidTrimmed || item.nombre_unidad === rfidTrimmed
     );
 
     if (!itemEncontrado) {
-      console.log(`❌ RFID ${rfidInput.trim()} no encontrado en el inventario`);
-      alert(`❌ RFID ${rfidInput.trim()} no encontrado en el inventario`);
+      console.log(`❌ RFID ${rfidTrimmed} no encontrado en el inventario`);
+      alert(`❌ RFID ${rfidTrimmed} no encontrado en el inventario`);
       setRfidInput('');
       return;
     }
     
     // Validar que el item sea específicamente un TIC
     if (itemEncontrado.categoria !== 'TIC') {
-      console.warn(`⚠️ RFID ${rfidInput.trim()} no es un TIC (categoría: ${itemEncontrado.categoria}). Solo se permiten TICs en pre-acondicionamiento.`);
-      alert(`⚠️ El item ${rfidInput.trim()} no es un TIC (categoría: ${itemEncontrado.categoria}). En pre-acondicionamiento solo se permiten TICs.`);
+      console.warn(`⚠️ RFID ${rfidTrimmed} no es un TIC (categoría: ${itemEncontrado.categoria}). Solo se permiten TICs en pre-acondicionamiento.`);
+      alert(`⚠️ El item ${rfidTrimmed} no es un TIC (categoría: ${itemEncontrado.categoria}). En pre-acondicionamiento solo se permiten TICs.`);
       setRfidInput('');
       return;
     }
     
     // Verificar si ya está en la lista
-    if (!rfidsEscaneados.includes(rfidInput.trim())) {
-      setRfidsEscaneados([...rfidsEscaneados, rfidInput.trim()]);
-      console.log(`✅ TIC ${rfidInput.trim()} agregado manualmente`);
+    if (!rfidsEscaneados.includes(rfidTrimmed)) {
+      setRfidsEscaneados([...rfidsEscaneados, rfidTrimmed]);
+      console.log(`✅ TIC ${rfidTrimmed} agregado manualmente`);
     } else {
-      console.log(`ℹ️ TIC ${rfidInput.trim()} ya está en la lista`);
+      console.log(`ℹ️ TIC ${rfidTrimmed} ya está en la lista`);
     }
     
     setRfidInput('');
