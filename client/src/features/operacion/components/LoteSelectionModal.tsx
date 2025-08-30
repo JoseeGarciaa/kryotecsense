@@ -17,9 +17,19 @@ interface Lote {
     rfid: string;
     estado: string;
     sub_estado: string;
+    categoria: string;
   }[];
   estado: string;
   sub_estado: string;
+}
+
+interface ItemSinLote {
+  id: number;
+  nombre_unidad: string;
+  rfid: string;
+  estado: string;
+  sub_estado: string;
+  categoria: string;
 }
 
 const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
@@ -29,11 +39,13 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
   subEstado
 }) => {
   const [lotes, setLotes] = useState<Lote[]>([]);
+  const [itemsSinLote, setItemsSinLote] = useState<ItemSinLote[]>([]);
   const [loteSeleccionado, setLoteSeleccionado] = useState<string | null>(null);
   const [ticsSeleccionados, setTicsSeleccionados] = useState<string[]>([]);
   const [cargando, setCargando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [vistaActual, setVistaActual] = useState<'lotes' | 'sin-lote'>('lotes');
 
   // Cargar lotes disponibles
   useEffect(() => {
@@ -60,6 +72,7 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
       // Agrupar por lote
       const loteMap = new Map<string, any[]>();
       const estadoLoteMap = new Map<string, {estado: string, sub_estado: string}>();
+      const itemsSinLoteArray: ItemSinLote[] = [];
       
       inventario.forEach((item: any) => {
         // Validar que el item tenga las propiedades necesarias
@@ -67,24 +80,38 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
           console.warn('⚠️ Item inválido encontrado:', item);
           return;
         }
-        if (item.lote) {
-          if (!loteMap.has(item.lote)) {
-            loteMap.set(item.lote, []);
-            // Guardar el estado del primer item del lote
-            estadoLoteMap.set(item.lote, {
-              estado: item.estado,
-              sub_estado: item.sub_estado
-            });
-          }
-          
-          // Solo incluir TICs que tienen categoria 'TIC'
-          if (item.categoria === 'TIC') {
+
+        // Solo incluir items que están listos para despacho
+        const estaListoParaDespacho = item.estado === 'Lista para Despacho';
+        
+        if (estaListoParaDespacho) {
+          if (item.lote) {
+            // Items con lote
+            if (!loteMap.has(item.lote)) {
+              loteMap.set(item.lote, []);
+              estadoLoteMap.set(item.lote, {
+                estado: item.estado,
+                sub_estado: item.sub_estado
+              });
+            }
+            
             loteMap.get(item.lote)?.push({
               id: item.id,
               nombre_unidad: item.nombre_unidad,
               rfid: item.rfid,
               estado: item.estado,
-              sub_estado: item.sub_estado
+              sub_estado: item.sub_estado,
+              categoria: item.categoria
+            });
+          } else {
+            // Items sin lote
+            itemsSinLoteArray.push({
+              id: item.id,
+              nombre_unidad: item.nombre_unidad,
+              rfid: item.rfid,
+              estado: item.estado,
+              sub_estado: item.sub_estado,
+              categoria: item.categoria
             });
           }
         }
@@ -99,6 +126,9 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
       }));
       
       setLotes(lotesArray);
+      setItemsSinLote(itemsSinLoteArray);
+      
+      console.log(`📦 Cargados ${lotesArray.length} lotes y ${itemsSinLoteArray.length} items sin lote`);
     } catch (error) {
       console.error('Error al cargar lotes:', error);
       setError('Error al cargar los lotes. Por favor, inténtalo de nuevo.');
@@ -109,6 +139,7 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
 
   const handleSeleccionarLote = (lote: string) => {
     setLoteSeleccionado(lote);
+    setVistaActual('lotes');
     
     // Obtener TICs del lote seleccionado
     const loteEncontrado = lotes.find(l => l.lote === lote);
@@ -119,6 +150,12 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
     } else {
       setTicsSeleccionados([]);
     }
+  };
+
+  const handleSeleccionarItemsSinLote = () => {
+    setLoteSeleccionado(null);
+    setVistaActual('sin-lote');
+    setTicsSeleccionados([]);
   };
 
   const handleToggleTic = (rfid: string) => {
@@ -141,13 +178,182 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
     if (ticsSeleccionados.length > 0) {
       onSeleccionarLote(ticsSeleccionados);
     } else {
-      setError('No hay TICs seleccionados');
+      setError('No hay items seleccionados');
     }
   };
+
+  const renderVistaLotes = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      {/* Lista de lotes */}
+      <div className="border rounded-md p-3">
+        <h4 className="font-medium mb-2 text-gray-700 dark:text-gray-300">Lotes disponibles</h4>
+        <div className="max-h-60 overflow-y-auto">
+          {lotesFiltrados.length > 0 ? (
+            lotesFiltrados.map((lote) => (
+              <div 
+                key={lote.lote}
+                onClick={() => handleSeleccionarLote(lote.lote)}
+                className={`p-2 cursor-pointer rounded-md mb-1 ${
+                  loteSeleccionado === lote.lote 
+                    ? 'bg-primary-100 border border-primary-300' 
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <div className="font-medium">{lote.lote}</div>
+                <div className="text-xs text-gray-500">{lote.tics.length} items disponibles</div>
+                <div className="text-xs text-gray-400 mt-1">
+                  Estado: {lote.estado}/{lote.sub_estado}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center p-4 text-gray-500">
+              No se encontraron lotes
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Lista de items del lote seleccionado */}
+      <div className="border rounded-md p-3">
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="font-medium text-gray-700 dark:text-gray-300">
+            Items del lote {loteSeleccionado || ""}
+          </h4>
+          {loteSeleccionado && lotes.find(l => l.lote === loteSeleccionado)?.tics && lotes.find(l => l.lote === loteSeleccionado)!.tics.length > 0 && (
+            <button
+              onClick={() => {
+                const loteActual = lotes.find(l => l.lote === loteSeleccionado);
+                if (loteActual) {
+                  const todosSeleccionados = Array.isArray(ticsSeleccionados) && loteActual.tics.every(tic => ticsSeleccionados.includes(tic.rfid));
+                  if (todosSeleccionados) {
+                    setTicsSeleccionados(prev => {
+                      if (!Array.isArray(prev)) return [];
+                      return prev.filter(rfid => !loteActual.tics.some(tic => tic.rfid === rfid));
+                    });
+                  } else {
+                    const rfidsDelLote = loteActual.tics.map(tic => tic.rfid);
+                    setTicsSeleccionados(prev => {
+                      if (!Array.isArray(prev)) return rfidsDelLote;
+                      const sinDuplicados = prev.filter(rfid => !rfidsDelLote.includes(rfid));
+                      return [...sinDuplicados, ...rfidsDelLote];
+                    });
+                  }
+                }
+              }}
+              className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            >
+              {Array.isArray(ticsSeleccionados) && lotes.find(l => l.lote === loteSeleccionado)?.tics.every(tic => ticsSeleccionados.includes(tic.rfid)) ? 'Deseleccionar todos' : 'Seleccionar todos'}
+            </button>
+          )}
+        </div>
+        <div className="max-h-60 overflow-y-auto">
+          {loteSeleccionado ? (
+            lotes.find(l => l.lote === loteSeleccionado)?.tics.map(tic => (
+              <div key={tic.id} className="flex items-center p-2 border-b">
+                <input
+                  type="checkbox"
+                  id={`tic-${tic.id}`}
+                  checked={Array.isArray(ticsSeleccionados) && ticsSeleccionados.includes(tic.rfid)}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    handleToggleTic(tic.rfid);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mr-2"
+                />
+                <label htmlFor={`tic-${tic.id}`} className="flex-1 cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <span>{tic.nombre_unidad}</span>
+                    <span className="text-xs bg-gray-100 px-2 py-1 rounded">{tic.categoria}</span>
+                  </div>
+                  <div className="text-xs text-gray-500">{tic.rfid}</div>
+                </label>
+              </div>
+            )) || (
+              <div className="text-center p-4 text-gray-500">
+                No hay items disponibles
+              </div>
+            )
+          ) : (
+            <div className="text-center p-4 text-gray-500">
+              Selecciona un lote para ver sus items
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderVistaItemsSinLote = () => (
+    <div className="mb-4">
+      <div className="border rounded-md p-3">
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="font-medium text-gray-700 dark:text-gray-300">
+            Items sin lote ({itemsSinLoteFiltrados.length})
+          </h4>
+          {itemsSinLoteFiltrados.length > 0 && (
+            <button
+              onClick={() => {
+                const todosSeleccionados = itemsSinLoteFiltrados.every(item => ticsSeleccionados.includes(item.rfid));
+                if (todosSeleccionados) {
+                  setTicsSeleccionados(prev => prev.filter(rfid => !itemsSinLoteFiltrados.some(item => item.rfid === rfid)));
+                } else {
+                  const rfidsItems = itemsSinLoteFiltrados.map(item => item.rfid);
+                  setTicsSeleccionados(prev => [...prev.filter(rfid => !rfidsItems.includes(rfid)), ...rfidsItems]);
+                }
+              }}
+              className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            >
+              {itemsSinLoteFiltrados.every(item => ticsSeleccionados.includes(item.rfid)) ? 'Deseleccionar todos' : 'Seleccionar todos'}
+            </button>
+          )}
+        </div>
+        <div className="max-h-96 overflow-y-auto">
+          {itemsSinLoteFiltrados.length > 0 ? (
+            itemsSinLoteFiltrados.map(item => (
+              <div key={item.id} className="flex items-center p-2 border-b">
+                <input
+                  type="checkbox"
+                  id={`item-${item.id}`}
+                  checked={ticsSeleccionados.includes(item.rfid)}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    handleToggleTic(item.rfid);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mr-2"
+                />
+                <label htmlFor={`item-${item.id}`} className="flex-1 cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <span>{item.nombre_unidad}</span>
+                    <span className="text-xs bg-gray-100 px-2 py-1 rounded">{item.categoria}</span>
+                  </div>
+                  <div className="text-xs text-gray-500">{item.rfid}</div>
+                  <div className="text-xs text-gray-400">Estado: {item.estado}/{item.sub_estado}</div>
+                </label>
+              </div>
+            ))
+          ) : (
+            <div className="text-center p-4 text-gray-500">
+              <div>No hay items sin lote disponibles</div>
+              <div className="text-xs mt-1">Todos los items están organizados en lotes</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   // Filtrar lotes por búsqueda
   const lotesFiltrados = lotes.filter(lote => 
     lote.lote.toLowerCase().includes(busqueda.toLowerCase())
+  );
+
+  // Filtrar items sin lote por búsqueda
+  const itemsSinLoteFiltrados = itemsSinLote.filter(item =>
+    item.nombre_unidad.toLowerCase().includes(busqueda.toLowerCase()) ||
+    item.rfid.toLowerCase().includes(busqueda.toLowerCase())
   );
 
   if (!mostrarModal) return null;
@@ -156,21 +362,48 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
         <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-          Seleccionar TICs por Lote para {subEstado}
+          Seleccionar Items por Lote para Envío
         </h3>
-        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-          <p className="text-sm text-yellow-800">
-            ⚠️ <strong>IMPORTANTE:</strong> Solo se muestran TICs en este modal. Los VIPs y CUBEs no están disponibles para pre-acondicionamiento.
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <p className="text-sm text-blue-800">
+            ℹ️ Items disponibles: <span className="font-medium">{lotes.length}</span> lotes • <span className="font-medium">{itemsSinLote.length}</span> items sin lote
           </p>
         </div>
         
+        
+        {/* Pestañas para alternar entre lotes e items sin lote */}
+        <div className="mb-4">
+          <div className="flex border-b border-gray-200">
+            <button
+              onClick={() => setVistaActual('lotes')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                vistaActual === 'lotes'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Por Lotes ({lotes.length})
+            </button>
+            <button
+              onClick={() => setVistaActual('sin-lote')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                vistaActual === 'sin-lote'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Items Individuales ({itemsSinLote.length})
+            </button>
+          </div>
+        </div>
+
         <div className="mb-4">
           <div className="relative">
             <input
               type="text"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar lote..."
+              placeholder={vistaActual === 'lotes' ? "Buscar lote..." : "Buscar item..."}
               className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
             />
             <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
@@ -188,111 +421,7 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            {/* Lista de lotes */}
-            <div className="border rounded-md p-3">
-              <h4 className="font-medium mb-2 text-gray-700 dark:text-gray-300">Lotes disponibles</h4>
-              <div className="max-h-60 overflow-y-auto">
-                {lotesFiltrados.length > 0 ? (
-                  lotesFiltrados.map((lote) => (
-                    <div 
-                      key={lote.lote}
-                      onClick={() => handleSeleccionarLote(lote.lote)}
-                      className={`p-2 cursor-pointer rounded-md mb-1 ${
-                        loteSeleccionado === lote.lote 
-                          ? 'bg-primary-100 border border-primary-300' 
-                          : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      <div className="font-medium">{lote.lote}</div>
-                      <div className="text-xs text-gray-500">{lote.tics.length} TICs disponibles</div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        Estado: {lote.estado}/{lote.sub_estado}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center p-4 text-gray-500">
-                    No se encontraron lotes
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {/* Lista de TICs del lote seleccionado */}
-            <div className="border rounded-md p-3">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-medium text-gray-700 dark:text-gray-300">
-                  TICs del lote {loteSeleccionado || ""}
-                </h4>
-                {loteSeleccionado && lotes.find(l => l.lote === loteSeleccionado)?.tics && lotes.find(l => l.lote === loteSeleccionado)!.tics.length > 0 && (
-                  <button
-                    onClick={() => {
-                      const loteActual = lotes.find(l => l.lote === loteSeleccionado);
-                      if (loteActual) {
-                        const todosSeleccionados = Array.isArray(ticsSeleccionados) && loteActual.tics.every(tic => ticsSeleccionados.includes(tic.rfid));
-                        if (todosSeleccionados) {
-                          // Deseleccionar todos los TICs del lote actual
-                          setTicsSeleccionados(prev => {
-                            if (!Array.isArray(prev)) {
-                              console.error('❌ ticsSeleccionados no es un array en deseleccionar:', prev);
-                              return [];
-                            }
-                            return prev.filter(rfid => !loteActual.tics.some(tic => tic.rfid === rfid));
-                          });
-                        } else {
-                          // Seleccionar todos los TICs del lote actual
-                          const rfidsDelLote = loteActual.tics.map(tic => tic.rfid);
-                          setTicsSeleccionados(prev => {
-                            if (!Array.isArray(prev)) {
-                              console.error('❌ ticsSeleccionados no es un array en seleccionar:', prev);
-                              return rfidsDelLote;
-                            }
-                            const sinDuplicados = prev.filter(rfid => !rfidsDelLote.includes(rfid));
-                            return [...sinDuplicados, ...rfidsDelLote];
-                          });
-                        }
-                      }
-                    }}
-                    className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                  >
-                    {Array.isArray(ticsSeleccionados) && lotes.find(l => l.lote === loteSeleccionado)?.tics.every(tic => ticsSeleccionados.includes(tic.rfid)) ? 'Deseleccionar todos' : 'Seleccionar todos'}
-                  </button>
-                )}
-              </div>
-              <div className="max-h-60 overflow-y-auto">
-                {loteSeleccionado ? (
-                  lotes.find(l => l.lote === loteSeleccionado)?.tics.map(tic => (
-                    <div key={tic.id} className="flex items-center p-2 border-b">
-                      <input
-                        type="checkbox"
-                        id={`tic-${tic.id}`}
-                        checked={Array.isArray(ticsSeleccionados) && ticsSeleccionados.includes(tic.rfid)}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          handleToggleTic(tic.rfid);
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="mr-2"
-                      />
-                      <label htmlFor={`tic-${tic.id}`} className="flex-1 cursor-pointer">
-                        <div>{tic.nombre_unidad}</div>
-                        <div className="text-xs text-gray-500">{tic.rfid}</div>
-                      </label>
-                    </div>
-                  )) || (
-                    <div className="text-center p-4 text-gray-500">
-                      No hay TICs disponibles
-                    </div>
-                  )
-                ) : (
-                  <div className="text-center p-4 text-gray-500">
-                    Selecciona un lote para ver sus TICs
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          vistaActual === 'lotes' ? renderVistaLotes() : renderVistaItemsSinLote()
         )}
         
         <div className="flex justify-end space-x-2 mt-4">

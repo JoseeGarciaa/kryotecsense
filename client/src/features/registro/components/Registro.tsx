@@ -449,7 +449,7 @@ const Registro: React.FC = () => {
         </p>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-3 sm:p-6 max-w-none lg:max-w-4xl lg:mx-0">
+      <div className="rounded-lg p-3 sm:p-6 max-w-none lg:max-w-4xl lg:mx-0">
         <div className="flex items-center mb-4 sm:mb-6">
           <Package className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600 mr-3" />
           <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
@@ -563,7 +563,7 @@ const Registro: React.FC = () => {
 
           {/* Lista de RFIDs Escaneados */}
           {lecturasRfid.length > 0 && (
-            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 sm:p-4">
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
                 <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white">
                   RFIDs Escaneados ({lecturasRfid.length})
@@ -578,7 +578,7 @@ const Registro: React.FC = () => {
               </div>
               <div className="max-h-60 overflow-y-auto space-y-2">
                 {lecturasRfid.map((lectura: any, index: any) => (
-                  <div key={lectura.rfid} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white dark:bg-gray-800 rounded-md p-3 border border-gray-200 dark:border-gray-700 gap-2">
+                  <div key={lectura.rfid} className="flex flex-col sm:flex-row sm:items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-md p-3 border border-gray-200 dark:border-gray-700 gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                         <span className="text-sm font-mono bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 px-2 py-1 rounded truncate">
@@ -609,7 +609,7 @@ const Registro: React.FC = () => {
           )}
 
           {duplicadosDetectados.length > 0 && (
-            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md dark:bg-yellow-900/20 dark:border-yellow-800">
+            <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
               <div className="flex items-start">
                 <AlertTriangle className="h-5 w-5 text-yellow-400 mr-2 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
@@ -712,10 +712,10 @@ const Registro: React.FC = () => {
 
       {/* Modal de Éxito */}
       {mostrarModalExito && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 sm:p-6 w-full max-w-md mx-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-lg shadow-xl border border-gray-200/50 dark:border-gray-700/50 p-4 sm:p-6 w-full max-w-md mx-auto">
             <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100/80 dark:bg-green-900/50 backdrop-blur-sm mb-4">
                 <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
@@ -726,7 +726,7 @@ const Registro: React.FC = () => {
               </p>
               
               {/* Conteo detallado por tipo */}
-              <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div className="mb-4 p-3 bg-gray-100/70 dark:bg-gray-700/70 backdrop-blur-sm rounded-lg">
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Detalle por tipo:
                 </p>
