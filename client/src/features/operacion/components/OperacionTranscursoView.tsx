@@ -728,21 +728,23 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
         {/* Sección Items en Transcurso */}
         <div className="bg-white rounded-lg border border-orange-200 overflow-hidden">
           <div className="bg-orange-50 border-b border-orange-200 px-4 sm:px-6 py-3 sm:py-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
                 <div>
                   <h2 className="text-base sm:text-lg font-semibold text-orange-800">Items en Transcurso</h2>
                   <p className="text-xs sm:text-sm text-orange-600">({itemsListosParaDespacho.length} items en envío)</p>
                 </div>
-                <WebSocketStatus isConnected={isConnected} />
+                <div className="hidden sm:inline-flex">
+                  <WebSocketStatus isConnected={isConnected} />
+                </div>
               </div>
-              <div className="flex items-center gap-2 flex-wrap justify-end">
+              <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
                 {/* Botones de acción en lote - Solo mostrar si hay items */}
                 {itemsListosParaDespacho.length > 0 && (
                   <>
                     <button
                       onClick={completarTodosLosEnvios}
-                      className="inline-flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-green-600 text-white text-xs sm:text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
+                      className="inline-flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-green-600 text-white text-xs sm:text-sm font-medium rounded-md hover:bg-green-700 transition-colors w-full sm:w-auto"
                       title="Completar todos los envíos"
                     >
                       <CheckCircle className="w-4 h-4" />
@@ -750,7 +752,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     </button>
                     <button
                       onClick={cancelarTodosLosEnvios}
-                      className="inline-flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-red-600 text-white text-xs sm:text-sm font-medium rounded-md hover:bg-red-700 transition-colors"
+                      className="inline-flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-red-600 text-white text-xs sm:text-sm font-medium rounded-md hover:bg-red-700 transition-colors w-full sm:w-auto"
                       title="Cancelar todos los envíos"
                     >
                       <X className="w-4 h-4" />
@@ -760,7 +762,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                 )}
                 <button
                   onClick={() => setMostrarModalSeleccion(true)}
-                  className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white text-xs sm:text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                  className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white text-xs sm:text-sm font-medium rounded-md hover:bg-blue-700 transition-colors w-full sm:w-auto"
                 >
                   <Package className="w-4 h-4" />
                   Agregar Items
