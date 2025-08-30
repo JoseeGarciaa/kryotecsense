@@ -22,33 +22,37 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [serverTimeDiff, setServerTimeDiff] = useState<number>(0);
   
-  // WebSocket para sincronización en tiempo real: usar env si existe, si no derivar del origen actual
+  // WebSocket para sincronización en tiempo real:
+  // Prioridad: VITE_TIMER_WS_URL -> derivar de VITE_API_URL -> same-origin/local (dev)
   const timerWsUrl = (() => {
     const explicit = import.meta.env.VITE_TIMER_WS_URL as string | undefined;
-    const sameOrigin = (() => {
-      if (typeof window !== 'undefined') {
-        const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        return `${proto}://${window.location.host}/ws/timers`;
-      }
-      return 'ws://localhost:8006/ws/timers';
-    })();
-
     if (explicit && explicit.trim().length > 0) {
       try {
-        const u = new URL(explicit);
-        // Si el host del explícito es distinto al host actual, forzar same-origin
-        if (typeof window !== 'undefined' && u.host !== window.location.host) {
-          console.warn(`VITE_TIMER_WS_URL apunta a ${u.host} pero la app corre en ${window.location.host}. Usando same-origin WS para evitar desincronización.`);
-          return sameOrigin;
-        }
+        // Validar formato
+        new URL(explicit);
         return explicit;
       } catch {
-        // En caso de URL inválida, usar same-origin
-        return sameOrigin;
+        // ignore and continue to API derivation
       }
     }
 
-    return sameOrigin;
+    const apiBase = (import.meta.env.VITE_API_URL as string | undefined) || '';
+    if (apiBase) {
+      try {
+        const u = new URL(apiBase);
+        const wsProto = u.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${wsProto}//${u.host}/ws/timers`;
+      } catch {
+        // fall through to same-origin
+      }
+    }
+
+    // Fallback para desarrollo/local cuando no hay variables
+    if (typeof window !== 'undefined') {
+      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      return `${proto}://${window.location.host}/ws/timers`;
+    }
+    return 'ws://localhost:8006/ws/timers';
   })();
   
   console.log('🔌 Conectando WebSocket:', timerWsUrl);
