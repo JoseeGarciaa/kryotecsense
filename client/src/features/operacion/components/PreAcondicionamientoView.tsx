@@ -142,14 +142,20 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   // Efecto para actualizar los datos cuando cambie el inventario
   useEffect(() => {
     if (operaciones.inventarioCompleto && operaciones.inventarioCompleto.length > 0 && !cargando) {
-      console.log('🔄 Actualizando datos de pre-acondicionamiento...');
+      console.log('🔄 [DEBUG] Actualizando datos de pre-acondicionamiento...');
+      console.log('📊 [DEBUG] Inventario completo recibido:', operaciones.inventarioCompleto.length, 'items');
+      
       const congelamiento = filtrarTicsCongelamiento(operaciones.inventarioCompleto);
       const atemperamiento = filtrarTicsAtemperamiento(operaciones.inventarioCompleto);
+      
+      console.log('❄️ [DEBUG] TICs en congelamiento:', congelamiento.length);
+      console.log('🌡️ [DEBUG] TICs en atemperamiento:', atemperamiento.length);
       
       setTicsCongelamiento(congelamiento);
       setTicsAtemperamiento(atemperamiento);
       
       // Datos actualizados - Congelamiento y Atemperamiento
+      console.log('✅ [DEBUG] Estados actualizados correctamente');
     }
   }, [operaciones.inventarioCompleto, cargando]);
   
@@ -181,26 +187,70 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   
   // Función para filtrar TICs en congelamiento
   const filtrarTicsCongelamiento = (inventario: any[]) => {
+    console.log('❄️ [DEBUG] Filtrando TICs para congelamiento...');
+    
     const filtered = inventario.filter((item: any) => {
       const esTic = item.categoria === 'TIC';
       const esPreAcond = item.estado === 'Pre-acondicionamiento';
-      const esCongelacion = (item.sub_estado === 'Congelación' || item.sub_estado === 'Congelamiento');
+      // Hacer comparación case-insensitive
+      const esCongelacion = item.sub_estado && 
+        (item.sub_estado.toLowerCase() === 'congelación' || 
+         item.sub_estado.toLowerCase() === 'congelacion' ||
+         item.sub_estado.toLowerCase() === 'congelamiento');
+      
+      // Log detallado para debugging
+      if (esTic) {
+        console.log(`❄️ [DEBUG] TIC ${item.rfid}:`, {
+          categoria: item.categoria,
+          estado: item.estado,
+          sub_estado: item.sub_estado,
+          sub_estado_lower: item.sub_estado?.toLowerCase(),
+          lote: item.lote,
+          cumple_filtro: esTic && esPreAcond && esCongelacion
+        });
+      }
       
       return esTic && esPreAcond && esCongelacion;
     });
+    
+    console.log('❄️ [DEBUG] TICs filtrados para Congelamiento:', filtered.length);
     return filtered;
   };
 
   // Función para filtrar TICs en atemperamiento
   const filtrarTicsAtemperamiento = (inventario: any[]) => {
+    console.log('🔍 [DEBUG] Filtrando TICs para atemperamiento...');
+    console.log('📊 [DEBUG] Total items en inventario:', inventario.length);
+    
     const filtered = inventario.filter((item: any) => {
       const esTic = item.categoria === 'TIC';
       const esPreAcond = item.estado === 'Pre-acondicionamiento';
-      const esAtemperamiento = item.sub_estado === 'Atemperamiento';
+      // Hacer comparación case-insensitive para sub_estado
+      const esAtemperamiento = item.sub_estado && item.sub_estado.toLowerCase() === 'atemperamiento';
+      
+      // Log detallado para debugging
+      if (esTic) {
+        console.log(`🔍 [DEBUG] TIC ${item.rfid}:`, {
+          categoria: item.categoria,
+          estado: item.estado,
+          sub_estado: item.sub_estado,
+          sub_estado_lower: item.sub_estado?.toLowerCase(),
+          lote: item.lote,
+          cumple_filtro: esTic && esPreAcond && esAtemperamiento
+        });
+      }
       
       return esTic && esPreAcond && esAtemperamiento;
     });
-    // TICs filtrados para Atemperamiento
+    
+    console.log('✅ [DEBUG] TICs filtrados para Atemperamiento:', filtered.length);
+    console.log('📋 [DEBUG] Lista de TICs en atemperamiento:', filtered.map(t => ({
+      rfid: t.rfid,
+      lote: t.lote,
+      estado: t.estado,
+      sub_estado: t.sub_estado
+    })));
+    
     return filtered;
   };
 
