@@ -316,7 +316,7 @@ const Registro: React.FC = () => {
         };
         
         // Contar por tipo basado en la categoría del item
-        const categoriaItem = categoriaFinal.toUpperCase();
+        const categoriaItem = categoriaFinal; // No convertir a mayúsculas
         console.log('🔍 Contando item:', { categoriaFinal, categoriaItem, lectura: lectura.nombre_unidad });
         
         if (categoriaItem === 'VIP') {
@@ -325,9 +325,9 @@ const Registro: React.FC = () => {
         } else if (categoriaItem === 'TIC') {
           contadorTics++;
           console.log('✅ TIC contado, total TICs:', contadorTics);
-        } else if (categoriaItem === 'CUBE' || categoriaItem.includes('CUBE')) {
+        } else if (categoriaItem === 'Cube') {
           contadorCubes++;
-          console.log('✅ CUBE contado, total CUBEs:', contadorCubes);
+          console.log('✅ Cube contado, total Cubes:', contadorCubes);
         } else {
           console.warn('⚠️ Categoría no reconocida:', categoriaItem);
         }
