@@ -15,6 +15,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
+from shared.message_queue import message_queue
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -96,6 +97,7 @@ class TimerManager:
         self.connections: Set[WebSocket] = set()
         self.running = True
         self.server_start_time = get_utc_now()
+        self.instance_id = str(uuid.uuid4())
         
     def get_server_timestamp(self):
         """Obtener timestamp del servidor en milisegundos"""
@@ -213,6 +215,17 @@ class TimerManager:
                 }
             }
         }, exclude=websocket)
+
+        # Publicar a otras instancias (fanout)
+        try:
+            await message_queue.publish_fanout("timers.events", {
+                "event": "TIMER_CREATED",
+                "origin": self.instance_id,
+                "timer": timer.to_dict(),
+                "server_timestamp": server_timestamp
+            })
+        except Exception as e:
+            logger.error(f"MQ publish TIMER_CREATED error: {e}")
         
     async def update_timer(self, timer_id: str, updates: Dict, websocket: Optional[WebSocket] = None):
         """Actualizar temporizador existente"""
@@ -232,6 +245,16 @@ class TimerManager:
             "type": "TIMER_UPDATED",
             "data": {"timer": timer.to_dict()}
         }, exclude=websocket)
+
+        # Publicar a otras instancias
+        try:
+            await message_queue.publish_fanout("timers.events", {
+                "event": "TIMER_UPDATED",
+                "origin": self.instance_id,
+                "timer": timer.to_dict()
+            })
+        except Exception as e:
+            logger.error(f"MQ publish TIMER_UPDATED error: {e}")
         
         return True
         
@@ -247,6 +270,16 @@ class TimerManager:
                 "type": "TIMER_DELETED",
                 "data": {"timerId": timer_id}
             }, exclude=websocket)
+
+            # Publicar a otras instancias
+            try:
+                await message_queue.publish_fanout("timers.events", {
+                    "event": "TIMER_DELETED",
+                    "origin": self.instance_id,
+                    "timerId": timer_id
+                })
+            except Exception as e:
+                logger.error(f"MQ publish TIMER_DELETED error: {e}")
             
             return True
         return False
@@ -302,6 +335,9 @@ class TimerManager:
                         "type": "TIMER_TIME_UPDATE",
                         "data": update
                     })
+
+                # Opcional: enviar pulsos de tiempo a otras instancias (solo estado, sin spam)
+                # Aquí no publicamos cada segundo para evitar carga; el cálculo se hará local con fechaFin
                 
                 await asyncio.sleep(1)  # Tick cada segundo exacto
                 
@@ -316,6 +352,81 @@ timer_manager = TimerManager()
 async def startup_event():
     """Iniciar el loop de actualización de timers"""
     asyncio.create_task(timer_manager.tick_timers())
+    logger.info(f"Timer service instance_id: {timer_manager.instance_id}")
+    # Conectar a RabbitMQ y suscribirnos a eventos
+    async def init_mq():
+        try:
+            await message_queue.connect()
+            logger.info("MQ conectado para timers")
+
+            async def on_event(msg: Dict):
+                try:
+                    if msg.get("origin") == timer_manager.instance_id:
+                        return  # ignorar mis propios eventos
+                    evt = msg.get("event")
+                    if evt == "TIMER_CREATED":
+                        data = msg.get("timer")
+                        if data:
+                            # Convertir fechas ISO a datetime
+                            data["fechaInicio"] = parse_iso_datetime(data["fechaInicio"]) if isinstance(data["fechaInicio"], str) else data["fechaInicio"]
+                            data["fechaFin"] = parse_iso_datetime(data["fechaFin"]) if isinstance(data["fechaFin"], str) else data["fechaFin"]
+                            t = Timer(**data)
+                            timer_manager.timers[t.id] = t
+                            logger.info(f"[MQ] TIMER_CREATED replicado: {t.id}")
+                            # Opcional: notificar a clientes locales
+                            await timer_manager.broadcast({
+                                "type": "TIMER_CREATED",
+                                "data": {"timer": {**t.to_dict(), "server_timestamp": msg.get("server_timestamp")}}
+                            })
+                    elif evt == "TIMER_UPDATED":
+                        data = msg.get("timer")
+                        if data and data.get("id") in timer_manager.timers:
+                            tid = data["id"]
+                            for k, v in data.items():
+                                if k in ("fechaInicio", "fechaFin") and isinstance(v, str):
+                                    v = parse_iso_datetime(v)
+                                setattr(timer_manager.timers[tid], k, v)
+                            logger.info(f"[MQ] TIMER_UPDATED replicado: {tid}")
+                            await timer_manager.broadcast({"type": "TIMER_UPDATED", "data": {"timer": timer_manager.timers[tid].to_dict()}})
+                    elif evt == "TIMER_DELETED":
+                        tid = msg.get("timerId")
+                        if tid and tid in timer_manager.timers:
+                            timer_manager.timers.pop(tid, None)
+                            logger.info(f"[MQ] TIMER_DELETED replicado: {tid}")
+                            await timer_manager.broadcast({"type": "TIMER_DELETED", "data": {"timerId": tid}})
+                    elif evt == "TIMERS_SNAPSHOT":
+                        # Reemplazar o fusionar timers con un snapshot completo
+                        timers = msg.get("timers", [])
+                        new_map = {}
+                        for data in timers:
+                            if isinstance(data.get("fechaInicio"), str):
+                                data["fechaInicio"] = parse_iso_datetime(data["fechaInicio"])
+                            if isinstance(data.get("fechaFin"), str):
+                                data["fechaFin"] = parse_iso_datetime(data["fechaFin"])
+                            t = Timer(**data)
+                            new_map[t.id] = t
+                        timer_manager.timers = new_map
+                        logger.info(f"[MQ] TIMERS_SNAPSHOT aplicado: {len(new_map)} timers")
+                        # Notificar a clientes locales
+                        server_timestamp = timer_manager.get_server_timestamp()
+                        payload = [{**t.to_dict(), "server_timestamp": server_timestamp} for t in timer_manager.timers.values()]
+                        await timer_manager.broadcast({"type": "TIMER_SYNC", "data": {"timers": payload, "server_timestamp": server_timestamp}})
+                except Exception as e:
+                    logger.error(f"Error procesando evento MQ: {e}")
+
+            await message_queue.consume_fanout("timers.events", on_event)
+            logger.info("Suscrito a fanout timers.events")
+
+            # Publicar snapshot inicial para que otras instancias se sincronicen (optional)
+            await message_queue.publish_fanout("timers.events", {
+                "event": "TIMERS_SNAPSHOT",
+                "origin": timer_manager.instance_id,
+                "timers": [t.to_dict() for t in timer_manager.timers.values()]
+            })
+        except Exception as e:
+            logger.error(f"No se pudo inicializar MQ: {e}")
+
+    asyncio.create_task(init_mq())
     logger.info("Servicio de timers iniciado")
 
 @app.on_event("shutdown")
@@ -430,7 +541,8 @@ async def health_check():
         "status": "healthy",
         "timers_count": len(timer_manager.timers),
         "connections_count": len(timer_manager.connections),
-        "timestamp": get_utc_now().isoformat()
+    "timestamp": get_utc_now().isoformat(),
+    "instance_id": timer_manager.instance_id
     }
 
 @app.get("/timers")

@@ -3,7 +3,7 @@ import json
 import os
 from typing import Optional, Dict, Any, Callable
 import aio_pika
-from aio_pika import Message, DeliveryMode
+from aio_pika import Message, DeliveryMode, ExchangeType
 import logging
 
 logger = logging.getLogger(__name__)
@@ -86,6 +86,24 @@ class MessageQueue:
         except Exception as e:
             logger.error(f"❌ Error publicando mensaje: {e}")
             raise
+
+    async def publish_fanout(self, exchange_name: str, message: Dict[Any, Any]):
+        """Publicar un mensaje en un exchange fanout (broadcast a todos los consumidores)."""
+        try:
+            if not self.channel:
+                await self.connect()
+
+            # Declarar exchange fanout
+            exchange = await self.channel.declare_exchange(exchange_name, ExchangeType.FANOUT, durable=True)
+            message_body = json.dumps(message, default=str)
+            await exchange.publish(
+                Message(message_body.encode(), delivery_mode=DeliveryMode.PERSISTENT),
+                routing_key=""
+            )
+            logger.info(f"📣 Fanout '{exchange_name}' publicado: {message}")
+        except Exception as e:
+            logger.error(f"❌ Error publicando en fanout '{exchange_name}': {e}")
+            raise
     
     async def consume_messages(self, queue_name: str, callback: Callable):
         """Consumir mensajes de una cola"""
@@ -115,6 +133,34 @@ class MessageQueue:
             
         except Exception as e:
             logger.error(f"❌ Error consumiendo mensajes: {e}")
+            raise
+
+    async def consume_fanout(self, exchange_name: str, callback: Callable):
+        """Consumir mensajes de un exchange fanout con una cola exclusiva por instancia."""
+        try:
+            if not self.channel:
+                await self.connect()
+
+            # Declarar exchange fanout
+            exchange = await self.channel.declare_exchange(exchange_name, ExchangeType.FANOUT, durable=True)
+            # Crear cola exclusiva y auto-borrable por instancia
+            queue = await self.channel.declare_queue(exclusive=True, auto_delete=True)
+            await queue.bind(exchange)
+
+            async def process_message(message: aio_pika.IncomingMessage):
+                async with message.process():
+                    try:
+                        data = json.loads(message.body.decode())
+                        logger.info(f"📥 Fanout '{exchange_name}' recibido: {data}")
+                        await callback(data)
+                    except Exception as e:
+                        logger.error(f"❌ Error procesando fanout '{exchange_name}': {e}")
+                        raise
+
+            await queue.consume(process_message)
+            logger.info(f"👂 Escuchando fanout '{exchange_name}' con cola exclusiva")
+        except Exception as e:
+            logger.error(f"❌ Error consumiendo fanout '{exchange_name}': {e}")
             raise
 
 # Instancia global del message queue
