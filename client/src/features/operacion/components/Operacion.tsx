@@ -773,6 +773,19 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
                     const itemsAtemperamiento = column.items.filter(item => 
                       item.tipo === 'ATEMPERAMIENTO' || item.sub_estado === 'Atemperamiento'
                     );
+
+                    // Contar realmente los TICs (si son tarjetas de grupo, sumar su items_grupo)
+                    const contarReales = (items: any[]) => {
+                      return items.reduce((acc, it: any) => {
+                        if (it && it.es_grupo) {
+                          const cantidad = Array.isArray(it.items_grupo) ? it.items_grupo.length : 0;
+                          return acc + cantidad;
+                        }
+                        return acc + 1;
+                      }, 0);
+                    };
+                    const totalCongelacion = contarReales(itemsCongelacion);
+                    const totalAtemperamiento = contarReales(itemsAtemperamiento);
                     
                     return (
                       <>
@@ -780,7 +793,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
                         <div className="bg-white rounded-lg shadow-md mb-4 overflow-hidden">
                           <div className="bg-blue-50 p-3 border-b border-blue-100 flex justify-between items-center">
                             <h3 className="text-sm font-semibold text-blue-800">TICs para Congelamiento</h3>
-                            <span className="text-xs text-blue-600">{itemsCongelacion.length} items</span>
+                            <span className="text-xs text-blue-600">{totalCongelacion} items</span>
                           </div>
                           <div className="p-3">
                             {/* Resumen de temporizadores por tiempo para Congelación */}
@@ -847,7 +860,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
                         <div className="bg-white rounded-lg shadow-md overflow-hidden">
                           <div className="bg-orange-50 p-3 border-b border-orange-100 flex justify-between items-center">
                             <h3 className="text-sm font-semibold text-orange-800">TICs para Atemperamiento</h3>
-                            <span className="text-xs text-orange-600">{itemsAtemperamiento.length} items</span>
+                            <span className="text-xs text-orange-600">{totalAtemperamiento} items</span>
                           </div>
                           <div className="p-3">
                             {/* Resumen de temporizadores por tiempo para Atemperamiento */}
