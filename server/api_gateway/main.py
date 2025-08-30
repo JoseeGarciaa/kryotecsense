@@ -57,6 +57,24 @@ class Timer(BaseModel):
     fechaFin: datetime
     activo: bool = True
     completado: bool = False
+
+    # Ignorar campos extra en creaciones (pydantic v2)
+    model_config = {
+        "extra": "ignore"
+    }
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "nombre": self.nombre,
+            "tipoOperacion": self.tipoOperacion,
+            "tiempoInicialMinutos": self.tiempoInicialMinutos,
+            "tiempoRestanteSegundos": self.tiempoRestanteSegundos,
+            "fechaInicio": self.fechaInicio.isoformat() if isinstance(self.fechaInicio, datetime) else self.fechaInicio,
+            "fechaFin": self.fechaFin.isoformat() if isinstance(self.fechaFin, datetime) else self.fechaFin,
+            "activo": self.activo,
+            "completado": self.completado
+        }
     
     def to_dict(self):
         """Convertir a diccionario con fechas en formato ISO string"""
