@@ -58,77 +58,82 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
     try {
       setCargando(true);
       setError(null);
+
+      // Normalizar objetivo (a dónde quiero mover)
+      const objetivo = (subEstado || '').toLowerCase();
+      // Para mover a atemperamiento, debo listar lotes que están hoy en congelación
+      const subEstadosFuente = objetivo === 'atemperamiento'
+        ? ['congelación', 'congelacion', 'congelamiento']
+        : [objetivo];
+
+      console.log('[Lotes] Cargando lotes para objetivo:', objetivo, 'subEstadosFuente:', subEstadosFuente);
       
-      // Obtener inventario agrupado por lotes
+      // Obtener inventario
       const response = await apiServiceClient.get('/inventory/inventario/');
       const inventario = Array.isArray(response.data) ? response.data : [];
       
-      // Validar que inventario sea un array
       if (!Array.isArray(inventario)) {
         console.error('❌ Inventario no es un array en LoteSelectionModal:', inventario);
         throw new Error('Datos de inventario inválidos');
       }
-      
-      // Agrupar por lote
+
+      // Agrupar por lote únicamente TICs en Pre-acondicionamiento y en el sub-estado fuente
       const loteMap = new Map<string, any[]>();
       const estadoLoteMap = new Map<string, {estado: string, sub_estado: string}>();
       const itemsSinLoteArray: ItemSinLote[] = [];
-      
-      inventario.forEach((item: any) => {
-        // Validar que el item tenga las propiedades necesarias
-        if (!item || typeof item !== 'object') {
-          console.warn('⚠️ Item inválido encontrado:', item);
-          return;
-        }
 
-        // Solo incluir items que están listos para despacho
-        const estaListoParaDespacho = item.estado === 'Lista para Despacho';
-        
-        if (estaListoParaDespacho) {
-          if (item.lote) {
-            // Items con lote
-            if (!loteMap.has(item.lote)) {
-              loteMap.set(item.lote, []);
-              estadoLoteMap.set(item.lote, {
-                estado: item.estado,
-                sub_estado: item.sub_estado
-              });
-            }
-            
-            loteMap.get(item.lote)?.push({
-              id: item.id,
-              nombre_unidad: item.nombre_unidad,
-              rfid: item.rfid,
-              estado: item.estado,
-              sub_estado: item.sub_estado,
-              categoria: item.categoria
-            });
-          } else {
-            // Items sin lote
-            itemsSinLoteArray.push({
-              id: item.id,
-              nombre_unidad: item.nombre_unidad,
-              rfid: item.rfid,
-              estado: item.estado,
-              sub_estado: item.sub_estado,
-              categoria: item.categoria
-            });
+      inventario.forEach((item: any) => {
+        if (!item || typeof item !== 'object') return;
+
+        const categoriaOk = item.categoria === 'TIC';
+        const estadoOk = (item.estado || '').toLowerCase() === 'pre-acondicionamiento' || (item.estado || '').toLowerCase() === 'preacondicionamiento';
+        const subEstadoLower = (item.sub_estado || '').toLowerCase();
+        const subOk = subEstadosFuente.includes(subEstadoLower);
+
+        if (!categoriaOk || !estadoOk || !subOk) return;
+
+        if (item.lote) {
+          if (!loteMap.has(item.lote)) {
+            loteMap.set(item.lote, []);
+            estadoLoteMap.set(item.lote, { estado: item.estado, sub_estado: item.sub_estado });
           }
+          loteMap.get(item.lote)?.push({
+            id: item.id,
+            nombre_unidad: item.nombre_unidad,
+            rfid: item.rfid,
+            estado: item.estado,
+            sub_estado: item.sub_estado,
+            categoria: item.categoria
+          });
+        } else {
+          itemsSinLoteArray.push({
+            id: item.id,
+            nombre_unidad: item.nombre_unidad,
+            rfid: item.rfid,
+            estado: item.estado,
+            sub_estado: item.sub_estado,
+            categoria: item.categoria
+          });
         }
       });
-      
-      // Convertir el mapa a un array de objetos
+
       const lotesArray: Lote[] = Array.from(loteMap.entries()).map(([lote, tics]) => ({
         lote,
         tics,
         estado: estadoLoteMap.get(lote)?.estado || '',
         sub_estado: estadoLoteMap.get(lote)?.sub_estado || ''
       }));
-      
+
+      // Ordenar lotes por nombre asc
+      lotesArray.sort((a, b) => a.lote.localeCompare(b.lote));
+
       setLotes(lotesArray);
       setItemsSinLote(itemsSinLoteArray);
-      
-      console.log(`📦 Cargados ${lotesArray.length} lotes y ${itemsSinLoteArray.length} items sin lote`);
+
+      console.log(`[Lotes] Resultado → ${lotesArray.length} lotes, ${itemsSinLoteArray.length} items sin lote`);
+      if (lotesArray.length > 0) {
+        console.log('[Lotes] Ejemplo primer lote:', lotesArray[0]);
+      }
     } catch (error) {
       console.error('Error al cargar lotes:', error);
       setError('Error al cargar los lotes. Por favor, inténtalo de nuevo.');
@@ -361,9 +366,16 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
-        <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-          Seleccionar Items por Lote para Envío
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Seleccionar items por lote
+          </h3>
+          {subEstado && (
+            <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600">
+              Destino: {subEstado}
+            </span>
+          )}
+        </div>
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
           <p className="text-sm text-blue-800">
             ℹ️ Items disponibles: <span className="font-medium">{lotes.length}</span> lotes • <span className="font-medium">{itemsSinLote.length}</span> items sin lote
