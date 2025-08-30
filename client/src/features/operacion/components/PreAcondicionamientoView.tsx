@@ -574,10 +574,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       let tiempoNuevo = 0; // Tiempo en minutos para el nuevo estado
       
       if (timerCompletado.tipoOperacion === 'congelamiento') {
-        // Congelamiento completado → va a Atemperamiento
+        // Congelamiento completado → va a Atemperamiento (sin timer por defecto)
         siguienteEstado = 'Pre-acondicionamiento';
         siguienteSubEstado = 'Atemperamiento';
-        tiempoNuevo = 10; // 10 minutos para atemperamiento
+        tiempoNuevo = 0; // No crear timer automáticamente
       } else if (timerCompletado.tipoOperacion === 'atemperamiento') {
   // Atemperamiento completado → va a Acondicionamiento (ensamblaje)
   siguienteEstado = 'Acondicionamiento';
@@ -619,24 +619,8 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         eliminarTimer(timerCompletado.id);
         console.log(`❌ [DEBUG] Timer eliminado: ${timerCompletado.id}`);
         
-        // Si el nuevo estado necesita timer, crearlo
-        if (tiempoNuevo > 0) {
-          console.log(`⏰ [DEBUG] Creando nuevo timer de ${tiempoNuevo} minutos para ${rfid}`);
-          
-          // Crear nuevo timer para el siguiente estado
-          const tipoOperacion = siguienteSubEstado.toLowerCase() as 'congelamiento' | 'atemperamiento' | 'envio';
-          console.log(`🎯 [DEBUG] Tipo de operación para timer: ${tipoOperacion}`);
-          
-          const timerId = crearTimer(
-            rfid, // Usar solo el RFID sin "TIC"
-            tipoOperacion,
-            tiempoNuevo
-          );
-          
-          console.log(`✅ [DEBUG] Nuevo timer creado con ID: ${timerId}`);
-        } else {
-          console.log(`ℹ️ [DEBUG] No se requiere timer para el nuevo estado`);
-        }
+  // No crear timer automáticamente al pasar a atemperamiento
+  console.log(`ℹ️ [DEBUG] No se crea timer automáticamente para el nuevo estado`);
         
         // Recargar datos
         console.log(`🔄 [DEBUG] Recargando datos...`);
@@ -660,7 +644,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     }
   };
 
-  // Completar todas las TICs con timer completado en Congelamiento → Atemperamiento (con nuevo timer)
+  // Completar todas las TICs con timer completado en Congelamiento → Atemperamiento (sin nuevo timer por defecto)
   const completarTodasCongelamiento = async () => {
     try {
       const timersCongelamiento = timers.filter((t: any) => t.completado && t.tipoOperacion === 'congelamiento');
@@ -669,7 +653,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         return;
       }
       const rfids = timersCongelamiento.map((t: any) => t.nombre);
-      const confirmar = window.confirm(`Completar ${timersCongelamiento.length} TIC(s) en congelamiento y mover a Atemperamiento con nuevo timer de 10 minutos?`);
+  const confirmar = window.confirm(`Completar ${timersCongelamiento.length} TIC(s) en congelamiento y mover a Atemperamiento (sin crear timer automáticamente)?`);
       if (!confirmar) return;
 
       // Actualizar estado primero en lote
@@ -678,10 +662,9 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         throw new Error('No se pudieron actualizar los estados.');
       }
 
-      // Eliminar timers completados y crear nuevos de atemperamiento
+  // Eliminar timers completados (no crear nuevos timers por defecto)
       for (const t of timersCongelamiento) {
         eliminarTimer(t.id);
-        crearTimer(t.nombre, 'atemperamiento', 10);
       }
 
       // Sincronizar y recargar
@@ -689,7 +672,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         forzarSincronizacion();
       }, 300);
       await cargarDatos();
-      alert(`✅ ${timersCongelamiento.length} TIC(s) movidas a Atemperamiento con timers de 10 minutos`);
+  alert(`✅ ${timersCongelamiento.length} TIC(s) movidas a Atemperamiento`);
     } catch (e: any) {
       console.error('Error al completar todas (congelamiento):', e);
       alert(`❌ Error al completar todas: ${e.message || e}`);

@@ -86,9 +86,9 @@ export const useOperaciones = () => {
   const procesarRfidIndividual = (rfid: string, soloTics: boolean = false) => {
     if (!rfid.trim()) return;
     
-    // Validar que el RFID sea válido (solo dígitos)
-    if (!/^\d+$/.test(rfid.trim())) {
-      console.warn(`⚠️ RFID inválido: ${rfid}. Solo se permiten dígitos.`);
+    // Validar que el RFID sea válido (alfanumérico)
+    if (!/^[a-zA-Z0-9]+$/.test(rfid.trim())) {
+      console.warn(`⚠️ RFID inválido: ${rfid}. Solo se permiten letras y dígitos.`);
       return;
     }
     
@@ -611,10 +611,10 @@ export const useOperaciones = () => {
     const rfid = rfidInput.trim();
     if (!rfid) return;
     
-    // Validar que el RFID sea válido (solo dígitos)
-    if (!/^\d+$/.test(rfid)) {
-      console.warn(`⚠️ RFID inválido: ${rfid}. Solo se permiten dígitos.`);
-      alert(`⚠️ RFID inválido: ${rfid}. Solo se permiten dígitos.`);
+    // Validar que el RFID sea válido (alfanumérico)
+    if (!/^[a-zA-Z0-9]+$/.test(rfid)) {
+      console.warn(`⚠️ RFID inválido: ${rfid}. Solo se permiten letras y dígitos.`);
+      alert(`⚠️ RFID inválido: ${rfid}. Solo se permiten letras y dígitos.`);
       return;
     }
     
@@ -634,10 +634,10 @@ export const useOperaciones = () => {
     const rfid = rfidInput.trim();
     if (!rfid) return;
     
-    // Validar que el RFID sea válido (solo dígitos)
-    if (!/^\d+$/.test(rfid)) {
-      console.warn(`⚠️ RFID inválido: ${rfid}. Solo se permiten dígitos.`);
-      alert(`⚠️ RFID inválido: ${rfid}. Solo se permiten dígitos.`);
+    // Validar que el RFID sea válido (alfanumérico)
+    if (!/^[a-zA-Z0-9]+$/.test(rfid)) {
+      console.warn(`⚠️ RFID inválido: ${rfid}. Solo se permiten letras y dígitos.`);
+      alert(`⚠️ RFID inválido: ${rfid}. Solo se permiten letras y dígitos.`);
       return;
     }
     
@@ -675,10 +675,10 @@ export const useOperaciones = () => {
   // Función para verificar RFID
   const verificarRfid = async (rfid: string) => {
     try {
-      // Validar formato del RFID (solo dígitos)
-      if (!rfid || !/^\d+$/.test(rfid)) {
-        console.error(`❌ RFID inválido: ${rfid}. Solo se permiten dígitos.`);
-        alert(`❌ RFID inválido: ${rfid}. Solo se permiten dígitos.`);
+      // Validar formato del RFID (alfanumérico)
+      if (!rfid || !/^[a-zA-Z0-9]+$/.test(rfid)) {
+        console.error(`❌ RFID inválido: ${rfid}. Solo se permiten letras y dígitos.`);
+        alert(`❌ RFID inválido: ${rfid}. Solo se permiten letras y dígitos.`);
         return false;
       }
       
@@ -754,9 +754,9 @@ export const useOperaciones = () => {
       for (const rfid of rfids) {
         console.log(`🔍 [DEBUG-HOOK] Procesando RFID: ${rfid}`);
         
-        // Verificar si el RFID es válido (no vacío y solo contiene dígitos)
-        if (!rfid || !/^\d+$/.test(rfid)) {
-          console.error(`❌ [DEBUG-HOOK] RFID inválido: ${rfid}. Solo se permiten dígitos.`);
+        // Verificar si el RFID es válido (no vacío y alfanumérico)
+        if (!rfid || !/^[a-zA-Z0-9]+$/.test(rfid)) {
+          console.error(`❌ [DEBUG-HOOK] RFID inválido: ${rfid}. Solo se permiten letras y dígitos.`);
           ticsInvalidas.push(rfid);
           continue;
         }
