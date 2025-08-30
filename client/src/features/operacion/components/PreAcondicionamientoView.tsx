@@ -1022,9 +1022,38 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
           </div>
         </div>
         
-        {/* Tabla responsiva con scroll horizontal */}
-        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-          <div className="min-w-full">
+        {/* Lista móvil (cards) */}
+        <div className="sm:hidden p-3 pt-0">
+          {cargando ? (
+            <div className="py-6 text-center text-gray-500 text-xs">Cargando…</div>
+          ) : ticsCongelamientoPaginados.length > 0 ? (
+            ticsCongelamientoPaginados.map((tic: TicItem) => (
+              <div key={tic.id} className="bg-white border rounded-md p-3 mb-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-semibold text-gray-900 truncate" title={tic.rfid}>{tic.rfid}</div>
+                    <div className="text-[11px] text-gray-700 truncate" title={tic.nombre_unidad}>{tic.nombre_unidad}</div>
+                    <div className="text-[11px] text-gray-500">Lote: <span className="font-medium">{tic.lote || '-'}</span></div>
+                  </div>
+                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
+                    {tic.sub_estado}
+                  </span>
+                </div>
+                <div className="mt-2">
+                  {renderizarTemporizador(tic.rfid)}
+                </div>
+              </div>
+            ))
+          ) : busquedaCongelamiento ? (
+            <div className="px-3 py-4 text-center text-gray-500 text-xs">No se encontraron TICs</div>
+          ) : (
+            <div className="px-3 py-4 text-center text-gray-500 text-xs">No hay TICs en congelamiento</div>
+          )}
+        </div>
+
+        {/* Tabla responsiva con scroll horizontal (solo >= sm) */}
+        <div className="hidden sm:block overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+          <div className="min-w-[720px]">
             <table className="w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -1251,9 +1280,38 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
           </div>
         </div>
         
-        {/* Tabla responsiva con scroll horizontal */}
-        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-          <div className="min-w-full">
+        {/* Lista móvil (cards) */}
+        <div className="sm:hidden p-3 pt-0">
+          {cargando ? (
+            <div className="py-6 text-center text-gray-500 text-xs">Cargando…</div>
+          ) : ticsAtemperamientoPaginados.length > 0 ? (
+            ticsAtemperamientoPaginados.map((tic: TicItem) => (
+              <div key={tic.id} className="bg-white border rounded-md p-3 mb-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-semibold text-gray-900 truncate" title={tic.rfid}>{tic.rfid}</div>
+                    <div className="text-[11px] text-gray-700 truncate" title={tic.nombre_unidad}>{tic.nombre_unidad}</div>
+                    <div className="text-[11px] text-gray-500">Lote: <span className="font-medium">{tic.lote || '-'}</span></div>
+                  </div>
+                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-orange-100 text-orange-800">
+                    {tic.sub_estado}
+                  </span>
+                </div>
+                <div className="mt-2">
+                  {renderizarTemporizador(tic.rfid, true)}
+                </div>
+              </div>
+            ))
+          ) : busquedaAtemperamiento ? (
+            <div className="px-3 py-4 text-center text-gray-500 text-xs">No se encontraron TICs</div>
+          ) : (
+            <div className="px-3 py-4 text-center text-gray-500 text-xs">No hay TICs en atemperamiento</div>
+          )}
+        </div>
+
+        {/* Tabla responsiva con scroll horizontal (solo >= sm) */}
+        <div className="hidden sm:block overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+          <div className="min-w-[720px]">
             <table className="w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
