@@ -283,19 +283,18 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     };
   }, [isConnected, sendMessage, syncRequested]);
 
-  // Actualizar timers cada segundo - SOLO cuando NO hay WebSocket
+  // Actualizar timers cada segundo
   useEffect(() => {
     const interval = setInterval(() => {
       setTimers(prevTimers => 
         prevTimers.map(timer => {
           if (!timer.activo || timer.completado) return timer;
           
-          // SI WEBSOCKET ESTÁ CONECTADO: NO TOCAR NADA - El servidor maneja todo
-          if (isConnected) {
-            return timer; // Mantener exactamente como está, sin verificaciones ni correcciones
-          }
+          // Regla: si WS está conectado y el timer NO es optimista, no tocamos (servidor es autoridad)
+          const debeActualizarLocal = !isConnected || timer.optimistic;
+          if (!debeActualizarLocal) return timer;
           
-          // SOLO si WebSocket NO está conectado: Actualizar localmente basado en fechas
+          // Actualizar localmente basado en fechas (optimista o sin WS)
           const ahora = getDeviceTimeAsUtcDate();
           const fechaFin = new Date(timer.fechaFin);
           const tiempoRestanteMs = fechaFin.getTime() - ahora.getTime();
@@ -315,7 +314,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             })();
           }
           
-          return {
+    return {
             ...timer,
             tiempoRestanteSegundos: nuevoTiempoRestante,
             completado,
@@ -326,7 +325,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [onTimerComplete, isConnected]); // Agregar isConnected como dependencia
+  }, [onTimerComplete, isConnected]); // isConnected cambia el modo de actualización
 
   const mostrarNotificacionCompletado = async (timer: Timer) => {
     // Notificación del navegador
