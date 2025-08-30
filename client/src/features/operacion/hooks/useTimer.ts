@@ -25,13 +25,30 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   // WebSocket para sincronización en tiempo real: usar env si existe, si no derivar del origen actual
   const timerWsUrl = (() => {
     const explicit = import.meta.env.VITE_TIMER_WS_URL as string | undefined;
-    if (explicit && explicit.trim().length > 0) return explicit;
-    if (typeof window !== 'undefined') {
-      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      return `${proto}://${window.location.host}/ws/timers`;
+    const sameOrigin = (() => {
+      if (typeof window !== 'undefined') {
+        const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        return `${proto}://${window.location.host}/ws/timers`;
+      }
+      return 'ws://localhost:8006/ws/timers';
+    })();
+
+    if (explicit && explicit.trim().length > 0) {
+      try {
+        const u = new URL(explicit);
+        // Si el host del explícito es distinto al host actual, forzar same-origin
+        if (typeof window !== 'undefined' && u.host !== window.location.host) {
+          console.warn(`VITE_TIMER_WS_URL apunta a ${u.host} pero la app corre en ${window.location.host}. Usando same-origin WS para evitar desincronización.`);
+          return sameOrigin;
+        }
+        return explicit;
+      } catch {
+        // En caso de URL inválida, usar same-origin
+        return sameOrigin;
+      }
     }
-    // Fallback de desarrollo local
-    return 'ws://localhost:8006/ws/timers';
+
+    return sameOrigin;
   })();
   
   console.log('🔌 Conectando WebSocket:', timerWsUrl);

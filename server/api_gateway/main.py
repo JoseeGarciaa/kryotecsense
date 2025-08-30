@@ -2924,12 +2924,14 @@ async def iniciar_timers_masivo(
             raise HTTPException(status_code=400, detail="Debe proporcionar items_ids")
             
         # Obtener información de los items
+        # Usar CSV para evitar problemas de binding de arrays con drivers
+        ids_csv = ",".join(str(i) for i in items_ids)
         query = text(f"""
             SELECT id, rfid, nombre_unidad 
             FROM {tenant_schema}.inventario_credocubes 
-            WHERE id = ANY(:ids) AND activo = true
+            WHERE id = ANY(STRING_TO_ARRAY(:ids_csv, ',')::int[]) AND activo = true
         """)
-        items = db.execute(query, {"ids": items_ids}).fetchall()
+        items = db.execute(query, {"ids_csv": ids_csv}).fetchall()
         
         if not items:
             raise HTTPException(status_code=404, detail="No se encontraron items válidos")
@@ -2938,10 +2940,12 @@ async def iniciar_timers_masivo(
         timers_creados = []
         now = get_utc_now()
         
-        for item in items:
+        for row in items:
+            m = row._mapping
             timer_data = {
                 "id": str(uuid.uuid4()),
-                "nombre": f"Timer {item.nombre_unidad} - {item.rfid}",
+                # El frontend busca el timer por RFID en 'nombre'; usar exactamente el RFID
+                "nombre": m["rfid"],
                 "tipoOperacion": tipo_operacion,
                 "tiempoInicialMinutos": tiempo_minutos,
                 "tiempoRestanteSegundos": tiempo_minutos * 60,
@@ -2949,8 +2953,8 @@ async def iniciar_timers_masivo(
                 "fechaFin": now + timedelta(minutes=tiempo_minutos),
                 "activo": True,
                 "completado": False,
-                "inventario_id": item.id,  # Vincular con el item del inventario
-                "rfid": item.rfid
+                "inventario_id": m["id"],  # Vincular con el item del inventario
+                "rfid": m["rfid"]
             }
             
             # Crear timer usando el timer_manager
@@ -2961,7 +2965,7 @@ async def iniciar_timers_masivo(
             "message": f"Timers iniciados para {len(timers_creados)} items",
             "timers_creados": len(timers_creados),
             "timers_activos_total": len(timer_manager.timers),
-            "items": [{"id": item.id, "rfid": item.rfid, "nombre": item.nombre_unidad} for item in items]
+            "items": [{"id": r._mapping["id"], "rfid": r._mapping["rfid"], "nombre": r._mapping["nombre_unidad"]} for r in items]
         }
         
     except Exception as e:
