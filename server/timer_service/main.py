@@ -342,7 +342,8 @@ async def websocket_endpoint(websocket: WebSocket):
             message_type = message.get("type")
             message_data = message.get("data", {})
             
-            if message_type == "REQUEST_SYNC":
+            # Compatibilidad: aceptar tanto REQUEST_SYNC (nuevo) como SYNC_REQUEST (viejo)
+            if message_type in ("REQUEST_SYNC", "SYNC_REQUEST"):
                 # Cliente solicita sincronización completa
                 server_timestamp = timer_manager.get_server_timestamp()
                 timers_data = []

@@ -109,10 +109,23 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             server_timestamp: lastMessage.data.timer.server_timestamp
           };
           setTimers(prev => {
+            // Si ya existe un timer con el mismo ID, no hacer nada
             if (prev.find(t => t.id === nuevoTimer.id)) return prev;
-            // Retirar cualquier optimista del mismo nombre para evitar duplicados visuales
-            const sinOptimistaDuplicado = prev.filter(t => !(t.optimistic && t.nombre === nuevoTimer.nombre));
-            const nuevos = [...sinOptimistaDuplicado, nuevoTimer];
+
+            // Si existe uno por el mismo nombre:
+            const existenteMismoNombre = prev.find(t => t.nombre === nuevoTimer.nombre && !t.completado);
+            if (existenteMismoNombre) {
+              // Si el existente es optimista, reemplazarlo por el del servidor
+              if (existenteMismoNombre.optimistic) {
+                const reemplazados = prev.map(t => t === existenteMismoNombre ? { ...nuevoTimer, optimistic: false } : t);
+                localStorage.setItem('kryotec_timers', JSON.stringify(reemplazados));
+                return reemplazados;
+              }
+              // Si no es optimista, evitar duplicado (quedarse con el primero)
+              return prev;
+            }
+
+            const nuevos = [...prev, nuevoTimer];
             localStorage.setItem('kryotec_timers', JSON.stringify(nuevos));
             return nuevos;
           });
@@ -202,11 +215,11 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       
       setTimeout(() => {
         if (isConnected) {
-          console.log('📤 Enviando SYNC_REQUEST al servidor...');
+          console.log('📤 Enviando REQUEST_SYNC al servidor...');
           sendMessage({
-            type: 'SYNC_REQUEST'
+            type: 'REQUEST_SYNC'
           });
-          console.log('✅ SYNC_REQUEST enviado');
+          console.log('✅ REQUEST_SYNC enviado');
         } else {
           console.log('⚠️ WebSocket desconectado antes de enviar SYNC_REQUEST');
         }
@@ -268,7 +281,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         if (lastVisibilityChange > 5000) {
           console.log('👁️ Pestaña visible después de estar oculta - Sincronizando');
           sendMessage({
-            type: 'SYNC_REQUEST'
+            type: 'REQUEST_SYNC'
           });
         }
       } else if (document.visibilityState === 'hidden') {
@@ -399,10 +412,10 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         }
       });
       
-      // Solicitar sincronización para asegurar que se vea en otros dispositivos
+    // Solicitar sincronización para asegurar que se vea en otros dispositivos
       setTimeout(() => {
         if (isConnected) {
-          sendMessage({ type: 'SYNC_REQUEST' });
+      sendMessage({ type: 'REQUEST_SYNC' });
         }
       }, 200);
     } else {
@@ -539,7 +552,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     if (isConnected) {
       console.log('🔄 Forzando sincronización manual');
       sendMessage({
-        type: 'SYNC_REQUEST'
+  type: 'REQUEST_SYNC'
       });
     } else {
       console.warn('⚠️ No se puede sincronizar - WebSocket desconectado');
