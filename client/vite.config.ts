@@ -8,7 +8,7 @@ export default defineConfig({
   define: {
     // Configuración explícita de variables de entorno
     'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || 'https://kryotecsense-production.up.railway.app'),
-    'import.meta.env.VITE_TIMER_WS_URL': JSON.stringify(process.env.VITE_TIMER_WS_URL || 'wss://kryotecsense-production.up.railway.app/ws/timers'),
+  'import.meta.env.VITE_TIMER_WS_URL': JSON.stringify(process.env.VITE_TIMER_WS_URL || ''),
     // Legacy WS constants kept for compatibility
     'import.meta.env.VITE_WS_URL': JSON.stringify(''),
     'import.meta.env.VITE_WS_LOCAL_URL': JSON.stringify(''),

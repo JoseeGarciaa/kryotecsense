@@ -22,8 +22,17 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [serverTimeDiff, setServerTimeDiff] = useState<number>(0);
   
-  // WebSocket para sincronización en tiempo real - CONFIGURACIÓN SIMPLIFICADA
-  const timerWsUrl = import.meta.env.VITE_TIMER_WS_URL || 'wss://auth-production-f64d.up.railway.app/ws/timers';
+  // WebSocket para sincronización en tiempo real: usar env si existe, si no derivar del origen actual
+  const timerWsUrl = (() => {
+    const explicit = import.meta.env.VITE_TIMER_WS_URL as string | undefined;
+    if (explicit && explicit.trim().length > 0) return explicit;
+    if (typeof window !== 'undefined') {
+      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      return `${proto}://${window.location.host}/ws/timers`;
+    }
+    // Fallback de desarrollo local
+    return 'ws://localhost:8006/ws/timers';
+  })();
   
   console.log('🔌 Conectando WebSocket:', timerWsUrl);
   

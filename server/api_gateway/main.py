@@ -73,6 +73,7 @@ class Timer(BaseModel):
         }
 
 from shared.database import get_db, get_engine
+from shared.message_queue import message_queue
 from shared.utils import verify_password, get_password_hash, create_access_token, get_current_user_from_token
 from api_gateway.models import Usuario
 from api_gateway.schemas import UsuarioCreate, Usuario as UsuarioModel, UsuarioSchema, Token, LoginRequest, UsuarioUpdate
@@ -271,8 +272,12 @@ class TimerManager:
         self.timers: Dict[str, Timer] = {}
         self.connections: Set[WebSocket] = set()
         self.running = True
+        self.instance_id = str(uuid.uuid4())
         # Cargar timers existentes al inicializar
         self.load_timers_from_file()
+
+    def get_server_timestamp(self) -> int:
+        return int(get_utc_now().timestamp() * 1000)
         
     def save_timers_to_file(self):
         """Guardar timers en archivo JSON"""
@@ -334,10 +339,17 @@ class TimerManager:
         timer_logger.info(f"Nueva conexión WebSocket. Total: {len(self.connections)}")
         
         # Enviar timers existentes al cliente recién conectado
+        server_ts = self.get_server_timestamp()
         await self.send_to_client(websocket, {
             "type": "TIMER_SYNC",
             "data": {
-                "timers": [timer.dict() for timer in self.timers.values()]
+                "timers": [
+                    {
+                        **timer.to_dict(),
+                        "server_timestamp": server_ts
+                    } for timer in self.timers.values()
+                ],
+                "server_timestamp": server_ts
             }
         })
         
@@ -398,10 +410,22 @@ class TimerManager:
         timer_logger.info(f"Timer creado: {timer.nombre} ({timer.id})")
         
         # Broadcast a todos los clientes excepto el que envió
+        server_ts = self.get_server_timestamp()
         await self.broadcast({
             "type": "TIMER_CREATED",
-            "data": {"timer": timer.dict()}
+            "data": {"timer": {**timer.to_dict(), "server_timestamp": server_ts}}
         }, exclude=websocket)
+
+        # Publicar a otras instancias (fanout)
+        try:
+            await message_queue.publish_fanout("timers.events", {
+                "event": "TIMER_CREATED",
+                "origin": self.instance_id,
+                "timer": timer.to_dict(),
+                "server_timestamp": server_ts
+            })
+        except Exception as e:
+            timer_logger.error(f"MQ publish TIMER_CREATED error: {e}")
         
     async def update_timer(self, timer_id: str, updates: Dict, websocket: Optional[WebSocket] = None):
         """Actualizar temporizador existente"""
@@ -420,10 +444,22 @@ class TimerManager:
         timer_logger.info(f"Timer actualizado: {timer.nombre} ({timer_id})")
         
         # Broadcast a todos los clientes excepto el que envió
+        server_ts = self.get_server_timestamp()
         await self.broadcast({
             "type": "TIMER_UPDATED",
-            "data": {"timer": timer.dict()}
+            "data": {"timer": {**timer.to_dict(), "server_timestamp": server_ts}}
         }, exclude=websocket)
+
+        # Publicar a otras instancias
+        try:
+            await message_queue.publish_fanout("timers.events", {
+                "event": "TIMER_UPDATED",
+                "origin": self.instance_id,
+                "timer": timer.to_dict(),
+                "server_timestamp": server_ts
+            })
+        except Exception as e:
+            timer_logger.error(f"MQ publish TIMER_UPDATED error: {e}")
         
         return True
         
@@ -442,6 +478,16 @@ class TimerManager:
                 "type": "TIMER_DELETED",
                 "data": {"timerId": timer_id}
             }, exclude=websocket)
+
+            # Publicar a otras instancias
+            try:
+                await message_queue.publish_fanout("timers.events", {
+                    "event": "TIMER_DELETED",
+                    "origin": self.instance_id,
+                    "timerId": timer_id
+                })
+            except Exception as e:
+                timer_logger.error(f"MQ publish TIMER_DELETED error: {e}")
             
             return True
         return False
@@ -505,10 +551,11 @@ class TimerManager:
                     if log_counter % 10 == 0:
                         timer_logger.info(f"Enviando {len(updated_timers)} actualizaciones de timer a {len(self.connections)} clientes")
                     
+                    server_ts = self.get_server_timestamp()
                     for update in updated_timers:
                         await self.broadcast({
                             "type": "TIMER_TIME_UPDATE",
-                            "data": update
+                            "data": {**update, "server_timestamp": server_ts}
                         })
                 
                 # Guardar en archivo cada 30 segundos si hay cambios
@@ -544,6 +591,85 @@ async def ensure_timer_task_running():
         background_task = asyncio.create_task(timer_manager.tick_timers())
         timer_logger.info("Background task de timers iniciado")
     return background_task
+
+
+@app.on_event("startup")
+async def timers_mq_startup():
+    """Conectar a RabbitMQ y replicar eventos de timers."""
+    try:
+        await message_queue.connect()
+        timer_logger.info("MQ conectado para timers (API gateway)")
+
+        async def on_event(msg: Dict):
+            try:
+                if msg.get("origin") == timer_manager.instance_id:
+                    return
+                evt = msg.get("event")
+                if evt == "TIMER_CREATED":
+                    data = msg.get("timer")
+                    if data:
+                        # parse dates
+                        if isinstance(data.get("fechaInicio"), str):
+                            data["fechaInicio"] = parse_iso_datetime(data["fechaInicio"])
+                        if isinstance(data.get("fechaFin"), str):
+                            data["fechaFin"] = parse_iso_datetime(data["fechaFin"])
+                        t = Timer(**data)
+                        timer_manager.timers[t.id] = t
+                        await timer_manager.broadcast({
+                            "type": "TIMER_CREATED",
+                            "data": {"timer": {**t.to_dict(), "server_timestamp": msg.get("server_timestamp")}}
+                        })
+                elif evt == "TIMER_UPDATED":
+                    data = msg.get("timer")
+                    if data and data.get("id") in timer_manager.timers:
+                        tid = data["id"]
+                        for k, v in data.items():
+                            if k in ("fechaInicio", "fechaFin") and isinstance(v, str):
+                                v = parse_iso_datetime(v)
+                            setattr(timer_manager.timers[tid], k, v)
+                        await timer_manager.broadcast({
+                            "type": "TIMER_UPDATED",
+                            "data": {"timer": {**timer_manager.timers[tid].to_dict(), "server_timestamp": msg.get("server_timestamp")}}
+                        })
+                elif evt == "TIMER_DELETED":
+                    tid = msg.get("timerId")
+                    if tid and tid in timer_manager.timers:
+                        timer_manager.timers.pop(tid, None)
+                        await timer_manager.broadcast({
+                            "type": "TIMER_DELETED",
+                            "data": {"timerId": tid}
+                        })
+                elif evt == "TIMERS_SNAPSHOT":
+                    timers = msg.get("timers", [])
+                    new_map = {}
+                    for data in timers:
+                        if isinstance(data.get("fechaInicio"), str):
+                            data["fechaInicio"] = parse_iso_datetime(data["fechaInicio"])
+                        if isinstance(data.get("fechaFin"), str):
+                            data["fechaFin"] = parse_iso_datetime(data["fechaFin"])
+                        t = Timer(**data)
+                        new_map[t.id] = t
+                    timer_manager.timers = new_map
+                    server_ts = timer_manager.get_server_timestamp()
+                    payload = [{**t.to_dict(), "server_timestamp": server_ts} for t in timer_manager.timers.values()]
+                    await timer_manager.broadcast({
+                        "type": "TIMER_SYNC",
+                        "data": {"timers": payload, "server_timestamp": server_ts}
+                    })
+            except Exception as e:
+                timer_logger.error(f"Error procesando evento MQ (API GW): {e}")
+
+        await message_queue.consume_fanout("timers.events", on_event)
+        timer_logger.info("Suscrito a fanout timers.events (API gateway)")
+
+        # Emitir snapshot inicial
+        await message_queue.publish_fanout("timers.events", {
+            "event": "TIMERS_SNAPSHOT",
+            "origin": timer_manager.instance_id,
+            "timers": [t.to_dict() for t in timer_manager.timers.values()]
+        })
+    except Exception as e:
+        timer_logger.error(f"No se pudo inicializar MQ (API gateway): {e}")
 
 
 @app.websocket("/ws/timers")
