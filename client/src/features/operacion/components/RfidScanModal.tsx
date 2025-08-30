@@ -12,6 +12,7 @@ interface RfidScanModalProps {
   descripcion?: string;
   onEliminarRfid?: (rfid: string) => void;
   subEstado?: string;
+  onProcesarRfidIndividual?: (rfid: string) => void; // Nueva prop para procesar RFID individual
 }
 
 const RfidScanModal: React.FC<RfidScanModalProps> = ({
@@ -22,13 +23,45 @@ const RfidScanModal: React.FC<RfidScanModalProps> = ({
   onEscanearRfid,
   onConfirmar,
   onCancelar,
-  titulo = 'Escanear TICs para Pre-acondicionamiento',
-  descripcion = 'Escanea los TICs o ingresa los códigos manualmente y presiona Enter después de cada uno.',
+  titulo = 'Escanear TICs para Congelamiento',
+  descripcion = 'Escanee los TICs que desea agregar para congelamiento. Solo se permiten TICs.',
   onEliminarRfid,
-  subEstado = 'Congelación'
+  subEstado = 'Congelación',
+  onProcesarRfidIndividual
 }) => {
   // Early return después de las props
   if (!mostrarModal) return null;
+
+  // Manejar cambio en el input con auto-procesamiento a 24 caracteres
+  const handleRfidChange = (value: string) => {
+    onRfidInputChange(value);
+    
+    // Auto-procesar cada 24 caracteres
+    if (value.length > 0 && value.length % 24 === 0) {
+      // Extraer códigos de 24 caracteres
+      const codigosCompletos = [];
+      for (let i = 0; i < value.length; i += 24) {
+        const codigo = value.substring(i, i + 24);
+        if (codigo.length === 24) {
+          codigosCompletos.push(codigo);
+        }
+      }
+      
+      // Procesar cada código usando la función del padre
+      codigosCompletos.forEach(codigo => {
+        if (onProcesarRfidIndividual) {
+          onProcesarRfidIndividual(codigo);
+        }
+      });
+      
+      // Limpiar el input después de procesar
+      onRfidInputChange('');
+      
+      if (codigosCompletos.length > 0) {
+        console.log(`🔄 Auto-procesados ${codigosCompletos.length} códigos de 24 caracteres`);
+      }
+    }
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -55,17 +88,29 @@ const RfidScanModal: React.FC<RfidScanModalProps> = ({
         
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Escanear RFID (presiona Enter después de cada escaneo)
+            Escanear RFID (longitud 24, auto-procesa múltiples escaneos)
           </label>
           <input
             type="text"
             value={rfidInput}
-            onChange={(e) => onRfidInputChange(e.target.value)}
+            onChange={(e) => handleRfidChange(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Escanea el RFID aquí..."
+            placeholder="Escanea los RFIDs aquí (auto-procesa a 24 chars)..."
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
             autoFocus
+            autoComplete="off"
           />
+          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 space-y-1">
+            <p>
+              Escaneados: <span className="font-medium text-green-600">{rfidsEscaneados.length}</span> TICs
+            </p>
+            <p className="text-blue-600">
+              🚀 Auto-procesamiento: Se procesa automáticamente al llegar a 24 caracteres
+            </p>
+            <p className="text-orange-600">
+              ⚠️ Solo TICs: Se filtran automáticamente VIPs y Cajas
+            </p>
+          </div>
         </div>
         
         {rfidsEscaneados.length > 0 && (
@@ -104,7 +149,7 @@ const RfidScanModal: React.FC<RfidScanModalProps> = ({
             className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600"
             disabled={rfidsEscaneados.length === 0}
           >
-            Confirmar
+            Confirmar ({rfidsEscaneados.length} TICs)
           </button>
         </div>
       </div>

@@ -1308,9 +1308,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
           setRfidInput('');
         }}
         titulo={`Escanear TICs para ${tipoEscaneoActual === 'congelamiento' ? 'Congelamiento' : 'Atemperamiento'}`}
-        descripcion={`Escanee los TICs que desea agregar a la lista de ${tipoEscaneoActual === 'congelamiento' ? 'congelamiento' : 'atemperamiento'} o ingrese los códigos manualmente.`}
+        descripcion={`Escanee los TICs que desea agregar a la lista de ${tipoEscaneoActual === 'congelamiento' ? 'congelamiento' : 'atemperamiento'}. Se procesan automáticamente códigos de 24 caracteres.`}
         onEliminarRfid={eliminarRfidEscaneado}
         subEstado={tipoEscaneoActual === 'congelamiento' ? 'Congelación' : 'Atemperamiento'}
+        onProcesarRfidIndividual={procesarRfid}
       />
       
       {/* Modal para seleccionar TICs por lote */}
