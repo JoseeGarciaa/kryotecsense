@@ -542,65 +542,65 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">Agregar Items a {subEstadoDestino}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">×</button>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow-xl w-[92vw] max-w-md sm:max-w-2xl md:max-w-4xl max-h-[88vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between p-3 sm:p-4 border-b">
+          <h2 className="text-base sm:text-lg font-semibold">Agregar Items a {subEstadoDestino}</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-lg leading-none">×</button>
         </div>
 
-        <div className="p-4 border-b bg-gray-50">
-          <div className="flex gap-4 mb-4">
-            <div className="flex-1">
+        <div className="p-3 sm:p-4 border-b bg-gray-50">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-2 sm:mb-3">
+            <div className="sm:flex-1">
               <input
                 type="text"
                 placeholder="Buscar por nombre, RFID o lote..."
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md"
+                className="w-full px-3 py-2 border rounded-md text-sm"
               />
             </div>
-            <select
-              value={filtroCategoria}
-              onChange={(e) => setFiltroCategoria(e.target.value)}
-              className="px-3 py-2 border rounded-md"
-            >
-              <option value="TODOS">Todas las categorías</option>
-              <option value="TIC">TIC</option>
-              <option value="VIP">VIP</option>
-              <option value="Cube">Cube</option>
-            </select>
-            <button
-              onClick={() => setMostrarEscanerRfid(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors"
-            >
-              <Scan className="w-4 h-4" />
-              Escanear RFID
-            </button>
+            <div className="flex gap-2">
+              <select
+                value={filtroCategoria}
+                onChange={(e) => setFiltroCategoria(e.target.value)}
+                className="px-3 py-2 border rounded-md text-sm"
+              >
+                <option value="TODOS">Todas las categorías</option>
+                <option value="TIC">TIC</option>
+                <option value="VIP">VIP</option>
+                <option value="Cube">Cube</option>
+              </select>
+              <button
+                onClick={() => setMostrarEscanerRfid(true)}
+                className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors"
+              >
+                <Scan className="w-4 h-4" />
+                Escanear RFID
+              </button>
+            </div>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
             <button
               onClick={() => setItemsSeleccionados(itemsFiltrados)}
-              className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded"
+              className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded"
             >
               Seleccionar todos ({itemsFiltrados.length})
             </button>
             <button
               onClick={() => setItemsSeleccionados([])}
-              className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded"
+              className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded"
             >
               Limpiar selección
             </button>
-            <span className="text-sm text-gray-600 py-1">
-              {itemsSeleccionados.length} seleccionado(s)
-            </span>
+            <span className="text-gray-600">{itemsSeleccionados.length} seleccionado(s)</span>
           </div>
         </div>
 
-        <div className="max-h-96 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4">
           {itemsFiltrados.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 text-sm">
               No hay items disponibles para mover a acondicionamiento
             </div>
           ) : (
@@ -621,24 +621,30 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                       isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <input 
-                        type="checkbox" 
-                        checked={!!isSelected} 
-                        onChange={() => {}} 
-                        className="rounded"
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={!!isSelected}
+                        onChange={() => {}}
+                        className="mt-0.5 rounded"
                       />
-                      <span className={`px-2 py-1 text-xs rounded ${
-                        item.categoria === 'TIC' ? 'bg-green-100 text-green-800' :
-                        item.categoria === 'VIP' ? 'bg-purple-100 text-purple-800' :
-                        item.categoria === 'Cube' ? 'bg-blue-100 text-blue-800' :
-                        'bg-orange-100 text-orange-800'
-                      }`}>
-                        {item.categoria}
-                      </span>
-                      <span className="font-medium">{item.nombre_unidad}</span>
-                      <span className="text-sm text-gray-500">RFID: {item.rfid}</span>
-                      {item.lote && <span className="text-sm text-gray-500">Lote: {item.lote}</span>}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`px-2 py-0.5 text-[11px] rounded ${
+                            item.categoria === 'TIC' ? 'bg-green-100 text-green-800' :
+                            item.categoria === 'VIP' ? 'bg-purple-100 text-purple-800' :
+                            item.categoria === 'Cube' ? 'bg-blue-100 text-blue-800' :
+                            'bg-orange-100 text-orange-800'
+                          }`}>
+                            {item.categoria}
+                          </span>
+                          <span className="font-medium text-sm truncate" title={item.nombre_unidad}>{item.nombre_unidad}</span>
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1 break-words">
+                          <span className="mr-2">RFID: {item.rfid}</span>
+                          {item.lote && <span className="mr-2">Lote: {item.lote}</span>}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
@@ -647,23 +653,23 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
           )}
         </div>
 
-        <div className="p-6 border-t bg-gray-50 flex justify-between items-center">
-          <div className="text-sm text-gray-600">
+        <div className="p-3 sm:p-4 border-t bg-gray-50 flex flex-col sm:flex-row sm:justify-between gap-2 sm:gap-3 items-stretch sm:items-center">
+          <div className="text-xs sm:text-sm text-gray-600">
             {itemsSeleccionados.length > 0 && (
               <span>{itemsSeleccionados.length} item(s) se moverán a {subEstadoDestino}</span>
             )}
           </div>
-          <div className="flex gap-3">
+          <div className="flex gap-2 sm:gap-3">
             <button
               onClick={onClose}
-              className="px-5 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+              className="px-4 py-2 text-sm text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
             >
               Cancelar
             </button>
             <button
               onClick={() => onConfirm(itemsSeleccionados, subEstadoDestino)}
               disabled={itemsSeleccionados.length === 0 || cargando}
-              className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
             >
               {cargando && (
                 <Loader className="w-4 h-4 animate-spin" />
