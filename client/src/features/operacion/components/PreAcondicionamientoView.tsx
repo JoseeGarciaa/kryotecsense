@@ -38,30 +38,29 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   // Función para procesar un RFID individual
   const procesarRfid = (rfid: string) => {
     if (!rfid.trim()) return;
-    
     const rfidLimpio = rfid.trim();
-    
+
     // Prevenir duplicados recientes (últimos 2 segundos)
     const ahora = Date.now();
-    if (ultimosRfidsEscaneados[rfidLimpio] && (ahora - ultimosRfidsEscaneados[rfidLimpio]) < 2000) {
+    const ultimo = ultimosRfidsEscaneados[rfidLimpio];
+    if (ultimo && (ahora - ultimo) < 2000) {
       console.log(`🔄 Ignorando duplicado reciente: ${rfidLimpio}`);
       return;
     }
-    
+
     // Actualizar timestamp del último escaneo
     setUltimosRfidsEscaneados(prev => ({
       ...prev,
       [rfidLimpio]: ahora
     }));
-    
+
     // Validar que el RFID sea válido (alfanumérico: dígitos y letras)
     if (!/^[a-zA-Z0-9]+$/.test(rfidLimpio)) {
       console.warn(`⚠️ RFID inválido: ${rfidLimpio}. Solo se permiten dígitos y letras.`);
       alert(`⚠️ RFID inválido: ${rfidLimpio}. Solo se permiten dígitos y letras.`);
       return;
     }
-    
-    // Verificar si el RFID existe en el inventario completo
+
     const itemEncontrado = operaciones.inventarioCompleto.find(item => 
       item.rfid === rfidLimpio || item.nombre_unidad === rfidLimpio
     );
@@ -71,14 +70,14 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       alert(`❌ RFID ${rfidLimpio} no encontrado en el inventario`);
       return;
     }
-    
+
     // Validar que el item sea específicamente un TIC
     if (itemEncontrado.categoria !== 'TIC') {
       console.warn(`⚠️ RFID ${rfidLimpio} no es un TIC (categoría: ${itemEncontrado.categoria}). Solo se permiten TICs en pre-acondicionamiento.`);
       alert(`⚠️ El item ${rfidLimpio} no es un TIC (categoría: ${itemEncontrado.categoria}). En pre-acondicionamiento solo se permiten TICs.`);
       return;
     }
-    
+
     // Verificar si ya está en la lista
     if (!rfidsEscaneados.includes(rfidLimpio)) {
       setRfidsEscaneados(prev => [...prev, rfidLimpio]);
@@ -1185,7 +1184,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             </div>
             
             {/* Botones */}
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
               {/* Botón para iniciar temporizadores de todos los TICs sin temporizador */}
               {ticsAtemperamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length > 0 && (
                 <button
@@ -1195,7 +1194,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                     setTipoOperacionTimer('atemperamiento');
                     setMostrarModalTimer(true);
                   }}
-                  className="flex items-center justify-center gap-2 px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm transition-colors"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-orange-500"
                   title="Iniciar temporizador para todos los TICs sin temporizador"
                 >
                   <Play size={16} />
@@ -1203,7 +1202,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 </button>
               )}
               
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
                 <button 
                   className={`p-2 rounded-md transition-colors ${
                     cargando 
@@ -1219,7 +1218,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 
                 <div className="relative" ref={dropdownRefAtemperamiento}>
                   <button 
-                    className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md flex items-center gap-2 justify-center text-sm min-w-0"
+                    className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md flex items-center gap-2 justify-center text-sm min-w-[9rem] font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-orange-500"
                     onClick={() => setShowDropdownAtemperamiento(!showDropdownAtemperamiento)}
                   >
                     <Plus size={16} />
@@ -1228,10 +1227,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                   </button>
                   
                   {showDropdownAtemperamiento && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
-                      <div className="py-1">
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-10 border border-gray-200 overflow-hidden">
+                      <div className="py-1 divide-y divide-gray-100">
                         <button
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                          className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                           onClick={() => {
                             setRfidsEscaneados([]);
                             setUltimosRfidsEscaneados({}); // Limpiar historial de duplicados
@@ -1244,7 +1243,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                           Escanear TICs
                         </button>
                         <button
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                          className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                           onClick={() => {
                             setTipoEscaneoActual('atemperamiento');
                             setMostrarModalLotes(true);

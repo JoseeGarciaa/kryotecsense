@@ -360,8 +360,23 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     const timerId = `timer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     console.log(`🚀 Creando timer: ${nombre} - ${tiempoMinutos} minutos`);
+    // Crear timer local optimista inmediatamente para mostrar el conteo regresivo
+    const ahora = getDeviceTimeAsUtcDate();
+    const fin = new Date(ahora.getTime() + tiempoMinutos * 60 * 1000);
+    const nuevoTimerLocal = {
+      id: timerId,
+      nombre,
+      tipoOperacion,
+      tiempoInicialMinutos: tiempoMinutos,
+      tiempoRestanteSegundos: tiempoMinutos * 60,
+      fechaInicio: ahora,
+      fechaFin: fin,
+      activo: true,
+      completado: false
+    } as Timer;
+    setTimers(prev => [...prev, nuevoTimerLocal]);
     
-    // ENVIAR DIRECTAMENTE AL SERVIDOR - él maneja las fechas y tiempos
+    // ENVIAR DIRECTAMENTE AL SERVIDOR (si hay conexión) - el servidor es la autoridad
     if (isConnected) {
       sendMessage({
         type: 'CREATE_TIMER',
@@ -385,7 +400,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         }
       }, 200);
     } else {
-      console.warn('⚠️ WebSocket no conectado - Timer no será sincronizado');
+      console.warn('⚠️ WebSocket no conectado - Timer creado solo localmente');
     }
     
     // Solicitar permisos de notificación
