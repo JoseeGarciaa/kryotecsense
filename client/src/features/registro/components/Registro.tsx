@@ -280,25 +280,42 @@ const Registro: React.FC = () => {
       
       // Registrar cada item en el inventario y crear actividades de operación
       for (const lectura of lecturasRfid) {
+        // Determinar la categoría correcta basada en el tipo del modelo
+        let categoriaFinal = 'Cube'; // Por defecto
+        
+        if (modelo.tipo) {
+          // Si el modelo tiene tipo definido, usarlo
+          categoriaFinal = modelo.tipo;
+        } else {
+          // Fallback basado en el tipo seleccionado
+          if (tipoSeleccionado === 'VIP') {
+            categoriaFinal = 'VIP';
+          } else if (tipoSeleccionado === 'TIC') {
+            categoriaFinal = 'TIC';
+          } else if (tipoSeleccionado === 'CUBE') {
+            categoriaFinal = 'Cube';
+          }
+        }
+        
         const inventarioData = {
           modelo_id: modelo.modelo_id,
           nombre_unidad: lectura.nombre_unidad,
           rfid: lectura.rfid,
           lote: null, // El lote se asignará en pre-acondicionamiento
           estado: 'En bodega',
-          categoria: modelo.tipo || tipoSeleccionado, // Usar el tipo del modelo en lugar de 'A'
+          categoria: categoriaFinal,
           validacion_limpieza: null,
           validacion_goteo: null,
           validacion_desinfeccion: null
         };
         
         // Contar por tipo basado en la categoría del item
-        const categoriaItem = (modelo.tipo || tipoSeleccionado).toUpperCase();
-        if (categoriaItem.includes('VIP')) {
+        const categoriaItem = categoriaFinal.toUpperCase();
+        if (categoriaItem === 'VIP') {
           contadorVips++;
-        } else if (categoriaItem.includes('TIC')) {
+        } else if (categoriaItem === 'TIC') {
           contadorTics++;
-        } else if (categoriaItem.includes('CUBE') || categoriaItem.includes('CREDO')) {
+        } else if (categoriaItem === 'CUBE' || categoriaItem.includes('CUBE')) {
           contadorCubes++;
         }
         
@@ -645,39 +662,39 @@ const Registro: React.FC = () => {
                 ¡Registro Exitoso!
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 sm:mb-6">
-                Se registraron exitosamente <strong>{itemsRegistrados}</strong> items de tipo{' '}
-                <strong>{tipoSeleccionado === 'CUBE' ? 'CUBE' : tipoSeleccionado}</strong> de{' '}
-                <strong>{litrajeSeleccionado}L</strong>.
+                Se registraron exitosamente <strong>{itemsRegistrados}</strong> items.
               </p>
               
               {/* Conteo detallado por tipo */}
-              {(conteoDetallado.vips > 0 || conteoDetallado.tics > 0 || conteoDetallado.cubes > 0) && (
-                <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Detalle por tipo:
-                  </p>
-                  <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                    {conteoDetallado.cubes > 0 && (
-                      <div className="flex justify-between">
-                        <span>CUBEs:</span>
-                        <span className="font-medium">{conteoDetallado.cubes}</span>
-                      </div>
-                    )}
-                    {conteoDetallado.vips > 0 && (
-                      <div className="flex justify-between">
-                        <span>VIPs:</span>
-                        <span className="font-medium">{conteoDetallado.vips}</span>
-                      </div>
-                    )}
-                    {conteoDetallado.tics > 0 && (
-                      <div className="flex justify-between">
-                        <span>TICs:</span>
-                        <span className="font-medium">{conteoDetallado.tics}</span>
-                      </div>
-                    )}
+              <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Detalle por tipo:
+                </p>
+                <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                  <div className="flex justify-between">
+                    <span>Total de items:</span>
+                    <span className="font-bold text-blue-600 dark:text-blue-400">{itemsRegistrados}</span>
                   </div>
+                  {conteoDetallado.cubes > 0 && (
+                    <div className="flex justify-between">
+                      <span>CUBEs registrados:</span>
+                      <span className="font-medium text-purple-600 dark:text-purple-400">{conteoDetallado.cubes}</span>
+                    </div>
+                  )}
+                  {conteoDetallado.vips > 0 && (
+                    <div className="flex justify-between">
+                      <span>VIPs registrados:</span>
+                      <span className="font-medium text-green-600 dark:text-green-400">{conteoDetallado.vips}</span>
+                    </div>
+                  )}
+                  {conteoDetallado.tics > 0 && (
+                    <div className="flex justify-between">
+                      <span>TICs registrados:</span>
+                      <span className="font-medium text-orange-600 dark:text-orange-400">{conteoDetallado.tics}</span>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
               
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-4 sm:mb-6">
                 Los items han sido agregados al inventario y están disponibles en la sección "En bodega" de operaciones.
