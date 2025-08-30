@@ -13,6 +13,7 @@ const Inventario: React.FC = () => {
   const [credocubeSeleccionado, setCredocubeSeleccionado] = useState<Credocube | null>(null);
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
   const [paginaActual, setPaginaActual] = useState(1);
+  const [categoriaFiltro, setCategoriaFiltro] = useState<'Todos' | 'Cube' | 'VIP' | 'TIC'>('Todos');
   const [itemsSeleccionados, setItemsSeleccionados] = useState<Set<number>>(new Set());
   const [mostrarConfirmacionEliminacion, setMostrarConfirmacionEliminacion] = useState(false);
   const [eliminandoItems, setEliminandoItems] = useState(false);
@@ -154,11 +155,23 @@ const Inventario: React.FC = () => {
     }
   };
 
+  // Conteos por categoría (según lista filtrada por búsqueda)
+  const conteoFiltrado = {
+    Cube: inventarioFiltrado.filter((i: Credocube) => i.categoria === 'Cube').length,
+    VIP: inventarioFiltrado.filter((i: Credocube) => i.categoria === 'VIP').length,
+    TIC: inventarioFiltrado.filter((i: Credocube) => i.categoria === 'TIC').length,
+  };
+
+  // Aplicar filtro por categoría antes de paginar
+  const listaPorCategoria = categoriaFiltro === 'Todos'
+    ? inventarioFiltrado
+    : inventarioFiltrado.filter((i: Credocube) => i.categoria === categoriaFiltro);
+
   // Cálculos de paginación
   const indiceInicio = (paginaActual - 1) * registrosPorPagina;
   const indiceFin = indiceInicio + registrosPorPagina;
-  const registrosActuales = inventarioFiltrado.slice(indiceInicio, indiceFin);
-  const totalPaginas = Math.ceil(inventarioFiltrado.length / registrosPorPagina);
+  const registrosActuales = listaPorCategoria.slice(indiceInicio, indiceFin);
+  const totalPaginas = Math.ceil(listaPorCategoria.length / registrosPorPagina);
 
   const irAPagina = (pagina: number) => {
     setPaginaActual(pagina);
@@ -219,7 +232,9 @@ const Inventario: React.FC = () => {
       <div className="bg-light-card dark:bg-dark-card p-4 rounded-lg border border-light-border dark:border-dark-border">
         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
           <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+              <Search className="w-4 h-4 text-gray-400" />
+            </div>
             <input 
               type="text" 
               value={terminoBusqueda}
@@ -255,9 +270,49 @@ const Inventario: React.FC = () => {
           )}
         </div>
         
+        {/* Segmentación por categoría con conteos (según búsqueda) */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => { setCategoriaFiltro('Todos'); setPaginaActual(1); }}
+            className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+              categoriaFiltro === 'Todos' ? 'bg-primary-600 text-white border-primary-600' : 'border-light-border dark:border-dark-border hover:bg-primary-50 dark:hover:bg-primary-900 text-light-text dark:text-dark-text'
+            }`}
+            title="Mostrar todas las categorías"
+          >
+            Todos <span className="ml-1 text-xs opacity-80">({inventarioFiltrado.length})</span>
+          </button>
+          <button
+            onClick={() => { setCategoriaFiltro('Cube'); setPaginaActual(1); }}
+            className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+              categoriaFiltro === 'Cube' ? 'bg-purple-600 text-white border-purple-600' : 'border-light-border dark:border-dark-border hover:bg-purple-50 dark:hover:bg-purple-900 text-light-text dark:text-dark-text'
+            }`}
+            title="Filtrar por Cube"
+          >
+            Cubes <span className="ml-1 text-xs opacity-80">({conteoFiltrado.Cube})</span>
+          </button>
+          <button
+            onClick={() => { setCategoriaFiltro('VIP'); setPaginaActual(1); }}
+            className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+              categoriaFiltro === 'VIP' ? 'bg-green-600 text-white border-green-600' : 'border-light-border dark:border-dark-border hover:bg-green-50 dark:hover:bg-green-900 text-light-text dark:text-dark-text'
+            }`}
+            title="Filtrar por VIP"
+          >
+            VIPs <span className="ml-1 text-xs opacity-80">({conteoFiltrado.VIP})</span>
+          </button>
+          <button
+            onClick={() => { setCategoriaFiltro('TIC'); setPaginaActual(1); }}
+            className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+              categoriaFiltro === 'TIC' ? 'bg-yellow-600 text-white border-yellow-600' : 'border-light-border dark:border-dark-border hover:bg-yellow-50 dark:hover:bg-yellow-900 text-light-text dark:text-dark-text'
+            }`}
+            title="Filtrar por TIC"
+          >
+            TICs <span className="ml-1 text-xs opacity-80">({conteoFiltrado.TIC})</span>
+          </button>
+        </div>
+
         {terminoBusqueda && (
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            {inventarioFiltrado.length} resultado{inventarioFiltrado.length !== 1 ? 's' : ''} encontrado{inventarioFiltrado.length !== 1 ? 's' : ''}
+            {listaPorCategoria.length} resultado{listaPorCategoria.length !== 1 ? 's' : ''} encontrado{listaPorCategoria.length !== 1 ? 's' : ''}
           </p>
         )}
       </div>
@@ -361,7 +416,7 @@ const Inventario: React.FC = () => {
         {!cargando && !error && totalPaginas > 1 && (
           <div className="mt-4 flex items-center justify-between">
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              Mostrando {indiceInicio + 1} a {Math.min(indiceFin, inventarioFiltrado.length)} de {inventarioFiltrado.length} registros
+              Mostrando {listaPorCategoria.length === 0 ? 0 : indiceInicio + 1} a {Math.min(indiceFin, listaPorCategoria.length)} de {listaPorCategoria.length} registros
             </div>
             <div className="flex items-center space-x-2">
               <button
