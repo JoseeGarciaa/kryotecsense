@@ -4,12 +4,14 @@ import useTimer, { Timer } from '../features/operacion/hooks/useTimer';
 interface TimerContextType {
   timers: Timer[];
   crearTimer: (nombre: string, tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio', tiempoMinutos: number) => string;
+  crearTimerLocal: (nombre: string, tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio', tiempoMinutos: number) => string;
   pausarTimer: (id: string) => void;
   reanudarTimer: (id: string) => void;
   eliminarTimer: (id: string) => void;
   formatearTiempo: (segundos: number) => string;
   obtenerTimersActivos: () => Timer[];
   obtenerTimersCompletados: () => Timer[];
+  forzarSincronizacion: () => void;
   isConnected: boolean;
 }
 

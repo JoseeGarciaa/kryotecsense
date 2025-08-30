@@ -127,10 +127,12 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   const {
     timers,
     crearTimer,
+  crearTimerLocal,
     pausarTimer,
     reanudarTimer,
     eliminarTimer,
-    formatearTiempo
+  formatearTiempo,
+  forzarSincronizacion
   } = useTimerContext();
   
   // Efecto para cargar los datos iniciales
@@ -431,6 +433,22 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             });
             
             console.log('✅ Respuesta de timers masivos:', timerResponse.data);
+
+            // Crear timers locales optimistas de inmediato para cada RFID
+            try {
+              rfidsPendientesTimer.forEach((rfid) => {
+                // Evitar duplicado si ya existe uno visible
+                if (!obtenerTemporizadorTIC(rfid)) {
+                  crearTimerLocal(rfid, tipoOperacionTimer, tiempoMinutos);
+                }
+              });
+              // Pedir sync luego para reemplazar optimistas por los reales del servidor
+              setTimeout(() => {
+                forzarSincronizacion();
+              }, 400);
+            } catch (optErr) {
+              console.warn('⚠️ No se pudieron crear timers locales optimistas:', optErr);
+            }
             
             // Limpiar estados ANTES de mostrar el mensaje de éxito
             setMostrarModalTimer(false);

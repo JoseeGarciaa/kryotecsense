@@ -14,6 +14,7 @@ export interface Timer {
   activo: boolean;
   completado: boolean;
   server_timestamp?: number; // Timestamp del servidor para sincronización
+  optimistic?: boolean; // Marcador para timers locales optimistas
 }
 
 export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
@@ -75,9 +76,13 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             server_timestamp: timer.server_timestamp
           }));
           
-          // REEMPLAZAR COMPLETAMENTE - El servidor es la autoridad
-          setTimers(timersDelServidor);
-          localStorage.setItem('kryotec_timers', JSON.stringify(timersDelServidor));
+          // Combinar con optimistas locales que aún no llegaron del servidor (por nombre)
+          setTimers(prev => {
+            const restantesOptimistas = prev.filter(t => t.optimistic && !timersDelServidor.some((s: any) => s.nombre === t.nombre));
+            const combinados = [...timersDelServidor, ...restantesOptimistas];
+            localStorage.setItem('kryotec_timers', JSON.stringify(combinados));
+            return combinados;
+          });
           
           // Almacenar diferencia de tiempo del servidor
           if (lastMessage.data.server_timestamp) {
@@ -105,7 +110,9 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
           };
           setTimers(prev => {
             if (prev.find(t => t.id === nuevoTimer.id)) return prev;
-            const nuevos = [...prev, nuevoTimer];
+            // Retirar cualquier optimista del mismo nombre para evitar duplicados visuales
+            const sinOptimistaDuplicado = prev.filter(t => !(t.optimistic && t.nombre === nuevoTimer.nombre));
+            const nuevos = [...sinOptimistaDuplicado, nuevoTimer];
             localStorage.setItem('kryotec_timers', JSON.stringify(nuevos));
             return nuevos;
           });
@@ -411,6 +418,39 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     return timerId;
   }, [isConnected, sendMessage]);
 
+  // Crear timer SOLO local (optimista) sin enviar al servidor. Útil cuando el backend ya creó el timer.
+  const crearTimerLocal = useCallback((
+    nombre: string,
+    tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio',
+    tiempoMinutos: number
+  ): string => {
+    const timerId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const ahora = getDeviceTimeAsUtcDate();
+    const fin = new Date(ahora.getTime() + tiempoMinutos * 60 * 1000);
+    const nuevoTimerLocal: Timer = {
+      id: timerId,
+      nombre,
+      tipoOperacion,
+      tiempoInicialMinutos: tiempoMinutos,
+      tiempoRestanteSegundos: tiempoMinutos * 60,
+      fechaInicio: ahora,
+      fechaFin: fin,
+      activo: true,
+      completado: false,
+      optimistic: true
+    };
+    setTimers(prev => {
+      // Evitar duplicados por nombre (si ya existe uno activo para el mismo nombre)
+      if (prev.some(t => t.nombre === nombre && !t.completado)) {
+        return prev;
+      }
+      const nuevos = [...prev, nuevoTimerLocal];
+      localStorage.setItem('kryotec_timers', JSON.stringify(nuevos));
+      return nuevos;
+    });
+    return timerId;
+  }, []);
+
   const pausarTimer = useCallback((id: string) => {
     setTimers(prev => 
       prev.map(timer => 
@@ -510,6 +550,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   return {
     timers,
     crearTimer,
+  crearTimerLocal,
     pausarTimer,
     reanudarTimer,
     eliminarTimer,
