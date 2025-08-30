@@ -579,30 +579,45 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
 
       if (!confirmar) return;
 
+      console.log(`🔄 [DEBUG] Iniciando completarTIC para RFID: ${rfid}`);
+      console.log(`📋 [DEBUG] Timer completado:`, timerCompletado);
+      console.log(`🎯 [DEBUG] Siguiente estado: ${siguienteEstado} / ${siguienteSubEstado}`);
+
       // Eliminar el timer completado ANTES de mover
       eliminarTimer(timerCompletado.id);
+      console.log(`❌ [DEBUG] Timer eliminado: ${timerCompletado.id}`);
 
       // Mover el TIC al siguiente estado usando la función existente
+      console.log(`🚀 [DEBUG] Llamando confirmarPreAcondicionamiento con:`, [rfid], siguienteSubEstado);
       const resultado = await operaciones.confirmarPreAcondicionamiento([rfid], siguienteSubEstado);
+      console.log(`📊 [DEBUG] Resultado de confirmarPreAcondicionamiento:`, resultado);
       
       if (resultado || resultado !== false) {
+        console.log(`✅ [DEBUG] Actualización exitosa`);
+        
         // Si el nuevo estado necesita timer, crearlo
         if (tiempoNuevo > 0) {
-          console.log(`⏰ Creando nuevo timer de ${tiempoNuevo} minutos para ${rfid}`);
+          console.log(`⏰ [DEBUG] Creando nuevo timer de ${tiempoNuevo} minutos para ${rfid}`);
           
           // Crear nuevo timer para el siguiente estado
           const tipoOperacion = siguienteSubEstado.toLowerCase() as 'congelamiento' | 'atemperamiento' | 'envio';
+          console.log(`🎯 [DEBUG] Tipo de operación para timer: ${tipoOperacion}`);
+          
           const timerId = crearTimer(
             rfid, // Usar solo el RFID sin "TIC"
             tipoOperacion,
             tiempoNuevo
           );
           
-          console.log(`✅ Nuevo timer creado con ID: ${timerId}`);
+          console.log(`✅ [DEBUG] Nuevo timer creado con ID: ${timerId}`);
+        } else {
+          console.log(`ℹ️ [DEBUG] No se requiere timer para el nuevo estado`);
         }
         
         // Recargar datos
+        console.log(`🔄 [DEBUG] Recargando datos...`);
         await cargarDatos();
+        console.log(`✅ [DEBUG] Datos recargados`);
         
         const mensajeExito = timerCompletado.tipoOperacion === 'congelamiento'
           ? `✅ TIC ${rfid} completado y movido a Atemperamiento con timer de ${tiempoNuevo} minutos`
@@ -610,8 +625,9 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         
         alert(mensajeExito);
         
-        console.log(`✅ TIC ${rfid} completado exitosamente`);
+        console.log(`✅ [DEBUG] TIC ${rfid} completado exitosamente`);
       } else {
+        console.error(`❌ [DEBUG] Error en resultado de confirmarPreAcondicionamiento:`, resultado);
         throw new Error('Error al actualizar el estado del TIC');
       }
     } catch (error) {

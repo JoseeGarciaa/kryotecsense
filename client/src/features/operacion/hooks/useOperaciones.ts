@@ -735,31 +735,45 @@ export const useOperaciones = () => {
   // Función para confirmar pre-acondicionamiento
   const confirmarPreAcondicionamiento = async (rfids: string[], subEstado: string = 'Congelación') => {
     try {
-      console.log(`🔄 Confirmando pre-acondicionamiento para ${rfids.length} TICs con sub-estado: ${subEstado}`);
+      console.log(`🔄 [DEBUG-HOOK] Confirmando pre-acondicionamiento para ${rfids.length} TICs con sub-estado: ${subEstado}`);
+      console.log(`📋 [DEBUG-HOOK] RFIDs recibidos:`, rfids);
       
       // Primero, actualizar el inventario para asegurarnos de tener datos frescos
       await actualizarInventarioEnSegundoPlano();
+      console.log(`📊 [DEBUG-HOOK] Inventario actualizado en segundo plano`);
       
       // Obtener actividades actuales para verificar duplicados
       const actividadesResponse = await apiServiceClient.get('/activities/actividades/');
       const actividades = actividadesResponse.data;
+      console.log(`📝 [DEBUG-HOOK] Actividades obtenidas:`, actividades?.length || 0);
       
       // Validar que las TICs no estén ya en pre-acondicionamiento
       const ticsInvalidas: string[] = [];
       const ticsValidas: any[] = [];
       
       for (const rfid of rfids) {
+        console.log(`🔍 [DEBUG-HOOK] Procesando RFID: ${rfid}`);
+        
         // Verificar si el RFID es válido (no vacío y solo contiene dígitos)
         if (!rfid || !/^\d+$/.test(rfid)) {
-          console.error(`❌ RFID inválido: ${rfid}. Solo se permiten dígitos.`);
+          console.error(`❌ [DEBUG-HOOK] RFID inválido: ${rfid}. Solo se permiten dígitos.`);
           ticsInvalidas.push(rfid);
           continue;
         }
         
         // Buscar el item en el inventario actualizado
         const item = inventarioCompleto.find((invItem: any) => invItem.rfid === rfid);
+        console.log(`🔍 [DEBUG-HOOK] Item encontrado para ${rfid}:`, item ? {
+          id: item.id,
+          nombre: item.nombre_unidad,
+          estado: item.estado,
+          sub_estado: item.sub_estado,
+          categoria: item.categoria,
+          lote: item.lote
+        } : 'NO ENCONTRADO');
+        
         if (!item) {
-          console.error(`❌ RFID ${rfid} no encontrado en el inventario`);
+          console.error(`❌ [DEBUG-HOOK] RFID ${rfid} no encontrado en el inventario`);
           ticsInvalidas.push(rfid);
           continue;
         }
@@ -815,7 +829,9 @@ export const useOperaciones = () => {
       const ticsActualizados: any[] = [];
       for (const item of ticsValidas) {
         try {
-          console.log(`📦 Moviendo TIC: ${item.nombre_unidad} (ID: ${item.id})`);
+          console.log(`📦 [DEBUG-HOOK] Moviendo TIC: ${item.nombre_unidad} (ID: ${item.id})`);
+          console.log(`🔄 [DEBUG-HOOK] Estado actual: ${item.estado} / ${item.sub_estado}`);
+          console.log(`🎯 [DEBUG-HOOK] Nuevo estado: Pre-acondicionamiento / ${subEstado}`);
           
           // Crear el objeto con los campos que espera el esquema InventarioCreate
           const actualizacionTIC = {
@@ -832,15 +848,15 @@ export const useOperaciones = () => {
             ultima_actualizacion: createUtcTimestamp() // Actualizar timestamp en UTC
           };
           
-          console.log('Actualizando TIC en inventario:', actualizacionTIC);
+          console.log('[DEBUG-HOOK] Actualizando TIC en inventario:', actualizacionTIC);
           // Usar la ruta correcta para actualizar el inventario
           const response = await apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionTIC);
-          console.log(`✅ TIC actualizado:`, response.data);
+          console.log(`✅ [DEBUG-HOOK] TIC actualizado:`, response.data);
           ticsActualizados.push(response.data);
         } catch (itemError: any) {
-          console.error(`Error al actualizar TIC ${item.nombre_unidad}:`, itemError);
+          console.error(`❌ [DEBUG-HOOK] Error al actualizar TIC ${item.nombre_unidad}:`, itemError);
           if (itemError.response) {
-            console.error('Detalles del error:', itemError.response.data);
+            console.error('[DEBUG-HOOK] Detalles del error:', itemError.response.data);
             alert(`Error al actualizar TIC ${item.nombre_unidad}: ${itemError.response.data.detail || 'Error desconocido'}`);
           } else {
             alert(`Error al actualizar TIC ${item.nombre_unidad}: ${itemError.message}`);
@@ -848,7 +864,7 @@ export const useOperaciones = () => {
         }
       }
       
-      console.log(`✅ ${ticsActualizados.length} TICs actualizados exitosamente`);
+      console.log(`✅ [DEBUG-HOOK] ${ticsActualizados.length} TICs actualizados exitosamente`);
       
       // Limpiar la lista de RFIDs escaneados
       setRfidsEscaneados([]);
