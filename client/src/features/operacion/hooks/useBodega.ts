@@ -18,7 +18,8 @@ export const useBodega = () => {
       
       if (categoria === 'tic') {
         tipoGrupo = 'TICS';
-      } else if (categoria === 'cube') {
+      } else if (categoria === 'cube' || categoria === 'a' || categoria === 'b' || categoria === 'c') {
+        // Incluir tanto 'cube' como las categorías A, B, C para compatibilidad
         tipoGrupo = 'CAJAS';
       } else if (categoria === 'vip') {
         tipoGrupo = 'VIPS';

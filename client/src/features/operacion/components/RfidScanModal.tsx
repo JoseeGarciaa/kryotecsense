@@ -24,7 +24,7 @@ const RfidScanModal: React.FC<RfidScanModalProps> = ({
   onConfirmar,
   onCancelar,
   titulo = 'Escanear TICs para Congelamiento',
-  descripcion = 'Escanee los TICs que desea agregar para congelamiento. Solo se permiten TICs.',
+  descripcion = '⚠️ IMPORTANTE: Solo se permiten TICs en pre-acondicionamiento. Los VIPs y CUBEs serán rechazados automáticamente.',
   onEliminarRfid,
   subEstado = 'Congelación',
   onProcesarRfidIndividual

@@ -15,7 +15,7 @@ const NuevoCredocubeModal: React.FC<Props> = ({ onClose, onSuccess }) => {
   const [lote, setLote] = useState('');
   const [estado, setEstado] = useState('En bodega');
   const [subEstado, setSubEstado] = useState('');
-  const [categoria, setCategoria] = useState('A');
+  const [categoria, setCategoria] = useState('Cube');
   const [validacionLimpieza, setValidacionLimpieza] = useState('');
   const [validacionGoteo, setValidacionGoteo] = useState('');
   const [validacionDesinfeccion, setValidacionDesinfeccion] = useState('');
@@ -123,9 +123,7 @@ const NuevoCredocubeModal: React.FC<Props> = ({ onClose, onSuccess }) => {
             <div>
               <label htmlFor="categoria" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Categoría</label>
               <select id="categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                <option value="A">Categoría A</option>
-                <option value="B">Categoría B</option>
-                <option value="C">Categoría C</option>
+                <option value="Cube">Credocube</option>
               </select>
             </div>
           </div>

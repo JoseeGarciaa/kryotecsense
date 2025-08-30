@@ -33,10 +33,9 @@ export const createRfidHandlers = (
         return;
       }
       
-      // Verificar que sea un TIC
-      const nombre = itemEncontrado.nombre_unidad?.toUpperCase() || '';
-  if (typeof nombre === 'string' && !nombre.includes('TIC')) {
-        alert(`⚠️ ${itemEncontrado.nombre_unidad} no es un TIC. Solo los TICs pueden ir a pre-acondicionamiento.`);
+      // Verificar que sea un TIC basado en la categoría
+      if (itemEncontrado.categoria !== 'TIC') {
+        alert(`⚠️ El item ${rfidLimpio} no es un TIC (categoría: ${itemEncontrado.categoria}). En pre-acondicionamiento solo se permiten TICs.`);
         setRfidInput('');
         return;
       }

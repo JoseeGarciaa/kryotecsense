@@ -158,6 +158,11 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
         <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
           Seleccionar TICs por Lote para {subEstado}
         </h3>
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+          <p className="text-sm text-yellow-800">
+            ⚠️ <strong>IMPORTANTE:</strong> Solo se muestran TICs en este modal. Los VIPs y CUBEs no están disponibles para pre-acondicionamiento.
+          </p>
+        </div>
         
         <div className="mb-4">
           <div className="relative">

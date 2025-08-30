@@ -22,6 +22,7 @@ const Registro: React.FC = () => {
   const [procesandoRegistro, setProcesandoRegistro] = useState(false);
   const [mostrarModalExito, setMostrarModalExito] = useState(false);
   const [itemsRegistrados, setItemsRegistrados] = useState<number>(0);
+  const [conteoDetallado, setConteoDetallado] = useState<{vips: number, tics: number, cubes: number}>({vips: 0, tics: 0, cubes: 0});
   const [ultimoInputProcesado, setUltimoInputProcesado] = useState('');
   const [mostrarCodigosDuplicados, setMostrarCodigosDuplicados] = useState(false);
   const rfidInputRef = useRef<HTMLInputElement>(null);
@@ -272,6 +273,11 @@ const Registro: React.FC = () => {
     setError('');
     
     try {
+      // Contadores para cada tipo de item
+      let contadorVips = 0;
+      let contadorTics = 0;
+      let contadorCubes = 0;
+      
       // Registrar cada item en el inventario y crear actividades de operación
       for (const lectura of lecturasRfid) {
         const inventarioData = {
@@ -285,6 +291,16 @@ const Registro: React.FC = () => {
           validacion_goteo: null,
           validacion_desinfeccion: null
         };
+        
+        // Contar por tipo basado en la categoría del item
+        const categoriaItem = (modelo.tipo || tipoSeleccionado).toUpperCase();
+        if (categoriaItem.includes('VIP')) {
+          contadorVips++;
+        } else if (categoriaItem.includes('TIC')) {
+          contadorTics++;
+        } else if (categoriaItem.includes('CUBE') || categoriaItem.includes('CREDO')) {
+          contadorCubes++;
+        }
         
         console.log('📦 Creando item en inventario:', inventarioData);
         const inventarioResponse = await apiServiceClient.post('/inventory/inventario/', inventarioData);
@@ -305,8 +321,13 @@ const Registro: React.FC = () => {
         console.log('✅ Actividad creada');
       }
       
-      // Mostrar modal de éxito
+      // Mostrar modal de éxito con conteo detallado
       setItemsRegistrados(lecturasRfid.length);
+      setConteoDetallado({
+        vips: contadorVips,
+        tics: contadorTics,
+        cubes: contadorCubes
+      });
       setMostrarModalExito(true);
       
       // Limpiar formulario
@@ -316,6 +337,7 @@ const Registro: React.FC = () => {
       setError('');
       setUltimoInputProcesado('');
       setMostrarCodigosDuplicados(false);
+      setConteoDetallado({vips: 0, tics: 0, cubes: 0});
       clearHistory();
       
     } catch (err: any) {
@@ -627,6 +649,36 @@ const Registro: React.FC = () => {
                 <strong>{tipoSeleccionado === 'CUBE' ? 'CUBE' : tipoSeleccionado}</strong> de{' '}
                 <strong>{litrajeSeleccionado}L</strong>.
               </p>
+              
+              {/* Conteo detallado por tipo */}
+              {(conteoDetallado.vips > 0 || conteoDetallado.tics > 0 || conteoDetallado.cubes > 0) && (
+                <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Detalle por tipo:
+                  </p>
+                  <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                    {conteoDetallado.cubes > 0 && (
+                      <div className="flex justify-between">
+                        <span>CUBEs:</span>
+                        <span className="font-medium">{conteoDetallado.cubes}</span>
+                      </div>
+                    )}
+                    {conteoDetallado.vips > 0 && (
+                      <div className="flex justify-between">
+                        <span>VIPs:</span>
+                        <span className="font-medium">{conteoDetallado.vips}</span>
+                      </div>
+                    )}
+                    {conteoDetallado.tics > 0 && (
+                      <div className="flex justify-between">
+                        <span>TICs:</span>
+                        <span className="font-medium">{conteoDetallado.tics}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-4 sm:mb-6">
                 Los items han sido agregados al inventario y están disponibles en la sección "En bodega" de operaciones.
                 El lote se asignará durante el proceso de pre-acondicionamiento.
