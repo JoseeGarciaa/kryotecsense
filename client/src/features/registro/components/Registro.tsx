@@ -287,25 +287,17 @@ const Registro: React.FC = () => {
       
       // Registrar cada item en el inventario y crear actividades de operación
       for (const lectura of lecturasRfid) {
-        // Determinar la categoría correcta basada SOLO en el tipo seleccionado por el usuario
-        let categoriaFinal = 'Cube'; // Por defecto
+        // Detectar automáticamente el tipo basado en el nombre del item
+        const categoriaFinal = detectarTipoAutomatico(lectura.nombre_unidad);
         
         console.log('🔍 Debug categoría:', { 
           modeloTipo: modelo.tipo, 
           tipoSeleccionado, 
           modelo: modelo.nombre_modelo,
+          nombreItem: lectura.nombre_unidad,
+          categoriaDetectada: categoriaFinal,
           timestamp: new Date().toISOString()
         });
-        
-        // Usar SIEMPRE el tipo seleccionado por el usuario como fuente de verdad
-        if (tipoSeleccionado === 'VIP') {
-          categoriaFinal = 'VIP';
-        } else if (tipoSeleccionado === 'TIC') {
-          categoriaFinal = 'TIC';
-        } else if (tipoSeleccionado === 'CUBE') {
-          categoriaFinal = 'Cube';
-        }
-        // Eliminar el fallback a modelo.tipo para evitar sobrescritura
         
         console.log('🎯 Categoría final determinada:', categoriaFinal);
         
@@ -402,6 +394,38 @@ const Registro: React.FC = () => {
     } finally {
       setProcesandoRegistro(false);
     }
+  };
+
+  // Función para detectar automáticamente el tipo basado en el nombre del item
+  const detectarTipoAutomatico = (nombreItem: string): string => {
+    const nombre = nombreItem.toLowerCase();
+    
+    // Detectar TIC
+    if (nombre.includes('tic') || nombre.startsWith('tics')) {
+      return 'TIC';
+    }
+    
+    // Detectar VIP
+    if (nombre.includes('vip')) {
+      return 'VIP';
+    }
+    
+    // Detectar Cube (puede ser "Credo Cube", "Cube", etc.)
+    if (nombre.includes('cube') || nombre.includes('credo')) {
+      return 'Cube';
+    }
+    
+    // Fallback: usar el tipo seleccionado en el dropdown
+    if (tipoSeleccionado === 'VIP') {
+      return 'VIP';
+    } else if (tipoSeleccionado === 'TIC') {
+      return 'TIC';
+    } else if (tipoSeleccionado === 'CUBE') {
+      return 'Cube';
+    }
+    
+    // Por defecto
+    return 'Cube';
   };
 
   // Manejar cierre del modal de éxito
