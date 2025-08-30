@@ -934,17 +934,32 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       {/* Modal de Selección de Items */}
       {mostrarModalSeleccion && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-lg shadow-xl w-[92vw] max-w-md sm:max-w-2xl md:max-w-4xl max-h-[90vh] overflow-hidden">
-            <div className="p-4 sm:p-6 border-b border-gray-200">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
-                Seleccionar Items por Lote para Envío
-              </h2>
-              <p className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-2">
-                Items disponibles: {itemsListosDespacho.length} | Lotes: {lotesDisponibles.length}
-              </p>
+          <div className="bg-white rounded-lg shadow-xl w-[92vw] max-w-md sm:max-w-2xl md:max-w-4xl max-h-[88vh] overflow-hidden flex flex-col">
+            <div className="p-4 sm:p-6 border-b border-gray-200 flex items-start justify-between gap-2">
+              <div>
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
+                  Seleccionar Items por Lote para Envío
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-2">
+                  Items disponibles: {itemsListosDespacho.length} | Lotes: {lotesDisponibles.length}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setMostrarModalSeleccion(false);
+                  setLoteSeleccionado('');
+                  setItemsDelLote([]);
+                  setItemsSeleccionadosModal([]);
+                }}
+                aria-label="Cerrar"
+                className="text-gray-500 hover:text-gray-700 p-1 -mt-1"
+                title="Cerrar"
+              >
+                <span className="text-xl leading-none">×</span>
+              </button>
             </div>
             
-            <div className="p-4 sm:p-6 flex flex-col md:flex-row gap-4 sm:gap-6 max-h-[70vh] overflow-y-auto">
+            <div className="p-4 sm:p-6 flex flex-col md:flex-row gap-4 sm:gap-6 flex-1 overflow-y-auto">
               {/* Lotes disponibles */}
               <div className="w-full md:w-1/3">
                 <h3 className="text-base sm:text-lg font-medium text-gray-800 mb-3 sm:mb-4">Lotes disponibles</h3>
@@ -974,7 +989,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     })
                   ) : (
                     <div className="text-center text-gray-500 py-8">
-                      <Package className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                      <Package className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-gray-400" />
                       <p>No hay lotes disponibles</p>
                       <p className="text-sm text-gray-400 mt-1">
                         Los items deben completar acondicionamiento primero
@@ -1046,7 +1061,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                   </div>
                 ) : (
                   <div className="text-center text-gray-500 py-8">
-                    <Package className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                    <Package className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-gray-400" />
                     <p>Selecciona un lote para ver sus TICs</p>
                   </div>
                 )}
