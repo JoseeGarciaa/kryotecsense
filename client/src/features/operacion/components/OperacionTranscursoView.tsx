@@ -713,36 +713,36 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   return (
   <div className="flex-1 overflow-hidden bg-white">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Gestión de Operación</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Gestión de Operación</h1>
             <WebSocketStatus isConnected={isConnected} className="mt-1" />
           </div>
         </div>
       </div>
 
       {/* Contenido principal */}
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
         
         {/* Sección Items en Transcurso */}
         <div className="bg-white rounded-lg border border-orange-200 overflow-hidden">
-          <div className="bg-orange-50 border-b border-orange-200 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+          <div className="bg-orange-50 border-b border-orange-200 px-4 sm:px-6 py-3 sm:py-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3 sm:gap-4">
                 <div>
-                  <h2 className="text-lg font-semibold text-orange-800">Items en Transcurso</h2>
-                  <p className="text-sm text-orange-600">({itemsListosParaDespacho.length} items en envío)</p>
+                  <h2 className="text-base sm:text-lg font-semibold text-orange-800">Items en Transcurso</h2>
+                  <p className="text-xs sm:text-sm text-orange-600">({itemsListosParaDespacho.length} items en envío)</p>
                 </div>
                 <WebSocketStatus isConnected={isConnected} />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
                 {/* Botones de acción en lote - Solo mostrar si hay items */}
                 {itemsListosParaDespacho.length > 0 && (
                   <>
                     <button
                       onClick={completarTodosLosEnvios}
-                      className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
+                      className="inline-flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-green-600 text-white text-xs sm:text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
                       title="Completar todos los envíos"
                     >
                       <CheckCircle className="w-4 h-4" />
@@ -750,7 +750,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     </button>
                     <button
                       onClick={cancelarTodosLosEnvios}
-                      className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors"
+                      className="inline-flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-red-600 text-white text-xs sm:text-sm font-medium rounded-md hover:bg-red-700 transition-colors"
                       title="Cancelar todos los envíos"
                     >
                       <X className="w-4 h-4" />
@@ -760,7 +760,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                 )}
                 <button
                   onClick={() => setMostrarModalSeleccion(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                  className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white text-xs sm:text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
                 >
                   <Package className="w-4 h-4" />
                   Agregar Items
@@ -770,7 +770,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
           </div>
 
           {/* Búsqueda */}
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-3 sm:p-4 border-b border-gray-200">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
@@ -778,14 +778,57 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                 placeholder="Buscar por RFID, nombre o lote..."
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
               />
             </div>
           </div>
 
-          {/* Tabla Items en Transcurso */}
+          {/* Lista responsive: tarjetas en móviles y tabla en >= sm */}
           {itemsListosParaDespacho.length > 0 ? (
-          <div className="overflow-x-auto">
+          <>
+          {/* Vista tarjetas para móviles */}
+          <div className="sm:hidden p-3 space-y-3">
+            {itemsFiltrados.map((item) => (
+              <div key={item.id} className="border rounded-lg p-3 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className={`px-2 py-1 text-xs font-medium rounded-full border ${getCategoriaColor(item.categoria)} whitespace-nowrap`}>
+                    {item.rfid}
+                  </div>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-orange-100 text-orange-800">
+                    En Transcurso
+                  </span>
+                </div>
+                <div className="mt-2">
+                  <div className="text-sm font-semibold text-gray-900 leading-tight">{item.nombre_unidad}</div>
+                  <div className="text-xs text-gray-500">Lote: {item.lote || 'Sin lote'} • {item.categoria?.toUpperCase()}</div>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  <div>{renderizarTemporizador(item.id)}</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => completarEnvio(item.id)}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors text-xs"
+                      title="Completar envío"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Completar
+                    </button>
+                    <button
+                      onClick={() => cancelarEnvio(item.id)}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors text-xs"
+                      title="Cancelar envío"
+                    >
+                      <X className="w-4 h-4" />
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tabla para >= sm */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full">
               <thead className="bg-white">
                 <tr>
@@ -873,6 +916,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
               </tbody>
             </table>
           </div>
+          </>
         ) : (
           <div className="p-8 text-center text-gray-500">
             <Package className="w-12 h-12 mx-auto mb-3 text-gray-400" />
@@ -887,21 +931,21 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
 
       {/* Modal de Selección de Items */}
       {mostrarModalSeleccion && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-800">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-lg shadow-xl w-[92vw] max-w-md sm:max-w-2xl md:max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="p-4 sm:p-6 border-b border-gray-200">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
                 Seleccionar Items por Lote para Envío
               </h2>
-              <p className="text-sm text-gray-600 mt-2">
+              <p className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-2">
                 Items disponibles: {itemsListosDespacho.length} | Lotes: {lotesDisponibles.length}
               </p>
             </div>
             
-            <div className="p-6 flex gap-6 max-h-[70vh] overflow-y-auto">
+            <div className="p-4 sm:p-6 flex flex-col md:flex-row gap-4 sm:gap-6 max-h-[70vh] overflow-y-auto">
               {/* Lotes disponibles */}
-              <div className="w-1/3">
-                <h3 className="text-lg font-medium text-gray-800 mb-4">Lotes disponibles</h3>
+              <div className="w-full md:w-1/3">
+                <h3 className="text-base sm:text-lg font-medium text-gray-800 mb-3 sm:mb-4">Lotes disponibles</h3>
                 <div className="space-y-2">
                   {lotesDisponibles.length > 0 ? (
                     lotesDisponibles.map((lote) => {
@@ -910,17 +954,17 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                         <button
                           key={lote}
                           onClick={() => seleccionarLote(lote)}
-                          className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                          className={`w-full text-left p-3 rounded-lg border transition-colors text-sm ${
                             loteSeleccionado === lote
                               ? 'bg-blue-50 border-blue-200 text-blue-800'
                               : 'bg-white border-gray-200 hover:bg-gray-50'
                           }`}
                         >
                           <div className="font-medium">{lote}</div>
-                          <div className="text-sm text-gray-500">
+                          <div className="text-xs sm:text-sm text-gray-500">
                             {itemsEnLote.length} TICs disponibles
                           </div>
-                          <div className="text-xs text-gray-400 mt-1">
+                          <div className="text-[11px] text-gray-400 mt-1">
                             Estado: {itemsEnLote[0]?.estado}/{itemsEnLote[0]?.sub_estado}
                           </div>
                         </button>
@@ -939,9 +983,9 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
               </div>
               
               {/* Items del lote seleccionado */}
-              <div className="w-2/3">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium text-gray-800">TICs del lote</h3>
+              <div className="w-full md:w-2/3">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h3 className="text-base sm:text-lg font-medium text-gray-800">TICs del lote</h3>
                   {loteSeleccionado && itemsDelLote.length > 0 && (
                     <button
                       onClick={() => {
@@ -960,18 +1004,18 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                           });
                         }
                       }}
-                      className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      className="text-xs sm:text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                     >
                       {itemsDelLote.every(item => itemsSeleccionadosModal.includes(item.id)) ? 'Deseleccionar todos' : 'Seleccionar todos'}
                     </button>
                   )}
                 </div>
                 {loteSeleccionado ? (
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                  <div className="space-y-2 max-h-64 sm:max-h-96 overflow-y-auto">
                     {itemsDelLote.map((item) => (
                       <div
                         key={item.id}
-                        className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                        className={`p-3 rounded-lg border cursor-pointer transition-colors text-sm ${
                           itemsSeleccionadosModal.includes(item.id)
                             ? 'bg-blue-50 border-blue-200'
                             : 'bg-white border-gray-200 hover:bg-gray-50'
@@ -981,7 +1025,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">{item.nombre_unidad}</div>
-                            <div className="text-sm text-gray-500">RFID: {item.rfid}</div>
+                            <div className="text-xs sm:text-sm text-gray-500">RFID: {item.rfid}</div>
                           </div>
                           <input
                             type="checkbox"
@@ -1008,9 +1052,9 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
             </div>
             
             {/* Controles del modal */}
-            <div className="p-6 border-t border-gray-200 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <label className="text-sm text-gray-600">Tiempo de envío:</label>
+            <div className="p-4 sm:p-6 border-t border-gray-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <label className="text-sm text-gray-600 whitespace-nowrap">Tiempo de envío:</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -1022,7 +1066,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     }}
                     min={0}
                     max={23}
-                    className="border border-gray-300 rounded px-3 py-1 text-sm w-20"
+                    className="border border-gray-300 rounded px-3 py-1 text-sm w-16 sm:w-20"
                     aria-label="Horas"
                   />
                   <span className="text-sm text-gray-600">h</span>
@@ -1039,14 +1083,14 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     }}
                     min={0}
                     max={59}
-                    className="border border-gray-300 rounded px-3 py-1 text-sm w-20"
+                    className="border border-gray-300 rounded px-3 py-1 text-sm w-16 sm:w-20"
                     aria-label="Minutos"
                   />
                   <span className="text-xs text-gray-500">min</span>
                 </div>
               </div>
               
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 justify-end">
                 <button
                   onClick={() => {
                     setMostrarModalSeleccion(false);
@@ -1054,14 +1098,14 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     setItemsDelLote([]);
                     setItemsSeleccionadosModal([]);
                   }}
-                  className="px-4 py-2 text-gray-600 bg-white rounded-lg hover:bg-white transition-colors"
+                  className="px-3 py-2 sm:px-4 sm:py-2 text-gray-600 bg-white rounded-lg hover:bg-white transition-colors text-sm"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={confirmarSeleccion}
                   disabled={itemsSeleccionadosModal.length === 0}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
+                  className={`px-3 py-2 sm:px-4 sm:py-2 rounded-lg transition-colors text-sm ${
                     itemsSeleccionadosModal.length > 0
                       ? 'bg-blue-600 hover:bg-blue-700 text-white'
                       : 'bg-white text-gray-500 cursor-not-allowed'
