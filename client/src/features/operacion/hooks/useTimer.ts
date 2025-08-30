@@ -190,7 +190,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
                 tiempoRestanteSegundos: nuevoTiempoRestante,
                 completado,
                 activo,
-                server_timestamp: lastMessage.data.server_timestamp
+                server_timestamp: lastMessage.data.server_timestamp,
+                optimistic: false
               };
             }
             return timer;
@@ -391,7 +392,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       fechaInicio: ahora,
       fechaFin: fin,
       activo: true,
-      completado: false
+  completado: false,
+  optimistic: true
     } as Timer;
     setTimers(prev => [...prev, nuevoTimerLocal]);
     
