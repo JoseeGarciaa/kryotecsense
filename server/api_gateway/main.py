@@ -2978,6 +2978,17 @@ async def iniciar_timers_masivo(
             await timer_manager.create_timer(timer_data, websocket=None)
             timers_creados.append(timer_data)
         
+        # Forzar una sincronización completa inmediata para todos los clientes
+        try:
+            server_ts = timer_manager.get_server_timestamp()
+            snapshot = [{**t.to_dict(), "server_timestamp": server_ts} for t in timer_manager.timers.values()]
+            await timer_manager.broadcast({
+                "type": "TIMER_SYNC",
+                "data": {"timers": snapshot, "server_timestamp": server_ts}
+            })
+        except Exception as _e:
+            timer_logger.warning(f"No se pudo emitir TIMER_SYNC post-masivo: {_e}")
+
         return {
             "message": f"Timers iniciados para {len(timers_creados)} items",
             "timers_creados": len(timers_creados),
