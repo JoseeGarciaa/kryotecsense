@@ -88,33 +88,9 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     }
   };
 
-  // Función para manejar cambios en el input de RFID con auto-procesamiento
+  // Función para manejar cambios en el input de RFID (sin auto-procesamiento, el modal lo maneja)
   const handleRfidChange = (value: string) => {
     setRfidInput(value);
-    
-    // Auto-procesar cada 24 caracteres
-    if (value.length > 0 && value.length % 24 === 0) {
-      // Extraer códigos de 24 caracteres
-      const codigosCompletos = [];
-      for (let i = 0; i < value.length; i += 24) {
-        const codigo = value.substring(i, i + 24);
-        if (codigo.length === 24) {
-          codigosCompletos.push(codigo);
-        }
-      }
-      
-      // Procesar cada código
-      codigosCompletos.forEach(codigo => {
-        procesarRfid(codigo);
-      });
-      
-      // Limpiar el input después de procesar
-      setRfidInput('');
-      
-      if (codigosCompletos.length > 0) {
-        console.log(`🔄 Auto-procesados ${codigosCompletos.length} códigos de 24 caracteres`);
-      }
-    }
   };
   
   // Estados para la carga de datos
@@ -255,13 +231,6 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   const manejarEscaneoRfid = () => {
     const rfidTrimmed = rfidInput.trim();
     if (!rfidTrimmed) return;
-    
-    // Si es un código de 24 caracteres, no procesarlo aquí porque ya fue auto-procesado
-    if (rfidTrimmed.length === 24) {
-      console.log(`⏭️ RFID de 24 caracteres ${rfidTrimmed} ya fue auto-procesado, omitiendo procesamiento manual`);
-      setRfidInput('');
-      return;
-    }
     
     // Verificar si el RFID existe en el inventario completo
     const itemEncontrado = operaciones.inventarioCompleto.find(item => 
