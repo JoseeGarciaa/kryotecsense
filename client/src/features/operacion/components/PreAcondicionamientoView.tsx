@@ -32,41 +32,59 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   const [rfidInput, setRfidInput] = useState('');
   const [rfidsEscaneados, setRfidsEscaneados] = useState<string[]>([]);
 
+  // Estado para prevenir duplicados recientes
+  const [ultimosRfidsEscaneados, setUltimosRfidsEscaneados] = useState<{[key: string]: number}>({});
+
   // Función para procesar un RFID individual
   const procesarRfid = (rfid: string) => {
     if (!rfid.trim()) return;
     
+    const rfidLimpio = rfid.trim();
+    
+    // Prevenir duplicados recientes (últimos 2 segundos)
+    const ahora = Date.now();
+    if (ultimosRfidsEscaneados[rfidLimpio] && (ahora - ultimosRfidsEscaneados[rfidLimpio]) < 2000) {
+      console.log(`🔄 Ignorando duplicado reciente: ${rfidLimpio}`);
+      return;
+    }
+    
+    // Actualizar timestamp del último escaneo
+    setUltimosRfidsEscaneados(prev => ({
+      ...prev,
+      [rfidLimpio]: ahora
+    }));
+    
     // Validar que el RFID sea válido (alfanumérico: dígitos y letras)
-    if (!/^[a-zA-Z0-9]+$/.test(rfid.trim())) {
-      console.warn(`⚠️ RFID inválido: ${rfid}. Solo se permiten dígitos y letras.`);
-      alert(`⚠️ RFID inválido: ${rfid}. Solo se permiten dígitos y letras.`);
+    if (!/^[a-zA-Z0-9]+$/.test(rfidLimpio)) {
+      console.warn(`⚠️ RFID inválido: ${rfidLimpio}. Solo se permiten dígitos y letras.`);
+      alert(`⚠️ RFID inválido: ${rfidLimpio}. Solo se permiten dígitos y letras.`);
       return;
     }
     
     // Verificar si el RFID existe en el inventario completo
     const itemEncontrado = operaciones.inventarioCompleto.find(item => 
-      item.rfid === rfid.trim() || item.nombre_unidad === rfid.trim()
+      item.rfid === rfidLimpio || item.nombre_unidad === rfidLimpio
     );
 
     if (!itemEncontrado) {
-      console.log(`❌ RFID ${rfid.trim()} no encontrado en el inventario`);
-      alert(`❌ RFID ${rfid.trim()} no encontrado en el inventario`);
+      console.log(`❌ RFID ${rfidLimpio} no encontrado en el inventario`);
+      alert(`❌ RFID ${rfidLimpio} no encontrado en el inventario`);
       return;
     }
     
     // Validar que el item sea específicamente un TIC
     if (itemEncontrado.categoria !== 'TIC') {
-      console.warn(`⚠️ RFID ${rfid.trim()} no es un TIC (categoría: ${itemEncontrado.categoria}). Solo se permiten TICs en pre-acondicionamiento.`);
-      alert(`⚠️ El item ${rfid.trim()} no es un TIC (categoría: ${itemEncontrado.categoria}). En pre-acondicionamiento solo se permiten TICs.`);
+      console.warn(`⚠️ RFID ${rfidLimpio} no es un TIC (categoría: ${itemEncontrado.categoria}). Solo se permiten TICs en pre-acondicionamiento.`);
+      alert(`⚠️ El item ${rfidLimpio} no es un TIC (categoría: ${itemEncontrado.categoria}). En pre-acondicionamiento solo se permiten TICs.`);
       return;
     }
     
     // Verificar si ya está en la lista
-    if (!rfidsEscaneados.includes(rfid.trim())) {
-      setRfidsEscaneados(prev => [...prev, rfid.trim()]);
-      console.log(`✅ TIC ${rfid.trim()} auto-procesado`);
+    if (!rfidsEscaneados.includes(rfidLimpio)) {
+      setRfidsEscaneados(prev => [...prev, rfidLimpio]);
+      console.log(`✅ TIC ${rfidLimpio} auto-procesado`);
     } else {
-      console.log(`ℹ️ TIC ${rfid.trim()} ya está en la lista`);
+      console.log(`ℹ️ TIC ${rfidLimpio} ya está en la lista`);
     }
   };
 
@@ -228,6 +246,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     console.log('🎯 Abriendo modal de escaneo para:', tipo);
     setTipoEscaneoActual(tipo);
     setRfidsEscaneados([]);
+    setUltimosRfidsEscaneados({}); // Limpiar historial de duplicados
     setRfidInput('');
     setMostrarModalEscaneo(true);
   };
@@ -304,6 +323,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     // Cerrar modal de escaneo
     setMostrarModalEscaneo(false);
     setRfidsEscaneados([]);
+    setUltimosRfidsEscaneados({}); // Limpiar historial de duplicados
     
     // Guardar los RFIDs y abrir modal de temporizador
     setRfidsPendientesTimer(rfids);
@@ -908,6 +928,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                           className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
                           onClick={() => {
                             setRfidsEscaneados([]);
+                            setUltimosRfidsEscaneados({}); // Limpiar historial de duplicados
                             setRfidInput('');
                             abrirModalEscaneo('congelamiento');
                             setShowDropdownCongelacion(false);
@@ -1136,6 +1157,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                           className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
                           onClick={() => {
                             setRfidsEscaneados([]);
+                            setUltimosRfidsEscaneados({}); // Limpiar historial de duplicados
                             setRfidInput('');
                             abrirModalEscaneo('atemperamiento');
                             setShowDropdownAtemperamiento(false);
@@ -1309,6 +1331,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         onCancelar={() => {
           setMostrarModalEscaneo(false);
           setRfidsEscaneados([]);
+          setUltimosRfidsEscaneados({}); // Limpiar historial de duplicados
           setRfidInput('');
         }}
         titulo={`Escanear TICs para ${tipoEscaneoActual === 'congelamiento' ? 'Congelamiento' : 'Atemperamiento'}`}
