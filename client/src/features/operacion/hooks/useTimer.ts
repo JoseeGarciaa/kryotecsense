@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiServiceClient } from '../../../api/apiClient';
-import { createUtcTimestamp, getDeviceTimeAsUtcDate } from '../../../shared/utils/dateUtils';
+import { createUtcTimestamp } from '../../../shared/utils/dateUtils';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 
 export interface Timer {
@@ -243,7 +243,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
           const timersParseados = JSON.parse(timersGuardados);
           // Recalcular tiempo restante basado en la fecha actual
           const timersActualizados = timersParseados.map((timer: Timer) => {
-            const ahora = getDeviceTimeAsUtcDate();
+            const ahora = new Date();
             const fechaFin = new Date(timer.fechaFin);
             const tiempoRestanteMs = fechaFin.getTime() - ahora.getTime();
             const tiempoRestanteSegundos = Math.max(0, Math.floor(tiempoRestanteMs / 1000));
@@ -315,7 +315,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
           const debeActualizarLocal = !isConnected || timer.optimistic || stalenessMs > 2000;
           if (!debeActualizarLocal) return timer;
           
-          // Actualizar localmente basado en fechas (estimando con tiempo de servidor si se conoce)
+          // Actualizar localmente basado en fechas (estimando con tiempo del servidor si se conoce)
           const ahora = new Date(nowServerEst);
           const fechaFin = new Date(timer.fechaFin);
           const tiempoRestanteMs = fechaFin.getTime() - ahora.getTime();
@@ -388,7 +388,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     
     console.log(`🚀 Creando timer: ${nombre} - ${tiempoMinutos} minutos`);
     // Crear timer local optimista inmediatamente para mostrar el conteo regresivo
-    const ahora = getDeviceTimeAsUtcDate();
+  const ahora = new Date();
     const fin = new Date(ahora.getTime() + tiempoMinutos * 60 * 1000);
     const nuevoTimerLocal = {
       id: timerId,
@@ -446,7 +446,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     tiempoMinutos: number
   ): string => {
     const timerId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const ahora = getDeviceTimeAsUtcDate();
+  const ahora = new Date();
     const fin = new Date(ahora.getTime() + tiempoMinutos * 60 * 1000);
     const nuevoTimerLocal: Timer = {
       id: timerId,
