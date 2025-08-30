@@ -311,12 +311,19 @@ const Registro: React.FC = () => {
         
         // Contar por tipo basado en la categoría del item
         const categoriaItem = categoriaFinal.toUpperCase();
+        console.log('🔍 Contando item:', { categoriaFinal, categoriaItem, lectura: lectura.nombre_unidad });
+        
         if (categoriaItem === 'VIP') {
           contadorVips++;
+          console.log('✅ VIP contado, total VIPs:', contadorVips);
         } else if (categoriaItem === 'TIC') {
           contadorTics++;
+          console.log('✅ TIC contado, total TICs:', contadorTics);
         } else if (categoriaItem === 'CUBE' || categoriaItem.includes('CUBE')) {
           contadorCubes++;
+          console.log('✅ CUBE contado, total CUBEs:', contadorCubes);
+        } else {
+          console.warn('⚠️ Categoría no reconocida:', categoriaItem);
         }
         
         console.log('📦 Creando item en inventario:', inventarioData);
@@ -337,6 +344,14 @@ const Registro: React.FC = () => {
         await apiServiceClient.post('/activities/actividades/', actividadData);
         console.log('✅ Actividad creada');
       }
+      
+      // Log final de contadores
+      console.log('📊 Conteo final:', {
+        total: lecturasRfid.length,
+        vips: contadorVips,
+        tics: contadorTics,
+        cubes: contadorCubes
+      });
       
       // Mostrar modal de éxito con conteo detallado
       setItemsRegistrados(lecturasRfid.length);
@@ -675,24 +690,18 @@ const Registro: React.FC = () => {
                     <span>Total de items:</span>
                     <span className="font-bold text-blue-600 dark:text-blue-400">{itemsRegistrados}</span>
                   </div>
-                  {conteoDetallado.cubes > 0 && (
-                    <div className="flex justify-between">
-                      <span>CUBEs registrados:</span>
-                      <span className="font-medium text-purple-600 dark:text-purple-400">{conteoDetallado.cubes}</span>
-                    </div>
-                  )}
-                  {conteoDetallado.vips > 0 && (
-                    <div className="flex justify-between">
-                      <span>VIPs registrados:</span>
-                      <span className="font-medium text-green-600 dark:text-green-400">{conteoDetallado.vips}</span>
-                    </div>
-                  )}
-                  {conteoDetallado.tics > 0 && (
-                    <div className="flex justify-between">
-                      <span>TICs registrados:</span>
-                      <span className="font-medium text-orange-600 dark:text-orange-400">{conteoDetallado.tics}</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between">
+                    <span>CUBEs registrados:</span>
+                    <span className="font-medium text-purple-600 dark:text-purple-400">{conteoDetallado.cubes}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>VIPs registrados:</span>
+                    <span className="font-medium text-green-600 dark:text-green-400">{conteoDetallado.vips}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>TICs registrados:</span>
+                    <span className="font-medium text-orange-600 dark:text-orange-400">{conteoDetallado.tics}</span>
+                  </div>
                 </div>
               </div>
               
