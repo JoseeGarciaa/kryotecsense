@@ -65,12 +65,12 @@ const RfidScanModal: React.FC<RfidScanModalProps> = ({
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      // Validar que el RFID sea válido (no vacío y solo contenga dígitos)
-      if (rfidInput.trim() && /^\d+$/.test(rfidInput.trim())) {
+      // Validar que el RFID sea válido (alfanumérico: dígitos y letras)
+      if (rfidInput.trim() && /^[a-zA-Z0-9]+$/.test(rfidInput.trim())) {
         onEscanearRfid();
       } else if (rfidInput.trim()) {
         // Si hay texto pero no es válido, mostrar alerta
-        alert('⚠️ RFID inválido. Solo se permiten dígitos.');
+        alert('⚠️ RFID inválido. Solo se permiten dígitos y letras.');
       }
     }
   };

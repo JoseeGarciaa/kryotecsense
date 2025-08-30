@@ -36,10 +36,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   const procesarRfid = (rfid: string) => {
     if (!rfid.trim()) return;
     
-    // Validar que el RFID sea válido (solo dígitos)
-    if (!/^\d+$/.test(rfid.trim())) {
-      console.warn(`⚠️ RFID inválido: ${rfid}. Solo se permiten dígitos.`);
-      alert(`⚠️ RFID inválido: ${rfid}. Solo se permiten dígitos.`);
+    // Validar que el RFID sea válido (alfanumérico: dígitos y letras)
+    if (!/^[a-zA-Z0-9]+$/.test(rfid.trim())) {
+      console.warn(`⚠️ RFID inválido: ${rfid}. Solo se permiten dígitos y letras.`);
+      alert(`⚠️ RFID inválido: ${rfid}. Solo se permiten dígitos y letras.`);
       return;
     }
     

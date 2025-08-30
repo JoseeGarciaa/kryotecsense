@@ -191,15 +191,19 @@ const Registro: React.FC = () => {
     }, 100);
   };
 
-  // Manejar cambio en el input con auto-procesamiento a 24 caracteres
+  // Manejar cambio en el input con auto-procesamiento alfanumérico
   const handleRfidChange = async (value: string) => {
     setRfidInput(value);
     
-    // Si llegamos exactamente a 24 caracteres, procesar automáticamente
-    if (value.length === 24) {
-      console.log('🚀 Auto-procesando código de 24 caracteres:', value);
-      const rfidLimpio = value.trim();
-      await procesarRfid(rfidLimpio);
+    // Permitir auto-procesamiento para códigos de 8 a 50 caracteres alfanuméricos
+    if (value.length >= 8 && value.length <= 50) {
+      // Validar que contenga al menos algunos caracteres alfanuméricos
+      const hasValidChars = /^[a-zA-Z0-9]+$/.test(value);
+      if (hasValidChars) {
+        console.log(`🚀 Auto-procesando código alfanumérico de ${value.length} caracteres:`, value);
+        const rfidLimpio = value.trim();
+        await procesarRfid(rfidLimpio);
+      }
     }
   };
 
@@ -523,11 +527,11 @@ const Registro: React.FC = () => {
                   value={rfidInput}
                   onChange={(e: any) => handleRfidChange(e.target.value)}
                   onKeyDown={handleRfidInput}
-                  maxLength={24}
+                  maxLength={50}
                   placeholder={
                     !tipoSeleccionado || !litrajeSeleccionado 
                       ? "Complete tipo y litraje primero..." 
-                      : `DataWedge: Escanee RFID de ${tipoSeleccionado} ${litrajeSeleccionado}L (auto-procesa a 24 chars)...`
+                      : `DataWedge: Escanee RFID de ${tipoSeleccionado} ${litrajeSeleccionado}L (alfanumérico, 8-50 chars)...`
                   }
                   className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-gray-900 dark:text-white text-sm"
                   disabled={!tipoSeleccionado || !litrajeSeleccionado}
