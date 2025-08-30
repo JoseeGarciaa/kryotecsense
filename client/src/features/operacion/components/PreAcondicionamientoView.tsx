@@ -579,10 +579,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         siguienteSubEstado = 'Atemperamiento';
         tiempoNuevo = 10; // 10 minutos para atemperamiento
       } else if (timerCompletado.tipoOperacion === 'atemperamiento') {
-        // Atemperamiento completado → va a Almacenamiento
-        siguienteEstado = 'Almacenamiento';
-        siguienteSubEstado = 'Almacenamiento';
-        tiempoNuevo = 0; // Sin timer para almacenamiento
+  // Atemperamiento completado → va a Acondicionamiento (ensamblaje)
+  siguienteEstado = 'Acondicionamiento';
+  siguienteSubEstado = 'En proceso';
+  tiempoNuevo = 0; // Sin timer aquí
       }
 
       console.log(`🔄 Completando TIC ${rfid} - Moviendo a ${siguienteEstado} / ${siguienteSubEstado} con tiempo: ${tiempoNuevo} min`);
@@ -590,7 +590,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       // Confirmar con el usuario
       const mensajeConfirmacion = timerCompletado.tipoOperacion === 'congelamiento' 
         ? `¿Completar el proceso de congelamiento para el TIC ${rfid}?\n\nEsto moverá el TIC a: Atemperamiento (${tiempoNuevo} minutos)`
-        : `¿Completar el proceso de atemperamiento para el TIC ${rfid}?\n\nEsto moverá el TIC a: Almacenamiento`;
+        : `¿Completar el proceso de atemperamiento para el TIC ${rfid}?\n\nEsto moverá el TIC a: Acondicionamiento`;
       
       const confirmar = window.confirm(mensajeConfirmacion);
 
@@ -600,17 +600,24 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       console.log(`📋 [DEBUG] Timer completado:`, timerCompletado);
       console.log(`🎯 [DEBUG] Siguiente estado: ${siguienteEstado} / ${siguienteSubEstado}`);
 
-      // Eliminar el timer completado ANTES de mover
-      eliminarTimer(timerCompletado.id);
-      console.log(`❌ [DEBUG] Timer eliminado: ${timerCompletado.id}`);
-
-      // Mover el TIC al siguiente estado usando la función existente
-      console.log(`🚀 [DEBUG] Llamando confirmarPreAcondicionamiento con:`, [rfid], siguienteSubEstado);
-      const resultado = await operaciones.confirmarPreAcondicionamiento([rfid], siguienteSubEstado);
+      // Mover el TIC al siguiente estado
+      let resultado: any = false;
+      if (timerCompletado.tipoOperacion === 'congelamiento') {
+        // Pasar a Atemperamiento dentro de Pre-acondicionamiento
+        console.log(`🚀 [DEBUG] Llamando confirmarPreAcondicionamiento con:`, [rfid], siguienteSubEstado);
+        resultado = await operaciones.confirmarPreAcondicionamiento([rfid], siguienteSubEstado);
+      } else {
+        // Pasar a Acondicionamiento usando el hook dedicado
+        console.log(`🚀 [DEBUG] Llamando moverTicAAcondicionamiento para:`, rfid);
+        resultado = await operaciones.moverTicAAcondicionamiento(rfid);
+      }
       console.log(`📊 [DEBUG] Resultado de confirmarPreAcondicionamiento:`, resultado);
       
       if (resultado || resultado !== false) {
         console.log(`✅ [DEBUG] Actualización exitosa`);
+        // Eliminar el timer completado tras actualizar estado
+        eliminarTimer(timerCompletado.id);
+        console.log(`❌ [DEBUG] Timer eliminado: ${timerCompletado.id}`);
         
         // Si el nuevo estado necesita timer, crearlo
         if (tiempoNuevo > 0) {
@@ -638,7 +645,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         
         const mensajeExito = timerCompletado.tipoOperacion === 'congelamiento'
           ? `✅ TIC ${rfid} completado y movido a Atemperamiento con timer de ${tiempoNuevo} minutos`
-          : `✅ TIC ${rfid} completado y movido a Almacenamiento`;
+          : `✅ TIC ${rfid} completado y movido a Acondicionamiento`;
         
         alert(mensajeExito);
         
@@ -650,6 +657,70 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     } catch (error) {
       console.error('❌ Error al completar TIC:', error);
       alert(`Error al completar el TIC ${rfid}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
+  };
+
+  // Completar todas las TICs con timer completado en Congelamiento → Atemperamiento (con nuevo timer)
+  const completarTodasCongelamiento = async () => {
+    try {
+      const timersCongelamiento = timers.filter((t: any) => t.completado && t.tipoOperacion === 'congelamiento');
+      if (timersCongelamiento.length === 0) {
+        alert('No hay TICs con congelamiento completado.');
+        return;
+      }
+      const rfids = timersCongelamiento.map((t: any) => t.nombre);
+      const confirmar = window.confirm(`Completar ${timersCongelamiento.length} TIC(s) en congelamiento y mover a Atemperamiento con nuevo timer de 10 minutos?`);
+      if (!confirmar) return;
+
+      // Actualizar estado primero en lote
+      const ok = await operaciones.confirmarPreAcondicionamiento(rfids, 'Atemperamiento');
+      if (!ok && ok !== undefined) {
+        throw new Error('No se pudieron actualizar los estados.');
+      }
+
+      // Eliminar timers completados y crear nuevos de atemperamiento
+      for (const t of timersCongelamiento) {
+        eliminarTimer(t.id);
+        crearTimer(t.nombre, 'atemperamiento', 10);
+      }
+
+      // Sincronizar y recargar
+      setTimeout(() => {
+        forzarSincronizacion();
+      }, 300);
+      await cargarDatos();
+      alert(`✅ ${timersCongelamiento.length} TIC(s) movidas a Atemperamiento con timers de 10 minutos`);
+    } catch (e: any) {
+      console.error('Error al completar todas (congelamiento):', e);
+      alert(`❌ Error al completar todas: ${e.message || e}`);
+    }
+  };
+
+  // Completar todas las TICs con timer completado en Atemperamiento → Acondicionamiento
+  const completarTodasAtemperamiento = async () => {
+    try {
+      const timersAtemp = timers.filter((t: any) => t.completado && t.tipoOperacion === 'atemperamiento');
+      if (timersAtemp.length === 0) {
+        alert('No hay TICs con atemperamiento completado.');
+        return;
+      }
+      const confirmar = window.confirm(`Completar ${timersAtemp.length} TIC(s) en atemperamiento y mover a Acondicionamiento?`);
+      if (!confirmar) return;
+
+      // Mover cada TIC a Acondicionamiento
+      for (const t of timersAtemp) {
+        await operaciones.moverTicAAcondicionamiento(t.nombre);
+        eliminarTimer(t.id);
+      }
+
+      setTimeout(() => {
+        forzarSincronizacion();
+      }, 300);
+      await cargarDatos();
+      alert(`✅ ${timersAtemp.length} TIC(s) movidas a Acondicionamiento`);
+    } catch (e: any) {
+      console.error('Error al completar todas (atemperamiento):', e);
+      alert(`❌ Error al completar todas: ${e.message || e}`);
     }
   };
 
@@ -972,6 +1043,17 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                   Iniciar Todos ({ticsCongelamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length})
                 </button>
               )}
+              {/* Completar todas: Congelamiento → Atemperamiento */}
+              {timers.some((t: any) => t.completado && t.tipoOperacion === 'congelamiento') && (
+                <button
+                  onClick={completarTodasCongelamiento}
+                  className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm transition-colors"
+                  title="Completar todos los TICs con timer de congelamiento completado"
+                >
+                  <CheckCircle size={16} />
+                  Completar todas (Congelación)
+                </button>
+              )}
               
               <div className="flex gap-2">
                 <button 
@@ -1217,6 +1299,17 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 >
                   <Play size={16} />
                   Iniciar Todos ({ticsAtemperamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length})
+                </button>
+              )}
+              {/* Completar todas: Atemperamiento → Acondicionamiento */}
+              {timers.some((t: any) => t.completado && t.tipoOperacion === 'atemperamiento') && (
+                <button
+                  onClick={completarTodasAtemperamiento}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm font-medium shadow-sm"
+                  title="Completar todos los TICs con timer de atemperamiento completado"
+                >
+                  <CheckCircle size={16} />
+                  Completar todas (Atemperamiento)
                 </button>
               )}
               
