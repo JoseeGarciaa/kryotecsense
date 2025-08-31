@@ -1256,7 +1256,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                     setTipoOperacionTimer('atemperamiento');
                     setMostrarModalTimer(true);
                   }}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-orange-500"
+                  className="flex items-center justify-center gap-2 px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm transition-colors"
                   title="Iniciar temporizador para todos los TICs sin temporizador"
                 >
                   <Play size={16} />
@@ -1267,7 +1267,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
               {timers.some((t: any) => t.completado && t.tipoOperacion === 'atemperamiento') && (
                 <button
                   onClick={() => limpiarTimersCompletadosPorTipo('atemperamiento')}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm font-medium shadow-sm"
+                  className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm transition-colors"
                   title="Limpiar timers completados de atemperamiento"
                 >
                   <X size={16} />
@@ -1278,7 +1278,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
               {timers.some((t: any) => t.completado && t.tipoOperacion === 'atemperamiento') && (
                 <button
                   onClick={completarTodasAtemperamiento}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm font-medium shadow-sm"
+                  className="flex items-center justify-center gap-2 px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm transition-colors"
                   title="Completar todos los TICs con timer de atemperamiento completado"
                 >
                   <CheckCircle size={16} />
@@ -1302,7 +1302,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 
                 <div className="relative" ref={dropdownRefAtemperamiento}>
                   <button 
-                    className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md flex items-center gap-2 justify-center text-sm min-w-[9rem] font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-orange-500"
+                    className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md flex items-center gap-2 justify-center text-sm min-w-0"
                     onClick={() => setShowDropdownAtemperamiento(!showDropdownAtemperamiento)}
                   >
                     <Plus size={16} />
