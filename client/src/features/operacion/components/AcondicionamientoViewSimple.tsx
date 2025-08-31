@@ -32,7 +32,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   ) || [];
 
   // Utilidad: normalizar texto (quitar acentos, minúsculas y trim)
-  const norm = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+  const norm = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
   // Filtrar items disponibles para traer a acondicionamiento
   // TICs: solo desde Pre-acondicionamiento → Atemperamiento (excluir cualquier Congelación/Congelamiento)

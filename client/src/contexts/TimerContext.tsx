@@ -35,7 +35,7 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
             const resp = await apiServiceClient.get('/inventory/inventario/');
             const inv = resp.data || [];
             const item = inv.find((it: any) => it.id === id);
-            const norm = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+            const norm = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
             const estado = norm(item?.estado);
             const sub = norm(item?.sub_estado);
             const devolucion = estado === 'devolucion';

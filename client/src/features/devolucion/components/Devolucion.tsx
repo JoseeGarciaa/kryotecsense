@@ -23,13 +23,29 @@ export const Devolucion: React.FC = () => {
   // Timers para mostrar la cuenta regresiva de Operación (96h)
   const { timers, formatearTiempo } = useTimerContext();
 
-  // Mapa a info de tiempo (segundos + fecha fin) para InlineCountdown
+  // Mapa a info de tiempo (segundos + fecha fin) para InlineCountdown, tolerante a "Envio/Envío" y variaciones
   const { infoPorId, infoPorNombre } = useMemo(() => {
-    const normalize = (s: string) => s
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '')
-      .toLowerCase()
-      .trim();
+    const normalize = (s: string) =>
+      s
+        ?.normalize('NFD')
+        // Remover marcas diacríticas (combining marks) sin usar \p{...} por compatibilidad
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim() ?? '';
+
+    const extractFromNombre = (nombre: string): { id?: number; base: string } => {
+      // Normalizar para comparar sin acentos y en minúsculas
+      const n = normalize(nombre);
+      // Acepta "envio" con o sin #ID y guión: "envio #123 - foo" | "envio foo"
+      const re = /^envio\s+(?:#(\d+)\s*-\s*)?(.*)$/i;
+      const m = n.match(re);
+      if (m) {
+        const id = m[1] ? Number(m[1]) : undefined;
+        const base = (m[2] || '').trim();
+        return { id, base };
+      }
+      return { base: n };
+    };
 
     const infoPorId = new Map<number, { seconds: number; endTime: Date }>();
     const infoPorNombre = new Map<string, { seconds: number; endTime: Date }>();
@@ -37,14 +53,15 @@ export const Devolucion: React.FC = () => {
     for (const t of timers) {
       if (t.tipoOperacion === 'envio' && t.activo && !t.completado) {
         const data = { seconds: t.tiempoRestanteSegundos, endTime: t.fechaFin };
-        const match = t.nombre.match(/^Envío\s+#(\d+)\s+-/);
-        if (match) {
-          const id = Number(match[1]);
+  const { id, base } = extractFromNombre(t.nombre);
+        if (typeof id === 'number' && !Number.isNaN(id)) {
           infoPorId.set(id, data);
         }
-        const base = t.nombre.replace(/^Envío\s+(#\d+\s+-\s+)?/, '');
-        const norm = normalize(base);
-        if (norm) infoPorNombre.set(norm, data);
+  const normBase = normalize(base);
+        if (normBase) infoPorNombre.set(normBase, data);
+        // También indexar por el nombre completo normalizado como respaldo
+  const normFull = normalize(t.nombre);
+        if (normFull && !infoPorNombre.has(normFull)) infoPorNombre.set(normFull, data);
       }
     }
     return { infoPorId, infoPorNombre };
@@ -222,8 +239,10 @@ export const Devolucion: React.FC = () => {
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-[10px] sm:text-xs text-blue-600 font-medium bg-blue-100 px-2 py-0.5 rounded">Pendiente</span>
                           {(() => {
-                            const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
-                            const info = infoPorId.get(item.id) || infoPorNombre.get(normalize(item.nombre_unidad));
+                            const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                            const info = infoPorId.get(item.id) 
+                              || infoPorNombre.get(normalize(item.nombre_unidad))
+                              || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
                             if (!info) return null;
                             return (
                               <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
@@ -265,8 +284,10 @@ export const Devolucion: React.FC = () => {
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-[10px] sm:text-xs text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">Pendiente</span>
                           {(() => {
-                            const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
-                            const info = infoPorId.get(item.id) || infoPorNombre.get(normalize(item.nombre_unidad));
+                            const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                            const info = infoPorId.get(item.id) 
+                              || infoPorNombre.get(normalize(item.nombre_unidad))
+                              || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
                             if (!info) return null;
                             return (
                               <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
@@ -308,8 +329,10 @@ export const Devolucion: React.FC = () => {
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-[10px] sm:text-xs text-yellow-600 font-medium bg-yellow-100 px-2 py-0.5 rounded">Pendiente</span>
                           {(() => {
-                            const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
-                            const info = infoPorId.get(item.id) || infoPorNombre.get(normalize(item.nombre_unidad));
+                            const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '',).toLowerCase().trim();
+                            const info = infoPorId.get(item.id) 
+                              || infoPorNombre.get(normalize(item.nombre_unidad))
+                              || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
                             if (!info) return null;
                             return (
                               <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
@@ -390,8 +413,10 @@ export const Devolucion: React.FC = () => {
                       <>
                         {itemsPaginaActual.map((item) => {
                           // Timer visible también en devueltos
-                          const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
-                          const info = infoPorId.get(item.id) || infoPorNombre.get(normalize(item.nombre_unidad));
+                          const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                          const info = infoPorId.get(item.id) 
+                            || infoPorNombre.get(normalize(item.nombre_unidad))
+                            || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
                           const secs = info?.seconds ?? 0;
                           const puedeRegresarAOpe = secs >= 48*3600; // 48h
 

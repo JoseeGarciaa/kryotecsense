@@ -35,7 +35,7 @@ export const Inspeccion: React.FC = () => {
 
     const normalize = (s: string | null | undefined) => (s ?? '')
       .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '')
+  .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .trim();
 
@@ -147,7 +147,7 @@ export const Inspeccion: React.FC = () => {
     // Obtener tiempo restante del cronómetro de inspección (si existe)
     const normalize = (s: string | null | undefined) => (s ?? '')
       .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '')
+  .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .trim();
     const claveNombre = normalize(item.nombre_unidad);
