@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiServiceClient } from '../../../api/apiClient';
 import { createUtcTimestamp } from '../../../shared/utils/dateUtils';
 import { useWebSocket } from '../../../hooks/useWebSocket';
@@ -90,6 +90,12 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   const [timers, setTimers] = useState<Timer[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
   const [serverTimeDiff, setServerTimeDiff] = useState<number>(0);
+  const serverTimeDiffRef = useRef<number>(0);
+
+  // Mantener un ref siempre actualizado para evitar reiniciar el interval al cambiar serverTimeDiff
+  useEffect(() => {
+    serverTimeDiffRef.current = serverTimeDiff;
+  }, [serverTimeDiff]);
   
   // WebSocket para sincronización en tiempo real:
   // Prioridad: VITE_TIMER_WS_URL -> derivar de VITE_API_URL -> same-origin/local (dev)
@@ -404,7 +410,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
 
           // Calcular siempre el tiempo restante localmente en base a fechaFin y reloj del servidor (si disponible)
           const nowLocal = Date.now();
-          const nowServerEst = nowLocal + (serverTimeDiff || 0);
+          const nowServerEst = nowLocal + (serverTimeDiffRef.current || 0);
           const ahora = new Date(nowServerEst);
           const fechaFin = new Date(timer.fechaFin);
           const tiempoRestanteMs = fechaFin.getTime() - ahora.getTime();
@@ -432,7 +438,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [onTimerComplete, serverTimeDiff]);
+  }, [onTimerComplete]);
 
   const mostrarNotificacionCompletado = async (timer: Timer) => {
   // Encolar para una sola notificación/alerta agregada
