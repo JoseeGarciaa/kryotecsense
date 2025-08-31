@@ -22,19 +22,32 @@ export const Devolucion: React.FC = () => {
   // Timers para mostrar la cuenta regresiva de Operación (96h)
   const { timers, formatearTiempo } = useTimerContext();
 
-  const tiempoRestantePorItem = useMemo(() => {
-    const map = new Map<number, string>();
+  const { tiempoPorId, tiempoPorNombre } = useMemo(() => {
+    // Normalizador para nombres (compatibilidad con timers previos sin ID)
+    const normalize = (s: string) => s
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .trim();
+
+    const tiempoPorId = new Map<number, string>();
+    const tiempoPorNombre = new Map<string, string>();
     for (const t of timers) {
       if (t.tipoOperacion === 'envio' && t.activo && !t.completado) {
-        // Buscar patrón en el nombre: "Envío #<id> - <nombre>"
+        const tiempo = formatearTiempo(t.tiempoRestanteSegundos);
+        // 1) Intentar por ID en el nombre
         const match = t.nombre.match(/^Envío\s+#(\d+)\s+-/);
         if (match) {
           const id = Number(match[1]);
-          map.set(id, formatearTiempo(t.tiempoRestanteSegundos));
+          tiempoPorId.set(id, tiempo);
         }
+        // 2) Fallback por nombre de unidad: quitar prefijo "Envío " y opcional patrón con ID
+        const base = t.nombre.replace(/^Envío\s+(#\d+\s+-\s+)?/, '');
+        const norm = normalize(base);
+        if (norm) tiempoPorNombre.set(norm, tiempo);
       }
     }
-    return map;
+    return { tiempoPorId, tiempoPorNombre };
   }, [timers, formatearTiempo]);
 
   useEffect(() => {
@@ -208,11 +221,16 @@ export const Devolucion: React.FC = () => {
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-[10px] sm:text-xs text-blue-600 font-medium bg-blue-100 px-2 py-0.5 rounded">Pendiente</span>
-                          {tiempoRestantePorItem.has(item.id) && (
-                            <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
-                              ⏱ {tiempoRestantePorItem.get(item.id)}
-                            </span>
-                          )}
+                          {(() => {
+                            const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+                            const t = tiempoPorId.get(item.id) || tiempoPorNombre.get(normalize(item.nombre_unidad));
+                            if (!t) return null;
+                            return (
+                              <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
+                                ⏱ {t}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
                     ))}
@@ -246,11 +264,16 @@ export const Devolucion: React.FC = () => {
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-[10px] sm:text-xs text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">Pendiente</span>
-                          {tiempoRestantePorItem.has(item.id) && (
-                            <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
-                              ⏱ {tiempoRestantePorItem.get(item.id)}
-                            </span>
-                          )}
+                          {(() => {
+                            const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+                            const t = tiempoPorId.get(item.id) || tiempoPorNombre.get(normalize(item.nombre_unidad));
+                            if (!t) return null;
+                            return (
+                              <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
+                                ⏱ {t}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
                     ))}
@@ -284,11 +307,16 @@ export const Devolucion: React.FC = () => {
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-[10px] sm:text-xs text-yellow-600 font-medium bg-yellow-100 px-2 py-0.5 rounded">Pendiente</span>
-                          {tiempoRestantePorItem.has(item.id) && (
-                            <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
-                              ⏱ {tiempoRestantePorItem.get(item.id)}
-                            </span>
-                          )}
+                          {(() => {
+                            const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+                            const t = tiempoPorId.get(item.id) || tiempoPorNombre.get(normalize(item.nombre_unidad));
+                            if (!t) return null;
+                            return (
+                              <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
+                                ⏱ {t}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
                     ))}

@@ -31,18 +31,35 @@ export const useDevolucion = () => {
         const inventarioResponse = await apiServiceClient.get('/inventory/inventario/');
         
         if (inventarioResponse.data && Array.isArray(inventarioResponse.data)) {
+          // Normalizador: sin tildes y minúsculas
+          const normalize = (s: string | null | undefined) =>
+            (s ?? '')
+              .normalize('NFD')
+              .replace(/\p{Diacritic}/gu, '')
+              .toLowerCase()
+              .trim();
+
           // Filtrar items pendientes de devolución:
-          // 1. Items completados de operación (operación/entregado)
-          // 2. Items que están listos para despacho (Acondicionamiento/Lista para Despacho)
-          const itemsPendientes = inventarioResponse.data.filter((item: any) => 
-            (item.estado === 'operación' && item.sub_estado === 'entregado') ||
-            (item.estado === 'Acondicionamiento' && item.sub_estado === 'Lista para Despacho')
-          );
+          // 1. Items en operación (en tránsito/en transcurso) -> mostrar tiempo restante de 96h
+          // 2. Items completados de operación (operación/entregado)
+          // 3. Items que están listos para despacho (Acondicionamiento/Lista para Despacho)
+          const itemsPendientes = inventarioResponse.data.filter((item: any) => {
+            const estado = normalize(item.estado);
+            const sub = normalize(item.sub_estado);
+            const acond = normalize('Acondicionamiento');
+            const listoDesp = normalize('Lista para Despacho');
+            const esOperacionCurso = estado === 'operacion' && (sub === 'en transito' || sub === 'en transcurso');
+            const esOperacionEntregado = estado === 'operacion' && (sub === 'entregado' || sub === 'entregada');
+            const esListoDespacho = estado === acond && sub === listoDesp;
+            return esOperacionCurso || esOperacionEntregado || esListoDespacho;
+          });
           
           // Filtrar items ya devueltos (estado: Devolución, sub_estado: Devuelto)
-          const itemsDevueltosData = inventarioResponse.data.filter((item: any) => 
-            item.estado === 'Devolución' && item.sub_estado === 'Devuelto'
-          );
+          const itemsDevueltosData = inventarioResponse.data.filter((item: any) => {
+            const estado = normalize(item.estado);
+            const sub = normalize(item.sub_estado);
+            return estado === 'devolucion' && sub === 'devuelto';
+          });
           
           setItemsDevolucion(itemsPendientes);
           setItemsDevueltos(itemsDevueltosData);
