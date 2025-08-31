@@ -9,7 +9,7 @@ interface KanbanCardProps {
     index: number;
     onCardClick?: (item: any, columnId?: string) => void;
     // Props para cronómetro (opcionales)
-    obtenerTiempoRestante?: (itemId: string) => string;
+  obtenerTiempoRestante?: (itemId: string) => React.ReactNode;
     iniciarCronometro?: (itemId: string, horas: number, minutos: number) => void;
     detenerCronometro?: (itemId: string) => void;
     moverABodega?: (item: any) => void;
@@ -36,24 +36,21 @@ const KanbanCard: React.FC<KanbanCardProps> = ({
   onToggleSeleccion
 }) => {
   const [mostrarModalTiempo, setMostrarModalTiempo] = useState(false);
-  const [tiempoRestante, setTiempoRestante] = useState('');
   
-  // Actualizar tiempo restante cada segundo SOLO cuando corresponda:
-  // - en la vista de Pre Acondicionamiento (columna 'pre-acondicionamiento')
-  // - o en la columna 'operacion' pero sólo si NO estamos en la vista 'Todas las fases' (isViewOnly=false)
-  useEffect(() => {
+  // Renderizar tiempo de forma directa; el componente que retorna puede animarse internamente (InlineCountdown)
+  const tiempoRestante = ((): React.ReactNode => {
     const mostrarTimerEnOperacion = columnId === 'operacion' && !isViewOnly;
     const mostrarTimerEnPre = columnId === 'pre-acondicionamiento';
-
-    if (obtenerTiempoRestante && item?.id && (mostrarTimerEnPre || mostrarTimerEnOperacion) && item.id.toString().startsWith('TIC')) {
-      const interval = setInterval(() => {
-        const tiempo = obtenerTiempoRestante(item.id.toString());
-        setTiempoRestante(tiempo);
-      }, 1000);
-
-      return () => clearInterval(interval);
+    if (
+      obtenerTiempoRestante &&
+      item?.id &&
+      (mostrarTimerEnPre || mostrarTimerEnOperacion) &&
+      item.id.toString().startsWith('TIC')
+    ) {
+      return obtenerTiempoRestante(item.id.toString());
     }
-  }, [obtenerTiempoRestante, item?.id, columnId, isViewOnly]);
+    return '';
+  })();
   
   // Solo log esencial para debug si es necesario
   // console.log(`🏇 KanbanCard ${index}:`, item.title);

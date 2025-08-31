@@ -148,6 +148,34 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   isConnected
   } = useTimerContext();
 
+  // Componente interno para mostrar un conteo regresivo suave segundo a segundo,
+  // sincronizado con el valor de segundos del contexto (corrige drift cuando cambia >=2s).
+  const InlineCountdown: React.FC<{ segundos: number }> = ({ segundos }) => {
+    const [display, setDisplay] = useState<number>(segundos);
+
+    // Reaccionar a cambios del contexto: aceptar cambios grandes o finalización
+    useEffect(() => {
+      const diff = segundos - display;
+      if (segundos === 0 || Math.abs(diff) >= 2 || diff > 0) {
+        setDisplay(segundos);
+      }
+      // Si la diferencia es -1 mantenemos animación local; si es 0 no hacemos nada
+    }, [segundos]);
+
+    // Tick local 1s para animar
+    useEffect(() => {
+      if (display <= 0) return;
+      const id = setInterval(() => {
+        setDisplay(prev => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+      return () => clearInterval(id);
+    }, [display]);
+
+    return (
+      <span>{formatearTiempo(display)}</span>
+    );
+  };
+
   // Tick local para re-renderizar cada segundo y asegurar conteo visual fluido
   const [nowTick, setNowTick] = useState<number>(Date.now());
   useEffect(() => {
@@ -806,8 +834,8 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         </div>
       );
     }
-  // Usar segundos restantes sincronizados del estado (consistente entre dispositivos)
-  const tiempoFormateado = formatearTiempo(timer.tiempoRestanteSegundos);
+  // Mostrar un conteo visual suave 1s/1s, sincronizado con segundos del contexto
+  const tiempoVisual = <InlineCountdown segundos={timer.tiempoRestanteSegundos} />;
   const esUrgente = timer.tiempoRestanteSegundos < 300; // Menos de 5 minutos
     
     return (
@@ -817,7 +845,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             esUrgente ? 'text-red-600' : 
             timer.tipoOperacion === 'congelamiento' ? 'text-blue-600' : 'text-orange-600'
           }`}>
-            {tiempoFormateado}
+            {tiempoVisual}
           </span>
         </div>
         {!timer.activo && (

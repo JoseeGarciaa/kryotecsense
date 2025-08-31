@@ -149,6 +149,23 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
     const i = setInterval(() => forceTick(v => v + 1), 1000);
     return () => clearInterval(i);
   }, []);
+
+  // Inline countdown component for item timers in Kanban, synced with context seconds
+  const InlineCountdown: React.FC<{ segundos: number }> = ({ segundos }) => {
+    const [display, setDisplay] = useState<number>(segundos);
+    useEffect(() => {
+      const diff = segundos - display;
+      if (segundos === 0 || Math.abs(diff) >= 2 || diff > 0) {
+        setDisplay(segundos);
+      }
+    }, [segundos]);
+    useEffect(() => {
+      if (display <= 0) return;
+      const id = setInterval(() => setDisplay(prev => (prev > 0 ? prev - 1 : 0)), 1000);
+      return () => clearInterval(id);
+    }, [display]);
+    return <>{formatearTiempo(display)}</>;
+  };
   
   // Función para manejar la devolución a bodega con confirmación (individual)
   const manejarDevolucionABodega = async (item: any) => {
@@ -362,11 +379,11 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
     return timer;
   };
 
-  const obtenerTiempoRestanteKanban = (itemId: string): string => {
+  const obtenerTiempoRestanteKanban = (itemId: string): any => {
     const timer = obtenerTemporizadorParaTIC(itemId);
     if (!timer) return '';
-  // Usar segundos restantes sincronizados del estado (consistente entre dispositivos)
-  return formatearTiempo(timer.tiempoRestanteSegundos);
+    // Mostrar conteo animado 1s/1s sincronizado con segundos del contexto
+    return <InlineCountdown segundos={timer.tiempoRestanteSegundos} />;
   };
 
   const contarTimersActivosEnColumna = (columnId: string): { activos: number, completados: number } => {

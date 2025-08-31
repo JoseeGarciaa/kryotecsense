@@ -11,7 +11,7 @@ interface KanbanColumnProps {
     columnId: string;
     onCardClick?: (item: any) => void;
     // Props para cronómetro (opcionales)
-    obtenerTiempoRestante?: (itemId: string) => string;
+    obtenerTiempoRestante?: (itemId: string) => React.ReactNode;
     iniciarCronometro?: (itemId: string, horas: number, minutos: number) => void;
     detenerCronometro?: (itemId: string) => void;
     moverABodega?: (item: any) => void;

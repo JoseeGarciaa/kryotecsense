@@ -172,19 +172,51 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         console.log('✅ Sincronización recibida del servidor');
         
         if (lastMessage.data.timers) {
-          const timersDelServidor = lastMessage.data.timers.map((timer: any) => ({
-            ...timer,
-            fechaInicio: new Date(timer.fechaInicio),
-            fechaFin: new Date(timer.fechaFin),
-            // Usar tiempo del servidor directamente
-            tiempoRestanteSegundos: timer.server_remaining_time || timer.tiempoRestanteSegundos,
-            server_timestamp: timer.server_timestamp
-          }));
-          
-          // Combinar con optimistas locales que aún no llegaron del servidor (por nombre)
+          // Mezclar con el estado actual para conservar el decremento local de 1s salvo drift significativo
           setTimers(prev => {
-            const restantesOptimistas = prev.filter(t => t.optimistic && !timersDelServidor.some((s: any) => s.nombre === t.nombre));
-            const combinados = [...timersDelServidor, ...restantesOptimistas];
+            const porIdONombre = new Map<string, Timer>();
+
+            // Indexar prev por id/nombre para lookups
+            const indexPrevByKey = (t: Timer) => t.id || t.nombre;
+            const prevIndex = new Map<string, Timer>();
+            prev.forEach(t => prevIndex.set(indexPrevByKey(t), t));
+
+            const normalizadosServidor: Timer[] = (lastMessage.data.timers as any[]).map((timer: any) => {
+              const key = timer.id || timer.nombre;
+              const previo = prevIndex.get(key);
+              const serverSecs = Number(timer.server_remaining_time ?? timer.tiempoRestanteSegundos ?? 0) || 0;
+              const completado = Boolean(timer.completado) || serverSecs === 0;
+              // Si el servidor no envía 'activo', asumir activo mientras no esté completado
+              const activoServer = timer.activo !== undefined ? Boolean(timer.activo) : !completado;
+
+              // Preservar decrecimiento local si la diferencia es pequeña (<2s) y no hay incremento grande
+              let tiempoRestanteSegundos = serverSecs;
+              if (previo && !completado) {
+                const diff = serverSecs - (previo.tiempoRestanteSegundos ?? 0);
+                if (diff < 2 && Math.abs(diff) < 2) {
+                  tiempoRestanteSegundos = previo.tiempoRestanteSegundos;
+                }
+              }
+
+              const normalizado: Timer = {
+                id: timer.id,
+                nombre: timer.nombre,
+                tipoOperacion: timer.tipoOperacion,
+                tiempoInicialMinutos: timer.tiempoInicialMinutos,
+                tiempoRestanteSegundos,
+                fechaInicio: new Date(timer.fechaInicio),
+                fechaFin: new Date(timer.fechaFin),
+                activo: !completado && (previo?.activo ?? activoServer),
+                completado,
+                server_timestamp: timer.server_timestamp,
+              };
+              porIdONombre.set(key, normalizado);
+              return normalizado;
+            });
+
+            // Mantener optimistas locales no presentes aún en servidor (por nombre)
+            const restantesOptimistas = prev.filter(t => t.optimistic && !porIdONombre.has(t.id) && !porIdONombre.has(t.nombre));
+            const combinados = [...normalizadosServidor, ...restantesOptimistas];
             localStorage.setItem('kryotec_timers', JSON.stringify(combinados));
             return combinados;
           });
