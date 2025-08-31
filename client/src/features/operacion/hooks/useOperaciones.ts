@@ -936,6 +936,13 @@ export const useOperaciones = () => {
         console.error(`❌ No se encontró TIC con ID: ${itemId}`);
         return;
       }
+
+      // Regla de negocio: Solo permitir mover a Atemperamiento si el sub_estado anterior es Congelación
+      const subAnterior = (item.sub_estado || '').toString().toLowerCase();
+      if (!(subAnterior.includes('congelacion') || subAnterior.includes('congelación'))) {
+        alert('⚠️ Solo se pueden mover a Atemperamiento las TICs que vienen de Congelación.');
+        return;
+      }
       
       // Crear el objeto con los campos que espera el esquema InventarioCreate
       const actualizacionTIC = {

@@ -28,12 +28,10 @@ export const usePreAcondicionamiento = () => {
   } else if (typeof subEstado === 'string' && subEstado.includes('ATEMPERAMIENTO')) {
         grupos.atemperamiento.push(item);
       } else {
-        // Si no hay sub-estado definido, clasificar por nombre
-  if (typeof nombre === 'string' && (nombre.includes('TIC') || nombre.includes('CREDO') || nombre.includes('VIP'))) {
-          grupos.congelacion.push(item); // Por defecto van a congelación
-        } else {
-          grupos.atemperamiento.push(item);
-        }
+        // Si no hay sub-estado definido, NO adivinar atemperamiento.
+        // Regla: solo llegan a ATEMPERAMIENTO los que vienen de CONGELACIÓN.
+        // Por defecto, clasificar en congelación hasta que el backend asigne sub_estado.
+        grupos.congelacion.push(item);
       }
     });
 
@@ -236,6 +234,13 @@ export const usePreAcondicionamiento = () => {
       
       if (!item) {
         console.error(`❌ No se encontró TIC con ID: ${itemId}`);
+        return;
+      }
+
+      // Regla: Solo mover a ATEMPERAMIENTO si viene de CONGELACIÓN
+      const subAnterior = (item.sub_estado || '').toString().toUpperCase();
+      if (!(subAnterior.includes('CONGELACION') || subAnterior.includes('CONGELACIÓN'))) {
+        alert('⚠️ Solo pueden llegar a ATEMPERAMIENTO las TICs cuyo estado anterior fue CONGELACIÓN.');
         return;
       }
       
