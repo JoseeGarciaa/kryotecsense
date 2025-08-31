@@ -78,6 +78,18 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       return;
     }
 
+    // Si estamos escaneando para Atemperamiento, exigir que el item venga de Congelación
+    if (tipoEscaneoActual === 'atemperamiento') {
+      const estadoLower = String(itemEncontrado.estado || '').toLowerCase();
+      const subLower = String(itemEncontrado.sub_estado || '').toLowerCase();
+      const estadoOk = estadoLower === 'pre-acondicionamiento' || estadoLower === 'preacondicionamiento';
+      const vieneDeCongelacion = subLower.includes('congel');
+      if (!(estadoOk && vieneDeCongelacion)) {
+        alert('⚠️ Solo pueden escanearse para Atemperamiento las TICs cuyo estado actual es Pre-acondicionamiento y su sub-estado es Congelación.');
+        return;
+      }
+    }
+
     // Verificar si ya está en la lista
     if (!rfidsEscaneados.includes(rfidLimpio)) {
       setRfidsEscaneados(prev => [...prev, rfidLimpio]);
@@ -288,7 +300,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       item.rfid === rfidTrimmed || item.nombre_unidad === rfidTrimmed
     );
 
-    if (!itemEncontrado) {
+  if (!itemEncontrado) {
       console.log(`❌ RFID ${rfidTrimmed} no encontrado en el inventario`);
       alert(`❌ RFID ${rfidTrimmed} no encontrado en el inventario`);
       setRfidInput('');
@@ -301,6 +313,19 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       alert(`⚠️ El item ${rfidTrimmed} no es un TIC (categoría: ${itemEncontrado.categoria}). En pre-acondicionamiento solo se permiten TICs.`);
       setRfidInput('');
       return;
+    }
+
+    // Si el modal actual es para Atemperamiento, validar que viene de Congelación
+    if (tipoEscaneoActual === 'atemperamiento') {
+      const estadoLower = String(itemEncontrado.estado || '').toLowerCase();
+      const subLower = String(itemEncontrado.sub_estado || '').toLowerCase();
+      const estadoOk = estadoLower === 'pre-acondicionamiento' || estadoLower === 'preacondicionamiento';
+      const vieneDeCongelacion = subLower.includes('congel');
+      if (!(estadoOk && vieneDeCongelacion)) {
+        alert('⚠️ Solo pueden agregarse a Atemperamiento las TICs que vienen de Congelación.');
+        setRfidInput('');
+        return;
+      }
     }
     
     // Verificar si ya está en la lista
@@ -1541,7 +1566,11 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
           setRfidInput('');
         }}
         titulo={`Escanear TICs para ${tipoEscaneoActual === 'congelamiento' ? 'Congelamiento' : 'Atemperamiento'}`}
-        descripcion={`⚠️ IMPORTANTE: Solo se aceptan TICs en pre-acondicionamiento. VIPs y CUBEs no están permitidos. Los códigos de 24 caracteres se procesan automáticamente.`}
+        descripcion={
+          tipoEscaneoActual === 'atemperamiento'
+            ? `⚠️ IMPORTANTE: Solo se aceptan TICs en Pre-acondicionamiento cuyo sub-estado actual sea Congelación. VIPs y CUBEs no están permitidos. Los códigos de 24 caracteres se procesan automáticamente.`
+            : `⚠️ IMPORTANTE: Solo se aceptan TICs en Pre-acondicionamiento. VIPs y CUBEs no están permitidos. Los códigos de 24 caracteres se procesan automáticamente.`
+        }
         onEliminarRfid={eliminarRfidEscaneado}
         subEstado={tipoEscaneoActual === 'congelamiento' ? 'Congelación' : 'Atemperamiento'}
         onProcesarRfidIndividual={procesarRfid}

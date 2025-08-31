@@ -639,17 +639,18 @@ const Registro: React.FC = () => {
                       title={mostrarCodigosDuplicados ? "Ocultar códigos" : "Mostrar códigos"}
                     >
                       <div className="flex items-center text-sm">
-                        <span className="mr-1">{mostrarCodigosDuplicados ? "Ocultar" : "Ver"}</span>
+                        <span className="mr-1">{mostrarCodigosDuplicados ? "Ocultar" : "Ver +"}</span>
                         <div className={`transform transition-transform ${mostrarCodigosDuplicados ? "rotate-45" : "rotate-0"}`}>
                           <Plus className="w-4 h-4" />
                         </div>
                       </div>
                     </button>
                   </div>
-                  <div className="mt-1 text-sm text-yellow-700 dark:text-yellow-300">
-                    Los siguientes códigos ya están registrados en el sistema:
-                  </div>
                   {mostrarCodigosDuplicados && (
+                    <>
+                      <div className="mt-1 text-sm text-yellow-700 dark:text-yellow-300">
+                        Los siguientes códigos ya están registrados en el sistema:
+                      </div>
                     <div className="mt-2 max-h-32 overflow-y-auto bg-yellow-100/50 dark:bg-yellow-900/30 rounded-md p-2">
                       <div className="text-xs font-mono text-yellow-600 dark:text-yellow-400 space-y-1">
                         {duplicadosDetectados.map((codigo, index) => (
@@ -659,15 +660,11 @@ const Registro: React.FC = () => {
                         ))}
                       </div>
                     </div>
+                    </>
                   )}
-                  {!mostrarCodigosDuplicados && duplicadosDetectados.length > 3 && (
-                    <div className="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
-                      {duplicadosDetectados.slice(0, 2).join(', ')}... y {duplicadosDetectados.length - 2} más
-                    </div>
-                  )}
-                  {!mostrarCodigosDuplicados && duplicadosDetectados.length <= 3 && (
-                    <div className="mt-1 text-xs font-mono text-yellow-600 dark:text-yellow-400 break-all">
-                      {duplicadosDetectados.join(', ')}
+                  {!mostrarCodigosDuplicados && (
+                    <div className="mt-1 text-xs text-yellow-700 dark:text-yellow-300">
+                      Haz clic en "Ver +" para ver los detalles.
                     </div>
                   )}
                 </div>
