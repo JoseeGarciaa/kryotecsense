@@ -36,7 +36,7 @@ export const useInspeccion = () => {
   const [itemsEscaneados, setItemsEscaneados] = useState<ItemInspeccion[]>([]);
   const [procesandoEscaneos, setProcesandoEscaneos] = useState(false);
 
-  // Cargar items que están en estado "Devolución" - "Devuelto" para inspección
+  // Cargar items pendientes de inspección
   const cargarItemsParaInspeccion = useCallback(async () => {
     setCargando(true);
     setError(null);
@@ -47,21 +47,33 @@ export const useInspeccion = () => {
       // Obtener inventario completo
       const response = await apiServiceClient.get('/inventory/inventario/');
       const inventarioCompleto = response.data;
+      const normalize = (s: string | null | undefined) =>
+        (s ?? '')
+          .normalize('NFD')
+          .replace(/\p{Diacritic}/gu, '')
+          .toLowerCase()
+          .trim();
       
-      // Filtrar items que están devueltos y listos para inspección
-      const itemsDevueltos = inventarioCompleto.filter((item: any) => 
-        item.estado === 'Devolución' && item.sub_estado === 'Devuelto'
-      );
+      // Pendientes si: (Devolución/Devuelto) o (Inspección/En proceso)
+      const itemsPendientes = inventarioCompleto.filter((item: any) => {
+        const estado = normalize(item.estado);
+        const sub = normalize(item.sub_estado);
+        const esDevuelto = estado === 'devolucion' && sub === 'devuelto';
+        const esEnProceso = estado === 'inspeccion' && (sub === 'en proceso' || sub === 'en proceso');
+        return esDevuelto || esEnProceso;
+      });
       
       // Filtrar items ya inspeccionados
-      const itemsYaInspeccionados = inventarioCompleto.filter((item: any) => 
-        item.estado === 'Inspección' && item.sub_estado === 'Inspeccionada'
-      );
+      const itemsYaInspeccionados = inventarioCompleto.filter((item: any) => {
+        const estado = normalize(item.estado);
+        const sub = normalize(item.sub_estado);
+        return estado === 'inspeccion' && sub === 'inspeccionada';
+      });
       
-      console.log(`📦 Items para inspección encontrados: ${itemsDevueltos.length}`);
+      console.log(`📦 Items para inspección encontrados: ${itemsPendientes.length}`);
       console.log(`✅ Items ya inspeccionados: ${itemsYaInspeccionados.length}`);
       
-      setItemsParaInspeccion(itemsDevueltos.map((item: any) => ({
+      setItemsParaInspeccion(itemsPendientes.map((item: any) => ({
         ...item,
         validaciones: {
           limpieza: false,

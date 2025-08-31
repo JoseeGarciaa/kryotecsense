@@ -121,7 +121,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   
   // Estados para el modal de temporizador
   const [mostrarModalTimer, setMostrarModalTimer] = useState(false);
-  const [tipoOperacionTimer, setTipoOperacionTimer] = useState<'congelamiento' | 'atemperamiento' | 'envio'>('congelamiento');
+  const [tipoOperacionTimer, setTipoOperacionTimer] = useState<'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion'>('congelamiento');
   const [rfidsPendientesTimer, setRfidsPendientesTimer] = useState<string[]>([]);
   const [rfidSeleccionado, setRfidSeleccionado] = useState<string>('');
   
@@ -1598,12 +1598,12 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         titulo={`Configurar Temporizador - ${
           tipoOperacionTimer === 'congelamiento' ? 'Congelación' : 
           tipoOperacionTimer === 'atemperamiento' ? 'Atemperamiento' : 
-          'Envío'
+          tipoOperacionTimer === 'envio' ? 'Envío' : 'Inspección'
         }`}
         descripcion={`Configure el tiempo de ${
           tipoOperacionTimer === 'congelamiento' ? 'congelación' : 
           tipoOperacionTimer === 'atemperamiento' ? 'atemperamiento' : 
-          'envío'
+          tipoOperacionTimer === 'envio' ? 'envío' : 'inspección'
         } para ${rfidsPendientesTimer.length} TIC(s). Se creará un temporizador para cada TIC.`}
         tipoOperacion={tipoOperacionTimer}
         cargando={cargandoTemporizador}

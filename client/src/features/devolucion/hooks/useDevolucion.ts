@@ -18,7 +18,7 @@ export const useDevolucion = () => {
   const [itemsDevueltos, setItemsDevueltos] = useState<ItemDevolucion[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { timers, eliminarTimer } = useTimerContext();
+  const { timers, eliminarTimer, crearTimer } = useTimerContext();
 
   // Cargar items pendientes de devolución
   const cargarItemsDevolucion = useCallback(async () => {
@@ -274,6 +274,8 @@ export const useDevolucion = () => {
           estado: 'Inspección',
           sub_estado: 'En proceso'
         });
+  // Crear temporizador de inspección 36h
+  crearTimer(`Inspección #${id} - ${nombre ?? 'Item'}`, 'inspeccion', 36 * 60);
         // Registrar actividad
         await apiServiceClient.post('/activities/actividades/', {
           inventario_id: id,

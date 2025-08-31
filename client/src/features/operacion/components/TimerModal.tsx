@@ -7,7 +7,7 @@ interface TimerModalProps {
   onConfirmar: (tiempoMinutos: number) => void;
   titulo: string;
   descripcion: string;
-  tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio';
+  tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion';
   cargando?: boolean;
 }
 

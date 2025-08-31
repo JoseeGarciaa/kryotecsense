@@ -6,7 +6,7 @@ import { useWebSocket } from '../../../hooks/useWebSocket';
 export interface Timer {
   id: string;
   nombre: string;
-  tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio';
+  tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion';
   tiempoInicialMinutos: number;
   tiempoRestanteSegundos: number;
   fechaInicio: Date;
@@ -471,7 +471,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
 
   const crearTimer = useCallback((
     nombre: string,
-    tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio',
+    tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion',
     tiempoMinutos: number
   ): string => {
     const timerId = `timer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -533,7 +533,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   // Crear timer SOLO local (optimista) sin enviar al servidor. Útil cuando el backend ya creó el timer.
   const crearTimerLocal = useCallback((
     nombre: string,
-    tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio',
+    tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion',
     tiempoMinutos: number
   ): string => {
     const timerId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
