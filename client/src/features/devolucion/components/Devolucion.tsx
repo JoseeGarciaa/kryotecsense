@@ -3,6 +3,7 @@ import { Package, Scan, CheckCircle, AlertCircle } from 'lucide-react';
 import { useDevolucion } from '../hooks/useDevolucion';
 import { DevolucionScanModal } from './DevolucionScanModal';
 import { useTimerContext } from '../../../contexts/TimerContext';
+import InlineCountdown from '../../../shared/components/InlineCountdown';
 
 export const Devolucion: React.FC = () => {
   const {
@@ -22,33 +23,32 @@ export const Devolucion: React.FC = () => {
   // Timers para mostrar la cuenta regresiva de Operación (96h)
   const { timers, formatearTiempo } = useTimerContext();
 
-  const { tiempoPorId, tiempoPorNombre } = useMemo(() => {
-    // Normalizador para nombres (compatibilidad con timers previos sin ID)
+  // Mapa a info de tiempo (segundos + fecha fin) para InlineCountdown
+  const { infoPorId, infoPorNombre } = useMemo(() => {
     const normalize = (s: string) => s
       .normalize('NFD')
       .replace(/\p{Diacritic}/gu, '')
       .toLowerCase()
       .trim();
 
-    const tiempoPorId = new Map<number, string>();
-    const tiempoPorNombre = new Map<string, string>();
+    const infoPorId = new Map<number, { seconds: number; endTime: Date }>();
+    const infoPorNombre = new Map<string, { seconds: number; endTime: Date }>();
+
     for (const t of timers) {
       if (t.tipoOperacion === 'envio' && t.activo && !t.completado) {
-        const tiempo = formatearTiempo(t.tiempoRestanteSegundos);
-        // 1) Intentar por ID en el nombre
+        const data = { seconds: t.tiempoRestanteSegundos, endTime: t.fechaFin };
         const match = t.nombre.match(/^Envío\s+#(\d+)\s+-/);
         if (match) {
           const id = Number(match[1]);
-          tiempoPorId.set(id, tiempo);
+          infoPorId.set(id, data);
         }
-        // 2) Fallback por nombre de unidad: quitar prefijo "Envío " y opcional patrón con ID
         const base = t.nombre.replace(/^Envío\s+(#\d+\s+-\s+)?/, '');
         const norm = normalize(base);
-        if (norm) tiempoPorNombre.set(norm, tiempo);
+        if (norm) infoPorNombre.set(norm, data);
       }
     }
-    return { tiempoPorId, tiempoPorNombre };
-  }, [timers, formatearTiempo]);
+    return { infoPorId, infoPorNombre };
+  }, [timers]);
 
   useEffect(() => {
     cargarItemsDevolucion();
@@ -223,11 +223,11 @@ export const Devolucion: React.FC = () => {
                           <span className="text-[10px] sm:text-xs text-blue-600 font-medium bg-blue-100 px-2 py-0.5 rounded">Pendiente</span>
                           {(() => {
                             const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
-                            const t = tiempoPorId.get(item.id) || tiempoPorNombre.get(normalize(item.nombre_unidad));
-                            if (!t) return null;
+                            const info = infoPorId.get(item.id) || infoPorNombre.get(normalize(item.nombre_unidad));
+                            if (!info) return null;
                             return (
                               <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
-                                ⏱ {t}
+                                ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
                               </span>
                             );
                           })()}
@@ -266,11 +266,11 @@ export const Devolucion: React.FC = () => {
                           <span className="text-[10px] sm:text-xs text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">Pendiente</span>
                           {(() => {
                             const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
-                            const t = tiempoPorId.get(item.id) || tiempoPorNombre.get(normalize(item.nombre_unidad));
-                            if (!t) return null;
+                            const info = infoPorId.get(item.id) || infoPorNombre.get(normalize(item.nombre_unidad));
+                            if (!info) return null;
                             return (
                               <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
-                                ⏱ {t}
+                                ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
                               </span>
                             );
                           })()}
@@ -309,11 +309,11 @@ export const Devolucion: React.FC = () => {
                           <span className="text-[10px] sm:text-xs text-yellow-600 font-medium bg-yellow-100 px-2 py-0.5 rounded">Pendiente</span>
                           {(() => {
                             const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
-                            const t = tiempoPorId.get(item.id) || tiempoPorNombre.get(normalize(item.nombre_unidad));
-                            if (!t) return null;
+                            const info = infoPorId.get(item.id) || infoPorNombre.get(normalize(item.nombre_unidad));
+                            if (!info) return null;
                             return (
                               <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
-                                ⏱ {t}
+                                ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
                               </span>
                             );
                           })()}
@@ -391,16 +391,8 @@ export const Devolucion: React.FC = () => {
                         {itemsPaginaActual.map((item) => {
                           // Timer visible también en devueltos
                           const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
-                          const tiempo = tiempoPorId.get(item.id) || tiempoPorNombre.get(normalize(item.nombre_unidad));
-                          // Parse HH:MM:SS or M:SS into seconds for comparison
-                          const parseToSeconds = (txt: string | undefined) => {
-                            if (!txt) return 0;
-                            const parts = txt.split(':').map(n => parseInt(n, 10));
-                            if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
-                            if (parts.length === 2) return parts[0]*60 + parts[1];
-                            return 0;
-                          };
-                          const secs = parseToSeconds(tiempo);
+                          const info = infoPorId.get(item.id) || infoPorNombre.get(normalize(item.nombre_unidad));
+                          const secs = info?.seconds ?? 0;
                           const puedeRegresarAOpe = secs >= 48*3600; // 48h
 
                           return (
@@ -412,9 +404,9 @@ export const Devolucion: React.FC = () => {
                                   <p className="text-xs text-gray-600">{item.categoria} • Lote: {item.lote}</p>
                                   <div className="mt-1 flex items-center gap-2">
                                     <span className="text-[10px] sm:text-xs text-green-700 font-medium bg-green-100 px-2 py-0.5 rounded">Devuelto</span>
-                                    {tiempo && (
+                                    {info && (
                                       <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo de operación restante">
-                                        ⏱ {tiempo}
+                                        ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
                                       </span>
                                     )}
                                   </div>
@@ -427,7 +419,7 @@ export const Devolucion: React.FC = () => {
                                   className={`px-3 py-1 text-xs rounded-md border ${puedeRegresarAOpe ? 'border-blue-300 text-blue-700 hover:bg-blue-50' : 'border-gray-200 text-gray-400 cursor-not-allowed'}`}
                                   onClick={() => {
                   if (!puedeRegresarAOpe) return;
-                  const ok = window.confirm(`¿Regresar "${item.nombre_unidad}" a Operación?\n\nEl cronómetro continuará desde el tiempo actual (⏱ ${tiempo ?? 'N/A'}).`);
+                  const ok = window.confirm(`¿Regresar "${item.nombre_unidad}" a Operación?\n\nEl cronómetro continuará desde el tiempo actual.`);
                   if (!ok) return;
                   // Emitir evento para mover a operación; dejamos el timer activo
                   window.dispatchEvent(new CustomEvent('devolucion:regresar-operacion', { detail: { id: item.id, nombre: item.nombre_unidad } }));
