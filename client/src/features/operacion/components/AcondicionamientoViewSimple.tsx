@@ -31,17 +31,25 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     item.estado === 'Acondicionamiento' && item.sub_estado === 'Lista para Despacho'
   ) || [];
 
+  // Utilidad: normalizar texto (quitar acentos, minúsculas y trim)
+  const norm = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+
   // Filtrar items disponibles para traer a acondicionamiento
-  // TICs solo pueden venir de Pre-acondicionamiento - Atemperamiento (nota el guión en "Pre-acondicionamiento")
+  // TICs: solo desde Pre-acondicionamiento → Atemperamiento (excluir cualquier Congelación/Congelamiento)
   // Para Lista para Despacho: solo items de Acondicionamiento - Ensamblaje
   const itemsDisponibles = inventarioCompleto?.filter(item => {
     if (item.estado === 'Acondicionamiento') {
       return false; // No mostrar items que ya están en acondicionamiento
     }
     
-    // Si es TIC, solo mostrar si está en Pre-acondicionamiento - Atemperamiento (con guión)
+    // Si es TIC, solo mostrar si está en Pre-acondicionamiento - Atemperamiento (variantes aceptadas)
     if (item.categoria === 'TIC') {
-      return item.estado === 'Pre-acondicionamiento' && item.sub_estado === 'Atemperamiento';
+      const e = norm(item.estado);
+      const s = norm(item.sub_estado);
+      const esPreAcond = e === 'pre-acondicionamiento' || e === 'preacondicionamiento';
+      const esAtemperamiento = s === 'atemperamiento';
+      const esCongelacion = s.includes('congel');
+      return esPreAcond && esAtemperamiento && !esCongelacion;
     }
     
     // Para otras categorías, mostrar de cualquier estado excepto Acondicionamiento
