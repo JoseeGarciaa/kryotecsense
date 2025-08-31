@@ -38,13 +38,19 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   // TICs: solo desde Pre-acondicionamiento → Atemperamiento (excluir cualquier Congelación/Congelamiento)
   // Para Lista para Despacho: solo items de Acondicionamiento - Ensamblaje
   const itemsDisponibles = inventarioCompleto?.filter(item => {
+    // Excluir cualquier item que esté en bodega
+    const e = norm(item.estado);
+    if (e.includes('bodega')) {
+      return false;
+    }
+
+    // Excluir items que ya están en acondicionamiento
     if (item.estado === 'Acondicionamiento') {
-      return false; // No mostrar items que ya están en acondicionamiento
+      return false;
     }
     
     // Si es TIC, solo mostrar si está en Pre-acondicionamiento - Atemperamiento (variantes aceptadas)
     if (item.categoria === 'TIC') {
-      const e = norm(item.estado);
       const s = norm(item.sub_estado);
       const esPreAcond = e === 'pre-acondicionamiento' || e === 'preacondicionamiento';
       const esAtemperamiento = s === 'atemperamiento';
@@ -52,7 +58,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
       return esPreAcond && esAtemperamiento && !esCongelacion;
     }
     
-    // Para otras categorías, mostrar de cualquier estado excepto Acondicionamiento
+    // Para otras categorías, mostrar de cualquier estado excepto Acondicionamiento ni Bodega
     return true;
   }) || [];
 
