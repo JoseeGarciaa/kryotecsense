@@ -401,20 +401,16 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     };
   }, [isConnected, sendMessage, syncRequested]);
 
-  // Actualizar timers cada segundo (visual smooth ticking, corrige incluso con WS conectado)
+  // Actualizar timers cada segundo de forma determinística (sin depender del reloj local):
+  // Disminuimos 1 segundo por tick sobre el valor sincronizado. El servidor seguirá corrigiendo por WS.
   useEffect(() => {
     const interval = setInterval(() => {
       setTimers(prevTimers =>
         prevTimers.map(timer => {
           if (!timer.activo || timer.completado) return timer;
 
-          // Calcular siempre el tiempo restante localmente en base a fechaFin y reloj del servidor (si disponible)
-          const nowLocal = Date.now();
-          const nowServerEst = nowLocal + (serverTimeDiffRef.current || 0);
-          const ahora = new Date(nowServerEst);
-          const fechaFin = new Date(timer.fechaFin);
-          const tiempoRestanteMs = fechaFin.getTime() - ahora.getTime();
-          const nuevoTiempoRestante = Math.max(0, Math.floor(tiempoRestanteMs / 1000));
+          // Disminuir 1 segundo del valor sincronizado para evitar desajustes entre dispositivos
+          const nuevoTiempoRestante = Math.max(0, (timer.tiempoRestanteSegundos || 0) - 1);
           const seCompletoAhora = nuevoTiempoRestante === 0 && !timer.completado;
 
           // Si se completó por conteo local, notificar una sola vez (batch + dedup evita duplicados)

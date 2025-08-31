@@ -806,12 +806,9 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         </div>
       );
     }
-  // Calcular tiempo restante en base a la fecha de fin para un conteo exacto por segundo
-  const ahoraMs = nowTick; // fuerza re-render cada segundo
-  const finMs = new Date(timer.fechaFin).getTime();
-  const restanteSeg = Math.max(0, Math.floor((finMs - ahoraMs) / 1000));
-  const tiempoFormateado = formatearTiempo(restanteSeg);
-  const esUrgente = restanteSeg < 300; // Menos de 5 minutos
+  // Usar segundos restantes sincronizados del estado (consistente entre dispositivos)
+  const tiempoFormateado = formatearTiempo(timer.tiempoRestanteSegundos);
+  const esUrgente = timer.tiempoRestanteSegundos < 300; // Menos de 5 minutos
     
     return (
       <div className="flex flex-col items-center space-y-1 py-1 max-w-20">

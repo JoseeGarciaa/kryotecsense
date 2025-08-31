@@ -143,10 +143,10 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
   
   // Hook para acceder a los temporizadores
   const { timers, formatearTiempo } = useTimerContext();
-  // Tick local para forzar re-render cada segundo y mantener visibles los conteos en "Todas las fases"
-  const [nowTick, setNowTick] = useState<number>(Date.now());
+  // Tick local solo para re-render cada segundo (no recalcula tiempo, usa valores sincronizados)
+  const [, forceTick] = useState<number>(0);
   useEffect(() => {
-    const i = setInterval(() => setNowTick(Date.now()), 1000);
+    const i = setInterval(() => forceTick(v => v + 1), 1000);
     return () => clearInterval(i);
   }, []);
   
@@ -365,10 +365,8 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
   const obtenerTiempoRestanteKanban = (itemId: string): string => {
     const timer = obtenerTemporizadorParaTIC(itemId);
     if (!timer) return '';
-    // Recalcular contra fechaFin para asegurar decremento visual incluso si no cambia el estado
-    const ahora = new Date(nowTick);
-    const restante = Math.max(0, Math.floor((new Date(timer.fechaFin).getTime() - ahora.getTime()) / 1000));
-    return formatearTiempo(restante);
+  // Usar segundos restantes sincronizados del estado (consistente entre dispositivos)
+  return formatearTiempo(timer.tiempoRestanteSegundos);
   };
 
   const contarTimersActivosEnColumna = (columnId: string): { activos: number, completados: number } => {
@@ -463,12 +461,11 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
       const timersActivos = timersDelLote.filter(timer => timer && timer.activo && !timer.completado);
       const timersCompletados = timersDelLote.filter(timer => timer && timer.completado);
 
-      // Encontrar el timer más próximo a completarse (recalculado por fechaFin)
+      // Encontrar el timer más próximo a completarse usando segundos sincronizados
       let timerMasProximo: any = null;
       let tiempoRestanteMenor = Infinity;
-      const ahora = new Date(nowTick);
       timersActivos.forEach(timer => {
-        const restante = Math.max(0, Math.floor((new Date(timer.fechaFin).getTime() - ahora.getTime()) / 1000));
+        const restante = timer.tiempoRestanteSegundos;
         if (restante < tiempoRestanteMenor) {
           tiempoRestanteMenor = restante;
           timerMasProximo = timer;
@@ -510,11 +507,10 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
       return null;
     }
 
-    // Encontrar el timer con menos tiempo restante (recalculado por fechaFin)
-    const ahora = new Date(nowTick);
+    // Encontrar el timer con menos tiempo restante (segundos sincronizados)
     const timerMasProximo = timersActivos.reduce((minTimer, currentTimer) => {
-      const restMin = Math.max(0, Math.floor((new Date(minTimer.fechaFin).getTime() - ahora.getTime()) / 1000));
-      const restCur = Math.max(0, Math.floor((new Date(currentTimer.fechaFin).getTime() - ahora.getTime()) / 1000));
+      const restMin = minTimer.tiempoRestanteSegundos;
+      const restCur = currentTimer.tiempoRestanteSegundos;
       return restCur < restMin ? currentTimer : minTimer;
     });
 
@@ -535,7 +531,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
       });
     });
 
-    const rest = Math.max(0, Math.floor((new Date(timerMasProximo.fechaFin).getTime() - ahora.getTime()) / 1000));
+  const rest = timerMasProximo.tiempoRestanteSegundos;
     return {
       timer: timerMasProximo,
       fase: faseDelTimer,
@@ -576,14 +572,10 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
         const timersActivos = timersGrupo.filter(t => !t.completado);
         const timersCompletados = timersGrupo.filter(t => t.completado);
         
-        // Encontrar el menor tiempo restante del grupo (solo de los activos), recalculado por fechaFin
+        // Encontrar el menor tiempo restante del grupo (segundos sincronizados)
         let tiempoRestanteMenor = null as string | null;
         if (timersActivos.length > 0) {
-          const ahora = new Date(nowTick);
-          const menor = timersActivos.reduce((minSeg, t) => {
-            const rest = Math.max(0, Math.floor((new Date(t.fechaFin).getTime() - ahora.getTime()) / 1000));
-            return Math.min(minSeg, rest);
-          }, Infinity);
+          const menor = timersActivos.reduce((minSeg, t) => Math.min(minSeg, t.tiempoRestanteSegundos), Infinity);
           if (isFinite(menor)) {
             tiempoRestanteMenor = formatearTiempo(menor);
           }
