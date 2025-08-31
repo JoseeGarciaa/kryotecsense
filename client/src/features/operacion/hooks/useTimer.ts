@@ -228,7 +228,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             setServerTimeDiff(serverTime - localTime);
           }
           
-          console.log(`🔄 ${timersDelServidor.length} timers sincronizados desde servidor`);
+          const count = Array.isArray(lastMessage.data.timers) ? lastMessage.data.timers.length : 0;
+          console.log(`🔄 ${count} timers sincronizados desde servidor`);
         } else {
           console.log('📭 Sin timers en el servidor');
           setTimers([]);
