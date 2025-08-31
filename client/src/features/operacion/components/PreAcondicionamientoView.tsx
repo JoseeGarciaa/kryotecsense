@@ -554,10 +554,14 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   // Función para obtener el temporizador de un TIC específico
   const obtenerTemporizadorTIC = (rfid: string) => {
     const timer = timers.find((timer: any) => timer.nombre === rfid && !timer.completado);
-    console.log(`🔍 Buscando timer para RFID ${rfid}:`, timer);
-    console.log(`📋 Todos los timers:`, timers);
     return timer;
   };
+
+  // Helpers para filtrar timers por tipo
+  const obtenerTimerActivoPorTipo = (rfid: string, tipo: 'congelamiento' | 'atemperamiento') =>
+    timers.find((t: any) => t.nombre === rfid && !t.completado && t.tipoOperacion === tipo);
+  const obtenerTimerCompletadoPorTipo = (rfid: string, tipo: 'congelamiento' | 'atemperamiento') =>
+    timers.find((t: any) => t.nombre === rfid && t.completado && t.tipoOperacion === tipo);
 
   // Función para verificar si un TIC tiene temporizador activo
   const tieneTimerActivo = (rfid: string): boolean => {
@@ -628,7 +632,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         console.log(`✅ [DEBUG] Datos recargados`);
         
         const mensajeExito = timerCompletado.tipoOperacion === 'congelamiento'
-          ? `✅ TIC ${rfid} completado y movido a Atemperamiento con timer de ${tiempoNuevo} minutos`
+          ? `✅ TIC ${rfid} completado y movido a Atemperamiento sin timer`
           : `✅ TIC ${rfid} completado y movido a Acondicionamiento`;
         
         alert(mensajeExito);
@@ -775,11 +779,16 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   
   // Función para renderizar el temporizador de un TIC
   const renderizarTemporizador = (rfid: string, esAtemperamiento: boolean = false) => {
-    const timer = obtenerTemporizadorTIC(rfid);
-    
-    // Verificar si hay un timer completado para este RFID
-    const timerCompletado = timers.find((t: any) => t.nombre === rfid && t.completado);
-    
+    // Usar el timer del tipo de la sección; evita arrastrar timers de otra fase
+    const timer = esAtemperamiento
+      ? obtenerTimerActivoPorTipo(rfid, 'atemperamiento')
+      : obtenerTimerActivoPorTipo(rfid, 'congelamiento');
+
+    // Timer completado del tipo de la sección
+    const timerCompletado = esAtemperamiento
+      ? obtenerTimerCompletadoPorTipo(rfid, 'atemperamiento')
+      : obtenerTimerCompletadoPorTipo(rfid, 'congelamiento');
+
     if (timerCompletado) {
       // Timer completado - mostrar estado completado
       return (
@@ -824,7 +833,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         </div>
       );
     }
-    
+
     if (!timer) {
       // Sin temporizador - mostrar botón para iniciar
       return (
@@ -891,9 +900,9 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             onClick={() => {
               setRfidSeleccionado(rfid);
               setRfidsPendientesTimer([rfid]);
-              const timer = obtenerTemporizadorTIC(rfid);
-              if (timer) {
-                setTipoOperacionTimer(timer.tipoOperacion);
+              const timerActual = timer;
+              if (timerActual) {
+                setTipoOperacionTimer(timerActual.tipoOperacion);
               }
               setMostrarModalTimer(true);
             }}
@@ -979,10 +988,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             {/* Botones */}
             <div className="flex flex-col sm:flex-row gap-2">
               {/* Botón para iniciar temporizadores de todos los TICs sin temporizador */}
-              {ticsCongelamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length > 0 && (
+              {ticsCongelamiento.filter(tic => !obtenerTimerActivoPorTipo(tic.rfid, 'congelamiento')).length > 0 && (
                 <button
                   onClick={() => {
-                    const ticsSinTimer = ticsCongelamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid));
+                    const ticsSinTimer = ticsCongelamiento.filter(tic => !obtenerTimerActivoPorTipo(tic.rfid, 'congelamiento'));
                     setRfidsPendientesTimer(ticsSinTimer.map(tic => tic.rfid));
                     setTipoOperacionTimer('congelamiento');
                     setMostrarModalTimer(true);
@@ -991,7 +1000,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                   title="Iniciar temporizador para todos los TICs sin temporizador"
                 >
                   <Play size={16} />
-                  Iniciar Todos ({ticsCongelamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length})
+                  Iniciar Todos ({ticsCongelamiento.filter(tic => !obtenerTimerActivoPorTipo(tic.rfid, 'congelamiento')).length})
                 </button>
               )}
               {/* Limpiar timers completados de congelación */}
@@ -1087,28 +1096,32 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         <div className="sm:hidden p-3 pt-0">
           {cargando ? (
             <div className="py-6 text-center text-gray-500 text-xs">Cargando…</div>
-          ) : ticsCongelamientoPaginados.length > 0 ? (
-            ticsCongelamientoPaginados.map((tic: TicItem) => (
-              <div key={tic.id} className="bg-white border rounded-md p-3 mb-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-[11px] font-semibold text-gray-900 truncate" title={tic.rfid}>{tic.rfid}</div>
-                    <div className="text-[11px] text-gray-700 truncate" title={tic.nombre_unidad}>{tic.nombre_unidad}</div>
-                    <div className="text-[11px] text-gray-500">Lote: <span className="font-medium">{tic.lote || '-'}</span></div>
-                  </div>
-                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
-                    {tic.sub_estado}
-                  </span>
-                </div>
-                <div className="mt-2">
-                  {renderizarTemporizador(tic.rfid)}
-                </div>
-              </div>
-            ))
-          ) : busquedaCongelamiento ? (
-            <div className="px-3 py-4 text-center text-gray-500 text-xs">No se encontraron TICs</div>
           ) : (
-            <div className="px-3 py-4 text-center text-gray-500 text-xs">No hay TICs en congelamiento</div>
+            ticsCongelamientoPaginados.length > 0 ? (
+              ticsCongelamientoPaginados.map((tic: TicItem) => (
+                <div key={tic.id} className="bg-white border rounded-md p-3 mb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold text-gray-900 truncate" title={tic.rfid}>{tic.rfid}</div>
+                      <div className="text-[11px] text-gray-700 truncate" title={tic.nombre_unidad}>{tic.nombre_unidad}</div>
+                      <div className="text-[11px] text-gray-500">Lote: <span className="font-medium">{tic.lote || '-'}</span></div>
+                    </div>
+                    <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
+                      {tic.sub_estado}
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    {renderizarTemporizador(tic.rfid)}
+                  </div>
+                </div>
+              ))
+            ) : (
+              busquedaCongelamiento ? (
+                <div className="px-3 py-4 text-center text-gray-500 text-xs">No se encontraron TICs</div>
+              ) : (
+                <div className="px-3 py-4 text-center text-gray-500 text-xs">No hay TICs en congelamiento</div>
+              )
+            )
           )}
         </div>
 
@@ -1248,10 +1261,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             {/* Botones */}
             <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
               {/* Botón para iniciar temporizadores de todos los TICs sin temporizador */}
-              {ticsAtemperamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length > 0 && (
+              {ticsAtemperamiento.filter(tic => !obtenerTimerActivoPorTipo(tic.rfid, 'atemperamiento')).length > 0 && (
                 <button
                   onClick={() => {
-                    const ticsSinTimer = ticsAtemperamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid));
+                    const ticsSinTimer = ticsAtemperamiento.filter(tic => !obtenerTimerActivoPorTipo(tic.rfid, 'atemperamiento'));
                     setRfidsPendientesTimer(ticsSinTimer.map(tic => tic.rfid));
                     setTipoOperacionTimer('atemperamiento');
                     setMostrarModalTimer(true);
@@ -1260,7 +1273,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                   title="Iniciar temporizador para todos los TICs sin temporizador"
                 >
                   <Play size={16} />
-                  Iniciar Todos ({ticsAtemperamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length})
+                  Iniciar Todos ({ticsAtemperamiento.filter(tic => !obtenerTimerActivoPorTipo(tic.rfid, 'atemperamiento')).length})
                 </button>
               )}
               {/* Limpiar timers completados de atemperamiento */}
@@ -1367,28 +1380,32 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         <div className="sm:hidden p-3 pt-0">
           {cargando ? (
             <div className="py-6 text-center text-gray-500 text-xs">Cargando…</div>
-          ) : ticsAtemperamientoPaginados.length > 0 ? (
-            ticsAtemperamientoPaginados.map((tic: TicItem) => (
-              <div key={tic.id} className="bg-white border rounded-md p-3 mb-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-[11px] font-semibold text-gray-900 truncate" title={tic.rfid}>{tic.rfid}</div>
-                    <div className="text-[11px] text-gray-700 truncate" title={tic.nombre_unidad}>{tic.nombre_unidad}</div>
-                    <div className="text-[11px] text-gray-500">Lote: <span className="font-medium">{tic.lote || '-'}</span></div>
-                  </div>
-                  <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-orange-100 text-orange-800">
-                    {tic.sub_estado}
-                  </span>
-                </div>
-                <div className="mt-2">
-                  {renderizarTemporizador(tic.rfid, true)}
-                </div>
-              </div>
-            ))
-          ) : busquedaAtemperamiento ? (
-            <div className="px-3 py-4 text-center text-gray-500 text-xs">No se encontraron TICs</div>
           ) : (
-            <div className="px-3 py-4 text-center text-gray-500 text-xs">No hay TICs en atemperamiento</div>
+            ticsAtemperamientoPaginados.length > 0 ? (
+              ticsAtemperamientoPaginados.map((tic: TicItem) => (
+                <div key={tic.id} className="bg-white border rounded-md p-3 mb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold text-gray-900 truncate" title={tic.rfid}>{tic.rfid}</div>
+                      <div className="text-[11px] text-gray-700 truncate" title={tic.nombre_unidad}>{tic.nombre_unidad}</div>
+                      <div className="text-[11px] text-gray-500">Lote: <span className="font-medium">{tic.lote || '-'}</span></div>
+                    </div>
+                    <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-orange-100 text-orange-800">
+                      {tic.sub_estado}
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    {renderizarTemporizador(tic.rfid, true)}
+                  </div>
+                </div>
+              ))
+            ) : (
+              busquedaAtemperamiento ? (
+                <div className="px-3 py-4 text-center text-gray-500 text-xs">No se encontraron TICs</div>
+              ) : (
+                <div className="px-3 py-4 text-center text-gray-500 text-xs">No hay TICs en atemperamiento</div>
+              )
+            )
           )}
         </div>
 

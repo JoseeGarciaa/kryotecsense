@@ -17,6 +17,54 @@ export interface Timer {
   optimistic?: boolean; // Marcador para timers locales optimistas
 }
 
+// --- UI notification batching for timer completions ---
+// We batch multiple timer-completion notifications within a short window to avoid spamming alerts.
+let pendingCompletionBatch: Timer[] = [];
+let batchCompletionHandle: number | null = null;
+const BATCH_WINDOW_MS = 700;
+
+function queueCompletionNotification(timer: Timer) {
+  pendingCompletionBatch.push(timer);
+  if (batchCompletionHandle !== null) {
+    return; // already scheduled
+  }
+  batchCompletionHandle = (setTimeout(() => {
+    const items = pendingCompletionBatch.slice();
+    pendingCompletionBatch = [];
+    batchCompletionHandle = null;
+
+    if (items.length === 0) return;
+
+    // Build a single message
+    if (Notification.permission === 'granted') {
+      if (items.length === 1) {
+        const t = items[0];
+        new Notification('⏰ Temporizador completado', {
+          body: `${t.nombre} - ${t.tipoOperacion === 'congelamiento' ? 'Congelación' : 'Atemperamiento'} completado`,
+          icon: '/favicon.ico'
+        });
+      } else {
+        const tipo = items.every(i => i.tipoOperacion === 'congelamiento') ? 'Congelación' : items.every(i => i.tipoOperacion === 'atemperamiento') ? 'Atemperamiento' : 'varios procesos';
+        new Notification('⏰ Temporizadores completados', {
+          body: `${items.length} TIC(s) completaron ${tipo}`,
+          icon: '/favicon.ico'
+        });
+      }
+    }
+
+    // Alert: aggregate into one
+    if (items.length === 1) {
+      const t = items[0];
+      alert(`⏰ Temporizador completado!\n\n${t.nombre}\n${t.tipoOperacion === 'congelamiento' ? 'Congelación' : 'Atemperamiento'} completado`);
+    } else {
+      const tipo = items.every(i => i.tipoOperacion === 'congelamiento') ? 'Congelación' : items.every(i => i.tipoOperacion === 'atemperamiento') ? 'Atemperamiento' : 'varios procesos';
+      const nombresPreview = items.slice(0, 5).map(i => i.nombre).join(', ');
+      const resto = items.length > 5 ? ` y ${items.length - 5} más` : '';
+      alert(`⏰ ${items.length} temporizadores completados (${tipo}).\nEjemplo: ${nombresPreview}${resto}`);
+    }
+  }, BATCH_WINDOW_MS) as unknown) as number;
+}
+
 export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   const [timers, setTimers] = useState<Timer[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -351,11 +399,11 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
           const nuevoTiempoRestante = Math.max(0, Math.floor(tiempoRestanteMs / 1000));
           const completado = nuevoTiempoRestante === 0;
           
-          // Si se completó, mostrar notificación y ejecutar callback
+      // Si se completó, mostrar notificación (batched) y ejecutar callback
           if (completado && timer.activo && !timer.completado) {
             // Ejecutar de forma asíncrona para no bloquear el estado
             (async () => {
-              await mostrarNotificacionCompletado(timer);
+        await mostrarNotificacionCompletado(timer);
               
               // Ejecutar callback si está definido
               if (onTimerComplete) {
@@ -378,16 +426,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   }, [onTimerComplete, isConnected]); // isConnected cambia el modo de actualización
 
   const mostrarNotificacionCompletado = async (timer: Timer) => {
-    // Notificación del navegador
-    if (Notification.permission === 'granted') {
-      new Notification(`⏰ Temporizador completado`, {
-        body: `${timer.nombre} - ${timer.tipoOperacion === 'congelamiento' ? 'Congelación' : 'Atemperamiento'} completado`,
-        icon: '/favicon.ico'
-      });
-    }
-    
-    // Alerta visual
-    alert(`⏰ Temporizador completado!\n\n${timer.nombre}\n${timer.tipoOperacion === 'congelamiento' ? 'Congelación' : 'Atemperamiento'} completado`);
+  // Encolar para una sola notificación/alerta agregada
+  queueCompletionNotification(timer);
     
     // Enviar evento al backend para crear alerta
     try {

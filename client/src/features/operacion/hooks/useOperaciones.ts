@@ -956,17 +956,28 @@ export const useOperaciones = () => {
         // Actualizar directamente el inventario
         await apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionTIC);
         console.log(`✅ TIC ${itemId} movido a atemperamiento exitosamente`);
-        
+
         // Limpiar tiempo de pre-acondicionamiento
         setTiempoPreAcondicionamiento(prev => {
           const newTiempos = { ...prev };
           delete newTiempos[itemId];
           return newTiempos;
         });
-        
+
+        // Eliminar cualquier timer global (congelación) asociado a este RFID para que no aparezca en Atemperamiento
+        try {
+          const timersDeEsteItem = timersGlobales.filter(t => t.nombre === itemId);
+          if (timersDeEsteItem.length > 0) {
+            console.log(`🗑️ Eliminando ${timersDeEsteItem.length} timer(s) asociados a ${itemId} tras mover a Atemperamiento`);
+            timersDeEsteItem.forEach(t => eliminarTimer(t.id));
+          }
+        } catch (elimErr) {
+          console.warn('⚠️ No se pudo eliminar timer asociado tras mover a Atemperamiento:', elimErr);
+        }
+
         // Actualización rápida optimizada (no bloqueante)
         actualizarColumnasDebounced();
-        
+
       } catch (error: any) {
         console.error(`❌ Error en backend:`, error);
         alert(`❌ Error al mover TIC a atemperamiento: ${error.response?.data?.detail || error.message}`);
@@ -1043,7 +1054,7 @@ export const useOperaciones = () => {
     }));
     
     // Crear timer para notificación
-    const timerId = window.setTimeout(() => {
+      const timerId = window.setTimeout(() => {
       const confirmar = window.confirm(
         `⏰ ¡TIC ${itemId} ha completado la congelación!\n\n¿Desea mover este TIC a ATEMPERAMIENTO ahora?`
       );
@@ -1051,6 +1062,12 @@ export const useOperaciones = () => {
       if (confirmar) {
         // Mover TIC de congelación a atemperamiento
         moverTicAAtempermiento(itemId);
+
+          // Intentar eliminar cualquier timer global existente para evitar que aparezca "Completo" en Atemperamiento
+          try {
+            const timersDeEsteItem = timersGlobales.filter(t => t.nombre === itemId);
+            timersDeEsteItem.forEach(t => eliminarTimer(t.id));
+          } catch {}
       }
       
       // Limpiar el timer
