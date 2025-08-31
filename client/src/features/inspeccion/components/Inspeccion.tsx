@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Package, CheckCircle, AlertCircle, Clock, Settings, Shield, Scan } from 'lucide-react';
 import { useInspeccion, ItemInspeccion } from '../hooks/useInspeccion';
 import { InspeccionScanModal } from './InspeccionScanModal';
+import { useTimerContext } from '../../../contexts/TimerContext';
 
 export const Inspeccion: React.FC = () => {
   const {
@@ -24,6 +25,37 @@ export const Inspeccion: React.FC = () => {
   const [paginaActual, setPaginaActual] = useState(1);
   const [mostrarModalEscaneo, setMostrarModalEscaneo] = useState(false);
   const itemsPorPagina = 5;
+
+  // Timers de inspección (36h) para mostrar el tiempo restante por item
+  const { timers, formatearTiempo } = useTimerContext();
+  const { tiempoPorId, tiempoPorNombre, vencidoPorId } = useMemo(() => {
+    const porId = new Map<number, string>();
+    const porNombre = new Map<string, string>();
+    const expirado = new Map<number, boolean>();
+
+    const normalize = (s: string | null | undefined) => (s ?? '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .trim();
+
+    for (const t of timers) {
+      if (t.tipoOperacion !== 'inspeccion') continue;
+      const label = t.completado ? 'Vencido' : formatearTiempo(t.tiempoRestanteSegundos);
+      // Intentar extraer el ID desde el nombre: "Inspección #<id> -"
+      const m = t.nombre.match(/^Inspección\s+#(\d+)\s+-/);
+      if (m) {
+        const id = Number(m[1]);
+        porId.set(id, label);
+        expirado.set(id, !!t.completado);
+      }
+      // Fallback por nombre normalizado (por si no coincide el patrón)
+      const n = t.nombre.split('-').slice(1).join('-').trim();
+      if (n) porNombre.set(normalize(n), label);
+    }
+
+    return { tiempoPorId: porId, tiempoPorNombre: porNombre, vencidoPorId: expirado };
+  }, [timers, formatearTiempo]);
 
   useEffect(() => {
     cargarItemsParaInspeccion();
@@ -112,6 +144,16 @@ export const Inspeccion: React.FC = () => {
     const { limpieza, goteo, desinfeccion } = item.validaciones!;
     const isCompleto = limpieza && goteo && desinfeccion;
 
+    // Obtener tiempo restante del cronómetro de inspección (si existe)
+    const normalize = (s: string | null | undefined) => (s ?? '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .trim();
+    const claveNombre = normalize(item.nombre_unidad);
+    const etiquetaTiempo = tiempoPorId.get(item.id) || tiempoPorNombre.get(claveNombre);
+    const estaVencido = vencidoPorId.get(item.id) === true;
+
     const getCategoriaColor = (categoria: string) => {
       switch (categoria) {
         case 'Cube': return 'bg-blue-50 border-blue-200 text-blue-800';
@@ -129,10 +171,10 @@ export const Inspeccion: React.FC = () => {
             <div>
               <h4 className="text-sm font-medium text-gray-900">{item.nombre_unidad}</h4>
               <p className="text-xs text-gray-600">Lote: {item.lote} • RFID: {item.rfid}</p>
-              {item.tiempo_en_curso && (
-                <p className="text-xs text-blue-600 flex items-center gap-1">
+              {etiquetaTiempo && (
+                <p className={`text-xs flex items-center gap-1 ${estaVencido ? 'text-red-600' : 'text-blue-600'}`}>
                   <Clock className="h-3 w-3" />
-                  {item.tiempo_en_curso}
+                  {estaVencido ? `Vencido` : `Restante: ${etiquetaTiempo}`}
                 </p>
               )}
             </div>
