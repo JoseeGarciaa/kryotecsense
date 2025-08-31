@@ -6,6 +6,7 @@ import LoteSelectionModal from './LoteSelectionModal';
 import TimerModal from './TimerModal';
 import { useTimerContext } from '../../../contexts/TimerContext';
 import { apiServiceClient } from '../../../api/apiClient';
+import InlineCountdown from '../../../shared/components/InlineCountdown';
 
 interface TicItem {
   id: string;
@@ -148,33 +149,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   isConnected
   } = useTimerContext();
 
-  // Componente interno para mostrar un conteo regresivo suave segundo a segundo,
-  // sincronizado con el valor de segundos del contexto (corrige drift cuando cambia >=2s).
-  const InlineCountdown: React.FC<{ segundos: number }> = ({ segundos }) => {
-    const [display, setDisplay] = useState<number>(segundos);
-
-    // Reaccionar a cambios del contexto: aceptar cambios grandes o finalización
-    useEffect(() => {
-      const diff = segundos - display;
-      if (segundos === 0 || Math.abs(diff) >= 2 || diff > 0) {
-        setDisplay(segundos);
-      }
-      // Si la diferencia es -1 mantenemos animación local; si es 0 no hacemos nada
-    }, [segundos]);
-
-    // Tick local 1s para animar
-    useEffect(() => {
-      if (display <= 0) return;
-      const id = setInterval(() => {
-        setDisplay(prev => (prev > 0 ? prev - 1 : 0));
-      }, 1000);
-      return () => clearInterval(id);
-    }, [display]);
-
-    return (
-      <span>{formatearTiempo(display)}</span>
-    );
-  };
+  // Re-render 1s to keep lists fresh (timers tick via InlineCountdown itself)
 
   // Tick local para re-renderizar cada segundo y asegurar conteo visual fluido
   const [nowTick, setNowTick] = useState<number>(Date.now());
@@ -835,7 +810,13 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       );
     }
   // Mostrar un conteo visual suave 1s/1s, sincronizado con segundos del contexto
-  const tiempoVisual = <InlineCountdown segundos={timer.tiempoRestanteSegundos} />;
+  const tiempoVisual = (
+    <InlineCountdown
+      endTime={timer.fechaFin}
+      seconds={timer.tiempoRestanteSegundos}
+      format={formatearTiempo}
+    />
+  );
   const esUrgente = timer.tiempoRestanteSegundos < 300; // Menos de 5 minutos
     
     return (

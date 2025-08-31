@@ -14,6 +14,7 @@ import AcondicionamientoViewSimple from './AcondicionamientoViewSimple';
 import OperacionEnvioView from './OperacionEnvioView';
 import OperacionTranscursoView from './OperacionTranscursoView';
 import TimerDisplayGlobal from './TimerDisplayGlobal';
+import InlineCountdown from '../../../shared/components/InlineCountdown';
 import { useTimerContext } from '../../../contexts/TimerContext';
 
 interface OperacionProps {
@@ -150,22 +151,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
     return () => clearInterval(i);
   }, []);
 
-  // Inline countdown component for item timers in Kanban, synced with context seconds
-  const InlineCountdown: React.FC<{ segundos: number }> = ({ segundos }) => {
-    const [display, setDisplay] = useState<number>(segundos);
-    useEffect(() => {
-      const diff = segundos - display;
-      if (segundos === 0 || Math.abs(diff) >= 2 || diff > 0) {
-        setDisplay(segundos);
-      }
-    }, [segundos]);
-    useEffect(() => {
-      if (display <= 0) return;
-      const id = setInterval(() => setDisplay(prev => (prev > 0 ? prev - 1 : 0)), 1000);
-      return () => clearInterval(id);
-    }, [display]);
-    return <>{formatearTiempo(display)}</>;
-  };
+  // InlineCountdown compartido: usaremos fechaFin cuando esté disponible
   
   // Función para manejar la devolución a bodega con confirmación (individual)
   const manejarDevolucionABodega = async (item: any) => {
@@ -382,8 +368,13 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
   const obtenerTiempoRestanteKanban = (itemId: string): any => {
     const timer = obtenerTemporizadorParaTIC(itemId);
     if (!timer) return '';
-    // Mostrar conteo animado 1s/1s sincronizado con segundos del contexto
-    return <InlineCountdown segundos={timer.tiempoRestanteSegundos} />;
+    return (
+      <InlineCountdown
+        endTime={timer.fechaFin}
+        seconds={timer.tiempoRestanteSegundos}
+        format={formatearTiempo}
+      />
+    );
   };
 
   const contarTimersActivosEnColumna = (columnId: string): { activos: number, completados: number } => {

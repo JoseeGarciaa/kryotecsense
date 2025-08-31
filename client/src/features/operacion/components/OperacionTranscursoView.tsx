@@ -4,6 +4,7 @@ import { useOperaciones } from '../hooks/useOperaciones';
 import { useEnvio } from '../hooks/useEnvio';
 import { useTimerContext } from '../../../contexts/TimerContext';
 import TimerModal from './TimerModal';
+import InlineCountdown from '../../../shared/components/InlineCountdown';
 import WebSocketStatus from '../../../shared/components/WebSocketStatus';
 
 interface OperacionTranscursoViewProps {
@@ -28,25 +29,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   const envio = useEnvio(actualizarColumnasDesdeBackend);
   const { timers, formatearTiempo, pausarTimer, reanudarTimer, eliminarTimer, crearTimer, obtenerTimersCompletados, isConnected } = useTimerContext();
 
-  // Inline animated countdown to ensure visible 1s decrement while staying in sync
-  const InlineCountdown: React.FC<{ segundos: number }> = ({ segundos }) => {
-    const [display, setDisplay] = useState<number>(segundos);
-
-    useEffect(() => {
-      const diff = segundos - display;
-      if (segundos === 0 || Math.abs(diff) >= 2 || diff > 0) {
-        setDisplay(segundos);
-      }
-    }, [segundos]);
-
-    useEffect(() => {
-      if (display <= 0) return;
-      const id = setInterval(() => setDisplay(prev => (prev > 0 ? prev - 1 : 0)), 1000);
-      return () => clearInterval(id);
-    }, [display]);
-
-    return <>{formatearTiempo(display)}</>;
-  };
+  // InlineCountdown compartido
   const [busqueda, setBusqueda] = useState('');
   const [itemsEnTransito, setItemsEnTransito] = useState<ItemEnTransito[]>([]);
   const [itemsListosParaDespacho, setItemsListosParaDespacho] = useState<any[]>([]);
@@ -428,7 +411,13 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     }
 
     // Timer activo o pausado
-  const tiempoFormateado = <InlineCountdown segundos={timer.tiempoRestanteSegundos} />;
+  const tiempoFormateado = (
+    <InlineCountdown
+      endTime={timer.fechaFin}
+      seconds={timer.tiempoRestanteSegundos}
+      format={formatearTiempo}
+    />
+  );
     const esUrgente = timer.tiempoRestanteSegundos < 300;
     
     // Determinar color según tipo de operación
