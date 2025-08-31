@@ -7,6 +7,7 @@ import TimerModal from './TimerModal';
 import { useTimerContext } from '../../../contexts/TimerContext';
 import { apiServiceClient } from '../../../api/apiClient';
 import InlineCountdown from '../../../shared/components/InlineCountdown';
+import WebSocketStatus from '../../../shared/components/WebSocketStatus';
 
 interface TicItem {
   id: string;
@@ -162,6 +163,16 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  // Forzar una sincronización cuando el WS conecte y al montar (para evitar casos de "Sin timer" por desfase)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (isConnected) {
+        try { forzarSincronizacion(); } catch {}
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [isConnected, forzarSincronizacion]);
   
   // Efecto para actualizar los datos cuando cambie el inventario
   useEffect(() => {
@@ -290,6 +301,13 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       setCargando(false);
     }
   };
+
+  // Normalizador simple para comparar IDs/RFIDs entre navegadores (sin acentos, case-insensitive)
+  const norm = (s: string | null | undefined) => (s ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
   
   // Función para abrir modal de escaneo según el tipo
   const abrirModalEscaneo = (tipo: 'congelamiento' | 'atemperamiento') => {
@@ -499,15 +517,20 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   
   // Función para obtener el temporizador de un TIC específico
   const obtenerTemporizadorTIC = (rfid: string) => {
-    const timer = timers.find((timer: any) => timer.nombre === rfid && !timer.completado);
+  const n = norm(rfid);
+  const timer = timers.find((timer: any) => norm(timer.nombre) === n && !timer.completado);
     return timer;
   };
 
   // Helpers para filtrar timers por tipo
-  const obtenerTimerActivoPorTipo = (rfid: string, tipo: 'congelamiento' | 'atemperamiento') =>
-    timers.find((t: any) => t.nombre === rfid && !t.completado && t.tipoOperacion === tipo);
-  const obtenerTimerCompletadoPorTipo = (rfid: string, tipo: 'congelamiento' | 'atemperamiento') =>
-    timers.find((t: any) => t.nombre === rfid && t.completado && t.tipoOperacion === tipo);
+  const obtenerTimerActivoPorTipo = (rfid: string, tipo: 'congelamiento' | 'atemperamiento') => {
+    const n = norm(rfid);
+    return timers.find((t: any) => norm(t.nombre) === n && !t.completado && t.tipoOperacion === tipo);
+  };
+  const obtenerTimerCompletadoPorTipo = (rfid: string, tipo: 'congelamiento' | 'atemperamiento') => {
+    const n = norm(rfid);
+    return timers.find((t: any) => norm(t.nombre) === n && t.completado && t.tipoOperacion === tipo);
+  };
 
   // Función para verificar si un TIC tiene temporizador activo
   const tieneTimerActivo = (rfid: string): boolean => {
@@ -917,6 +940,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     <div className="p-2 sm:p-4 max-w-full">
       <div className="mb-4 sm:mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Registrar Pre Acondicionamiento</h1>
+  <WebSocketStatus isConnected={isConnected} className="mt-1" />
       </div>
       
   {/* Se removió el banner global de limpiar; ahora se limpia por sección */}
