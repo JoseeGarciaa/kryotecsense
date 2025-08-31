@@ -33,7 +33,18 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   const [itemsSeleccionados, setItemsSeleccionados] = useState<number[]>([]);
   // Tiempo de envío fijo para Operación: 96 horas (5760 minutos)
   const TIEMPO_ENVIO_MIN = 96 * 60;
+  // Tiempo de envío editable con default 96h
+  const [tiempoEnvio, setTiempoEnvio] = useState<number>(TIEMPO_ENVIO_MIN);
+  const [tiempoHoras, setTiempoHoras] = useState<number>(Math.floor(TIEMPO_ENVIO_MIN / 60));
+  const [tiempoMinutosRest, setTiempoMinutosRest] = useState<number>(TIEMPO_ENVIO_MIN % 60);
 
+  useEffect(() => {
+    // Mantener horas/minutos en sync si tiempoEnvio cambia
+    const horas = Math.floor(tiempoEnvio / 60);
+    const minutos = tiempoEnvio % 60;
+    setTiempoHoras(horas);
+    setTiempoMinutosRest(minutos);
+  }, [tiempoEnvio]);
   const [mostrarModalSeleccion, setMostrarModalSeleccion] = useState(false);
   const [itemsListosDespacho, setItemsListosDespacho] = useState<any[]>([]);
   const [loteSeleccionado, setLoteSeleccionado] = useState<string>('');
@@ -435,7 +446,13 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
               <Play className="w-3 h-3 text-green-600" />
             )}
           </button>
-          {/* Edición deshabilitada para envío: tiempo fijo (96h) */}
+          <button
+            onClick={() => editarTemporizadorItem(itemId, timer)}
+            className="p-1 rounded-md hover:bg-gray-100 transition-colors"
+            title="Editar temporizador"
+          >
+            <Clock className="w-3 h-3 text-blue-600" />
+          </button>
           <button
             onClick={() => eliminarTimer(timer.id)}
             className="p-1 rounded-md hover:bg-gray-100 transition-colors"
@@ -459,41 +476,10 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
 
   // Función para iniciar temporizador para un item específico
   const iniciarTemporizadorParaItem = (itemId: number) => {
-    // En envío (operación), el tiempo es fijo de 96h y el timer es server-authoritative.
-    const item = inventarioCompleto.find(i => i.id === itemId);
-    if (!item) return;
-
-    // Evitar duplicados si ya tiene timer
-    const existente = obtenerTemporizadorParaItem(itemId);
-    if (existente) return;
-
-    const timerId = crearTimer(
-      `Envío ${item.nombre_unidad}`,
-      'envio',
-      TIEMPO_ENVIO_MIN
-    );
-
-    const fechaInicio = new Date();
-    const fechaEstimada = new Date(fechaInicio.getTime() + (TIEMPO_ENVIO_MIN * 60 * 1000));
-
-    const itemEnvio = {
-      id: item.id,
-      nombre_unidad: item.nombre_unidad,
-      rfid: item.rfid,
-      lote: item.lote || 'Sin lote',
-      estado: 'operación',
-      sub_estado: 'En transito',
-      categoria: item.categoria || 'tics',
-      tiempoEnvio: TIEMPO_ENVIO_MIN,
-      timerId, // Asociar el timer creado
-      fechaInicioEnvio: fechaInicio,
-      fechaEstimadaLlegada: fechaEstimada
-    };
-
-    envio.setItemsEnEnvio(prev => {
-      const sinItemAnterior = prev.filter(i => i.id !== itemId);
-      return [...sinItemAnterior, itemEnvio];
-    });
+  // Abrir modal para configurar tiempo con default 96h
+  setItemIdParaTimer(itemId);
+  setTimerEnEdicion(null);
+  setMostrarModalTimer(true);
   };
 
   // Función para editar temporizador existente
@@ -504,7 +490,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   };
 
   // Función para confirmar temporizador (crear o editar)
-  const confirmarTemporizador = async (_tiempoMinutos: number) => {
+  const confirmarTemporizador = async (tiempoMinutos: number) => {
     if (!itemIdParaTimer) return;
 
     setCargandoTimer(true);
@@ -517,17 +503,17 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
         eliminarTimer(timerEnEdicion.id);
       }
 
-      // Crear nuevo timer de envío (fijo 96h)
-      const minutosFijos = TIEMPO_ENVIO_MIN;
+      // Crear nuevo timer de envío con el tiempo elegido
+      const minutosElegidos = tiempoMinutos > 0 ? tiempoMinutos : TIEMPO_ENVIO_MIN;
       const timerId = crearTimer(
         `Envío ${item.nombre_unidad}`,
         'envio',
-        minutosFijos
+        minutosElegidos
       );
 
       // Siempre actualizar o crear el registro de envío
       const fechaInicio = new Date();
-  const fechaEstimada = new Date(fechaInicio.getTime() + (minutosFijos * 60 * 1000));
+  const fechaEstimada = new Date(fechaInicio.getTime() + (minutosElegidos * 60 * 1000));
 
       const itemEnvio = {
         id: item.id,
@@ -537,7 +523,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
         estado: 'operación',
         sub_estado: 'En transito',
         categoria: item.categoria || 'tics',
-  tiempoEnvio: minutosFijos,
+  tiempoEnvio: minutosElegidos,
         timerId, // Asegurar que se guarde el timerId
         fechaInicioEnvio: fechaInicio,
         fechaEstimadaLlegada: fechaEstimada
@@ -659,7 +645,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   Array.isArray(itemsSeleccionadosModal) && itemsSeleccionadosModal.includes(item.id)
       );
       
-  await envio.iniciarEnvio(itemsParaEnvio, TIEMPO_ENVIO_MIN);
+  await envio.iniciarEnvio(itemsParaEnvio, tiempoEnvio);
       
       // Cerrar modal y limpiar selección
       setMostrarModalSeleccion(false);
@@ -710,7 +696,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   Array.isArray(itemsSeleccionados) && itemsSeleccionados.includes(item.id)
       );
       
-  await envio.iniciarEnvio(itemsParaEnvio, TIEMPO_ENVIO_MIN);
+  await envio.iniciarEnvio(itemsParaEnvio, tiempoEnvio);
       setItemsSeleccionados([]);
       
       // Los items se actualizarán automáticamente a través del useEffect
@@ -1109,12 +1095,41 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
             
             {/* Controles del modal */}
             <div className="p-4 sm:p-6 border-t border-gray-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <Clock className="w-4 h-4 text-blue-600" />
-                <span className="text-sm text-gray-700">Tiempo de envío:</span>
-                <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                  96 horas (fijo)
-                </span>
+              <div className="flex items-center gap-3 sm:gap-4">
+                <label className="text-sm text-gray-600 whitespace-nowrap">Tiempo de envío:</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={tiempoHoras}
+                    onChange={(e) => {
+                      const v = Number(e.target.value) || 0;
+                      setTiempoHoras(v);
+                      setTiempoEnvio(v * 60 + tiempoMinutosRest);
+                    }}
+                    min={0}
+                    max={240}
+                    className="border border-gray-300 rounded px-3 py-1 text-sm w-16 sm:w-20"
+                    aria-label="Horas"
+                  />
+                  <span className="text-sm text-gray-600">h</span>
+
+                  <input
+                    type="number"
+                    value={tiempoMinutosRest}
+                    onChange={(e) => {
+                      let v = Number(e.target.value) || 0;
+                      if (v < 0) v = 0;
+                      if (v > 59) v = 59;
+                      setTiempoMinutosRest(v);
+                      setTiempoEnvio(tiempoHoras * 60 + v);
+                    }}
+                    min={0}
+                    max={59}
+                    className="border border-gray-300 rounded px-3 py-1 text-sm w-16 sm:w-20"
+                    aria-label="Minutos"
+                  />
+                  <span className="text-xs text-gray-500">min</span>
+                </div>
               </div>
               
               <div className="flex items-center gap-2 sm:gap-3 justify-end">
@@ -1161,6 +1176,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
           titulo={timerEnEdicion ? 'Editar Temporizador de Envío' : 'Configurar Temporizador de Envío'}
           descripcion={`Configure el tiempo de envío para el item. ${timerEnEdicion ? 'Editando temporizador existente.' : 'Se creará un nuevo temporizador.'}`}
           tipoOperacion="envio"
+          initialMinutes={TIEMPO_ENVIO_MIN}
           cargando={cargandoTimer}
         />
       )}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Clock, X, Play, Loader } from 'lucide-react';
 
 interface TimerModalProps {
@@ -9,6 +9,7 @@ interface TimerModalProps {
   descripcion: string;
   tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion';
   cargando?: boolean;
+  initialMinutes?: number;
 }
 
 const TimerModal: React.FC<TimerModalProps> = ({
@@ -18,11 +19,22 @@ const TimerModal: React.FC<TimerModalProps> = ({
   titulo,
   descripcion,
   tipoOperacion,
-  cargando = false
+  cargando = false,
+  initialMinutes
 }) => {
   // Defaults: 30 minutos por defecto para cualquier operación
   const [horas, setHoras] = useState<number>(0);
   const [minutos, setMinutos] = useState<number>(30);
+
+  // Al abrir el modal, si se provee initialMinutes, usarlo como default
+  useEffect(() => {
+    if (mostrarModal && typeof initialMinutes === 'number' && initialMinutes > 0) {
+      const h = Math.floor(initialMinutes / 60);
+      const m = initialMinutes % 60;
+      setHoras(h);
+      setMinutos(m);
+    }
+  }, [mostrarModal, initialMinutes]);
 
   const handleConfirmar = () => {
     const tiempoTotalMinutos = (horas * 60) + minutos;
@@ -107,7 +119,7 @@ const TimerModal: React.FC<TimerModalProps> = ({
                 <input
                   type="number"
                   min="0"
-                  max="24"
+                  max="240"
                   value={horas}
                   onChange={(e) => setHoras(Math.max(0, parseInt(e.target.value) || 0))}
                   disabled={cargando}
