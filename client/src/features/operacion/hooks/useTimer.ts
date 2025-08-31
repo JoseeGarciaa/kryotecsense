@@ -395,56 +395,44 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     };
   }, [isConnected, sendMessage, syncRequested]);
 
-  // Actualizar timers cada segundo
+  // Actualizar timers cada segundo (visual smooth ticking, corrige incluso con WS conectado)
   useEffect(() => {
     const interval = setInterval(() => {
-      setTimers(prevTimers => 
+      setTimers(prevTimers =>
         prevTimers.map(timer => {
           if (!timer.activo || timer.completado) return timer;
-          
-          // Fallback inteligente:
-          // - Si no hay WS: tick local
-          // - Si es optimista: tick local
-          // - Si WS está conectado pero no llegan updates del servidor (stale > 2s): tick local
+
+          // Calcular siempre el tiempo restante localmente en base a fechaFin y reloj del servidor (si disponible)
           const nowLocal = Date.now();
           const nowServerEst = nowLocal + (serverTimeDiff || 0);
-          const lastServerTs = timer.server_timestamp ?? 0;
-          const stalenessMs = lastServerTs ? (nowServerEst - lastServerTs) : Number.POSITIVE_INFINITY;
-          const debeActualizarLocal = !isConnected || timer.optimistic || stalenessMs > 2000;
-          if (!debeActualizarLocal) return timer;
-          
-          // Actualizar localmente basado en fechas (estimando con tiempo del servidor si se conoce)
           const ahora = new Date(nowServerEst);
           const fechaFin = new Date(timer.fechaFin);
           const tiempoRestanteMs = fechaFin.getTime() - ahora.getTime();
           const nuevoTiempoRestante = Math.max(0, Math.floor(tiempoRestanteMs / 1000));
-          const completado = nuevoTiempoRestante === 0;
-          
-      // Si se completó, mostrar notificación (batched) y ejecutar callback
-          if (completado && timer.activo && !timer.completado) {
-            // Ejecutar de forma asíncrona para no bloquear el estado
+          const seCompletoAhora = nuevoTiempoRestante === 0 && !timer.completado;
+
+          // Si se completó por conteo local, notificar una sola vez (batch + dedup evita duplicados)
+          if (seCompletoAhora) {
             (async () => {
-        await mostrarNotificacionCompletado(timer);
-              
-              // Ejecutar callback si está definido
+              await mostrarNotificacionCompletado(timer);
               if (onTimerComplete) {
-                onTimerComplete(timer);
+                onTimerComplete({ ...timer, tiempoRestanteSegundos: 0, completado: true, activo: false });
               }
             })();
           }
-          
-    return {
+
+          return {
             ...timer,
             tiempoRestanteSegundos: nuevoTiempoRestante,
-            completado,
-            activo: !completado
+            completado: timer.completado || nuevoTiempoRestante === 0,
+            activo: nuevoTiempoRestante > 0 && timer.activo
           };
         })
       );
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [onTimerComplete, isConnected]); // isConnected cambia el modo de actualización
+  }, [onTimerComplete, serverTimeDiff]);
 
   const mostrarNotificacionCompletado = async (timer: Timer) => {
   // Encolar para una sola notificación/alerta agregada

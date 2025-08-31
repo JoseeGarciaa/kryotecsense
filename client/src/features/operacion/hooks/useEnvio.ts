@@ -52,21 +52,21 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
    */
   const iniciarEnvio = useCallback(async (
     itemsSeleccionados: any[],
-    _tiempoEnvioMinutos: number = 120 // ignorado: siempre 96h
+    tiempoEnvioMinutos: number = 5760 // default 96h, pero respetar valor del UI
   ) => {
     setCargandoEnvio(true);
     
     try {
-      console.log('🚚 ===== INICIANDO PROCESO DE ENVÍO =====');
-      console.log('📦 Items seleccionados:', itemsSeleccionados.length);
-  console.log('⏱️ Tiempo de operación forzado:', 5760, 'minutos (96h)');
+  console.log('🚚 ===== INICIANDO PROCESO DE ENVÍO =====');
+  console.log('📦 Items seleccionados:', itemsSeleccionados.length);
+  console.log('⏱️ Tiempo de operación solicitado:', tiempoEnvioMinutos, 'minutos');
 
       const itemsParaEnvio: ItemEnvio[] = [];
       const actualizacionesEstado = [];
       const actividadesCreadas = [];
 
-      // Forzar tiempo de operación 96 horas (5760 minutos)
-      const tiempoOperacionMin = 5760;
+  // Tiempo de operación: usar el proporcionado (UI) con default 96h
+  const tiempoOperacionMin = Math.max(1, Math.floor(tiempoEnvioMinutos));
 
       for (const item of itemsSeleccionados) {
         // Crear temporizador de envío (nombre incluye ID para coincidencia fiable en Devolución)
@@ -108,7 +108,7 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
         actividadesCreadas.push({
           inventario_id: item.id,
           usuario_id: 1,
-          descripcion: `Iniciado envío de ${item.nombre_unidad} - Tiempo de operación: 5760 minutos (96h)`,
+          descripcion: `Iniciado envío de ${item.nombre_unidad} - Tiempo de operación: ${tiempoOperacionMin} minutos`,
           estado_nuevo: 'operación',
           sub_estado_nuevo: 'En transito'
         });
@@ -125,7 +125,7 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
       
       const payload = {
         items_ids: itemsSeleccionados.map(item => item.id),
-  tiempo_envio_minutos: tiempoOperacionMin,
+        tiempo_envio_minutos: tiempoOperacionMin,
         descripcion_adicional: 'Envío iniciado desde centro de operaciones'
       };
       
@@ -154,7 +154,7 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
 
   console.log('🚚 ===== ENVÍO INICIADO EXITOSAMENTE =====');
   console.log(`📦 ${itemsParaEnvio.length} items en tránsito`);
-  console.log(`⏱️ Tiempo de operación: ${formatearTiempo(tiempoOperacionMin * 60)} (96h)`);
+  console.log(`⏱️ Tiempo de operación: ${formatearTiempo(tiempoOperacionMin * 60)}`);
 
       return {
         success: true,
