@@ -31,7 +31,6 @@ Para cada servicio usa estos valores.
   - Start Command: (vacío; usa el CMD del Dockerfile de Nginx)
   - Build variables (scope Build):
     - `VITE_API_URL = https://<api-gateway>.up.railway.app`
-    - `VITE_TIMER_WS_URL = wss://<timer-service>.up.railway.app/ws/timers`
 
 - api-gateway
   - Root Directory: `server`
@@ -109,7 +108,7 @@ Notas:
 1) Desplegar auth-service, inventory-service, activities-service, reports-service, alerts-service, timer-service.
 2) Cuando cada uno tenga dominio público, configúralos en api-gateway mediante las variables `*_SERVICE_URL` y `FRONTEND_ORIGIN`.
 3) Desplegar api-gateway.
-4) Configurar variables de build del cliente (`VITE_API_URL`, `VITE_TIMER_WS_URL`) y desplegar client.
+4) Configurar variable de build del cliente (`VITE_API_URL`) y desplegar client.
 
 ## 4) Comprobaciones rápidas
 
@@ -117,7 +116,7 @@ Notas:
 - `GET https://<inventory-service>/health` → ok.
 - `GET https://<auth-service>/usuarios/test` → debe responder si DB está bien conectada.
 - En el frontend, el login debe redirigir correctamente y el dashboard cargar datos.
-- El WebSocket de timers debe conectar a `wss://<timer-service>/ws/timers`.
+- El WebSocket de timers conecta a `wss://<api-gateway>/ws/timers`.
 
 ## 5) Opcional: RabbitMQ
 
@@ -132,7 +131,7 @@ Si más adelante quieres habilitar eventos asíncronos:
 - DB (en servicios backend): `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
 - Auth (en auth-service): `JWT_SECRET`, `JWT_ALGORITHM=HS256`, `ACCESS_TOKEN_EXPIRE_MINUTES=30`
 - API Gateway: `FRONTEND_ORIGIN`, `AUTH_SERVICE_URL`, `INVENTORY_SERVICE_URL`, `ALERTS_SERVICE_URL`, `ACTIVITIES_SERVICE_URL`, `REPORTS_SERVICE_URL`
-- Client (Build): `VITE_API_URL`, `VITE_TIMER_WS_URL`
+- Client (Build): `VITE_API_URL`
 
 ## 7) Notas de seguridad
 

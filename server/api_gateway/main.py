@@ -392,7 +392,39 @@ class TimerManager:
             timer_logger.info(f"Timer ya existe, actualizando: {timer_id}")
             await self.update_timer(timer_id, timer_data, websocket)
             return
-        
+        # Asegurar campos requeridos si el cliente no los envió
+        try:
+            now = get_utc_now()
+            # fechaInicio
+            fi = timer_data.get('fechaInicio')
+            if not fi:
+                timer_data['fechaInicio'] = now
+            elif isinstance(fi, str):
+                timer_data['fechaInicio'] = parse_iso_datetime(fi)
+
+            # fechaFin
+            ff = timer_data.get('fechaFin')
+            if not ff:
+                minutos = int(timer_data.get('tiempoInicialMinutos', 0) or 0)
+                base = timer_data['fechaInicio'] if isinstance(timer_data['fechaInicio'], datetime) else now
+                timer_data['fechaFin'] = base + timedelta(minutes=minutos)
+            elif isinstance(ff, str):
+                timer_data['fechaFin'] = parse_iso_datetime(ff)
+
+            # tiempoRestanteSegundos
+            restante = max(0, int((timer_data['fechaFin'] - now).total_seconds()))
+            if not isinstance(timer_data.get('tiempoRestanteSegundos'), int):
+                timer_data['tiempoRestanteSegundos'] = restante
+
+            # Flags
+            completado = bool(timer_data.get('completado', False)) or timer_data['tiempoRestanteSegundos'] == 0
+            activo = bool(timer_data.get('activo', True)) and not completado
+            timer_data['completado'] = completado
+            timer_data['activo'] = activo
+        except Exception as e:
+            timer_logger.error(f"Error normalizando CREATE_TIMER: {e}")
+            raise
+
         timer = Timer(**timer_data)
         self.timers[timer.id] = timer
         
@@ -697,6 +729,16 @@ async def websocket_endpoint(websocket: WebSocket):
                         "server_timestamp": server_ts
                     }
                 })
+            elif message_type == "SYNC_REQUEST":
+                # Compatibilidad con clientes que envían SYNC_REQUEST
+                server_ts = timer_manager.get_server_timestamp()
+                await timer_manager.send_to_client(websocket, {
+                    "type": "TIMER_SYNC",
+                    "data": {
+                        "timers": [{**t.to_dict(), "server_timestamp": server_ts} for t in timer_manager.timers.values()],
+                        "server_timestamp": server_ts
+                    }
+                })
                 
             elif message_type == "CREATE_TIMER":
                 timer_data = message_data.get("timer")
@@ -717,6 +759,15 @@ async def websocket_endpoint(websocket: WebSocket):
                 timer_id = message_data.get("timerId")
                 if timer_id:
                     await timer_manager.delete_timer(timer_id, websocket)
+            elif message_type == "FORCE_BROADCAST_SYNC":
+                server_ts = timer_manager.get_server_timestamp()
+                await timer_manager.broadcast({
+                    "type": "TIMER_SYNC",
+                    "data": {
+                        "timers": [{**t.to_dict(), "server_timestamp": server_ts} for t in timer_manager.timers.values()],
+                        "server_timestamp": server_ts
+                    }
+                })
                     
             else:
                 timer_logger.warning(f"Tipo de mensaje no reconocido: {message_type}")

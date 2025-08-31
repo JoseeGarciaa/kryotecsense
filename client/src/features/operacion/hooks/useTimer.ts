@@ -98,17 +98,13 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   }, [serverTimeDiff]);
   
   // WebSocket para sincronización en tiempo real:
-  // Prioridad: VITE_TIMER_WS_URL -> derivar de VITE_API_URL -> same-origin/local (dev)
+  // Unificado: derivar SIEMPRE del host de la API (VITE_API_URL) o same-origin en dev.
+  // Nota: Ignoramos VITE_TIMER_WS_URL para evitar "split-brain" entre servicios distintos.
   const timerWsUrl = (() => {
-    const explicit = import.meta.env.VITE_TIMER_WS_URL as string | undefined;
-    if (explicit && explicit.trim().length > 0) {
-      try {
-        // Validar formato
-        new URL(explicit);
-        return explicit;
-      } catch {
-        // ignore and continue to API derivation
-      }
+    const explicit = (import.meta.env.VITE_TIMER_WS_URL as string | undefined)?.trim();
+    if (explicit) {
+      // Aviso visible en consola si alguien intentó forzar otra URL de WS
+      console.warn('VITE_TIMER_WS_URL está definido pero será ignorado para unificar el endpoint WS en API Gateway:', explicit);
     }
 
     const apiBase = (import.meta.env.VITE_API_URL as string | undefined) || '';
