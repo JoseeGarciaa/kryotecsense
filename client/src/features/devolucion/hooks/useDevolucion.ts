@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { apiServiceClient } from '../../../api/apiClient';
 import { useTimerContext } from '../../../contexts/TimerContext';
 
@@ -203,18 +203,8 @@ export const useDevolucion = () => {
         // Ejecutar todas las promesas en paralelo
         await Promise.all([...promesasEstado, ...promesasActividades]);
 
-        console.log(`✅ ${idsValidos.length} items válidos marcados como devueltos en backend`);
-        // Eliminar timers de operación (envío) asociados ahora que pasaron a Devolución
-        try {
-          for (const id of idsValidos) {
-            const timer = timers.find(t => t.tipoOperacion === 'envio' && new RegExp(`^Envío\\s+#${id}\\s+-`).test(t.nombre));
-            if (timer) {
-              eliminarTimer(timer.id);
-            }
-          }
-        } catch (e) {
-          console.warn('No se pudieron eliminar algunos timers tras devolución:', e);
-        }
+  console.log(`✅ ${idsValidos.length} items válidos marcados como devueltos en backend`);
+  // Mantener timers para que sigan visibles en "Items Devueltos" con su conteo
         
         // Una sola recarga al final
         await cargarItemsDevolucion();
@@ -229,18 +219,6 @@ export const useDevolucion = () => {
           sub_estado: 'Devuelto'
         }))]);
         
-        // Eliminar timers localmente también
-        try {
-          for (const id of itemIds) {
-            const timer = timers.find(t => t.tipoOperacion === 'envio' && new RegExp(`^Envío\\s+#${id}\\s+-`).test(t.nombre));
-            if (timer) {
-              eliminarTimer(timer.id);
-            }
-          }
-        } catch (e) {
-          console.warn('No se pudieron eliminar algunos timers (local) tras devolución:', e);
-        }
-
         console.log(`✅ ${itemIds.length} items marcados como devueltos localmente (modo desarrollo)`);
       }
     } catch (err) {
@@ -248,12 +226,77 @@ export const useDevolucion = () => {
       setError('Error al marcar items como devueltos');
       throw err;
     }
-  }, [itemsDevolucion, cargarItemsDevolucion, timers, eliminarTimer]);
+  }, [itemsDevolucion, cargarItemsDevolucion]);
 
   // Mantener función individual para compatibilidad
   const marcarComoDevuelto = useCallback(async (itemId: number) => {
     return marcarItemsComoDevueltos([itemId]);
   }, [marcarItemsComoDevueltos]);
+
+  // Escuchar acciones desde la UI para mover estados
+  useEffect(() => {
+    const onRegresarOperacion = async (e: Event) => {
+      const id = (e as CustomEvent).detail?.id as number;
+      const nombre = (e as CustomEvent).detail?.nombre as string | undefined;
+      if (!id) return;
+      try {
+        await apiServiceClient.patch(`/inventory/inventario/${id}/estado`, {
+          estado: 'operación',
+          sub_estado: 'En transito'
+        });
+        // Registrar actividad
+        await apiServiceClient.post('/activities/actividades/', {
+          inventario_id: id,
+          usuario_id: 1,
+          descripcion: `${nombre ?? 'Item'} regresado a Operación (continúa cronómetro)`,
+          estado_nuevo: 'operación',
+          sub_estado_nuevo: 'En transito'
+        });
+        await cargarItemsDevolucion();
+        alert('✅ Regresó a Operación (cronómetro continúa)');
+      } catch (err) {
+        console.error('Error regresando a operación:', err);
+        alert('❌ Error regresando a Operación');
+      }
+    };
+
+    const onPasarInspeccion = async (e: Event) => {
+      const id = (e as CustomEvent).detail?.id as number;
+      const nombre = (e as CustomEvent).detail?.nombre as string | undefined;
+      if (!id) return;
+      try {
+        // Cancelar timer de operación si existe
+        const timer = timers.find(t => t.tipoOperacion === 'envio' && new RegExp(`^Envío\\s+#${id}\\s+-`).test(t.nombre));
+        if (timer) eliminarTimer(timer.id);
+
+        // Mover a inspección
+        await apiServiceClient.patch(`/inventory/inventario/${id}/estado`, {
+          estado: 'Inspección',
+          sub_estado: 'En proceso'
+        });
+        // Registrar actividad
+        await apiServiceClient.post('/activities/actividades/', {
+          inventario_id: id,
+          usuario_id: 1,
+          descripcion: `${nombre ?? 'Item'} pasó a Inspección (cronómetro cancelado)`,
+          estado_nuevo: 'Inspección',
+          sub_estado_nuevo: 'En proceso'
+        });
+        await cargarItemsDevolucion();
+        alert('🔎 Pasó a Inspección (cronómetro cancelado)');
+      } catch (err) {
+        console.error('Error pasando a inspección:', err);
+        alert('❌ Error pasando a Inspección');
+      }
+    };
+
+    window.addEventListener('devolucion:regresar-operacion', onRegresarOperacion as EventListener);
+    window.addEventListener('devolucion:pasar-inspeccion', onPasarInspeccion as EventListener);
+    return () => {
+      window.removeEventListener('devolucion:regresar-operacion', onRegresarOperacion as EventListener);
+      window.removeEventListener('devolucion:pasar-inspeccion', onPasarInspeccion as EventListener);
+    };
+  }, [cargarItemsDevolucion, timers, eliminarTimer]);
 
   return {
     itemsDevolucion,
@@ -262,6 +305,6 @@ export const useDevolucion = () => {
     error,
     cargarItemsDevolucion,
     marcarComoDevuelto,
-    marcarItemsComoDevueltos
+  marcarItemsComoDevueltos
   };
 };

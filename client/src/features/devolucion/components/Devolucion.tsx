@@ -388,18 +388,68 @@ export const Devolucion: React.FC = () => {
                     
                     return (
                       <>
-                        {itemsPaginaActual.map((item) => (
-                          <div key={item.id} className="bg-green-50 rounded-lg p-3 flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-900">{item.nombre_unidad}</h4>
-                                <p className="text-xs text-gray-600">{item.categoria} • Lote: {item.lote}</p>
+                        {itemsPaginaActual.map((item) => {
+                          // Timer visible también en devueltos
+                          const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim();
+                          const tiempo = tiempoPorId.get(item.id) || tiempoPorNombre.get(normalize(item.nombre_unidad));
+                          // Parse HH:MM:SS or M:SS into seconds for comparison
+                          const parseToSeconds = (txt: string | undefined) => {
+                            if (!txt) return 0;
+                            const parts = txt.split(':').map(n => parseInt(n, 10));
+                            if (parts.length === 3) return parts[0]*3600 + parts[1]*60 + parts[2];
+                            if (parts.length === 2) return parts[0]*60 + parts[1];
+                            return 0;
+                          };
+                          const secs = parseToSeconds(tiempo);
+                          const puedeRegresarAOpe = secs >= 48*3600; // 48h
+
+                          return (
+                            <div key={item.id} className="bg-green-50 rounded-lg p-3 flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                <div>
+                                  <h4 className="text-sm font-medium text-gray-900">{item.nombre_unidad}</h4>
+                                  <p className="text-xs text-gray-600">{item.categoria} • Lote: {item.lote}</p>
+                                  <div className="mt-1 flex items-center gap-2">
+                                    <span className="text-[10px] sm:text-xs text-green-700 font-medium bg-green-100 px-2 py-0.5 rounded">Devuelto</span>
+                                    {tiempo && (
+                                      <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo de operación restante">
+                                        ⏱ {tiempo}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                <button
+                                  disabled={!puedeRegresarAOpe}
+                                  title={puedeRegresarAOpe ? 'Regresar a Operación (continúa el tiempo)' : 'Disponible cuando queden ≥ 48h'}
+                                  className={`px-3 py-1 text-xs rounded-md border ${puedeRegresarAOpe ? 'border-blue-300 text-blue-700 hover:bg-blue-50' : 'border-gray-200 text-gray-400 cursor-not-allowed'}`}
+                                  onClick={() => {
+                  if (!puedeRegresarAOpe) return;
+                  const ok = window.confirm(`¿Regresar "${item.nombre_unidad}" a Operación?\n\nEl cronómetro continuará desde el tiempo actual (⏱ ${tiempo ?? 'N/A'}).`);
+                  if (!ok) return;
+                  // Emitir evento para mover a operación; dejamos el timer activo
+                  window.dispatchEvent(new CustomEvent('devolucion:regresar-operacion', { detail: { id: item.id, nombre: item.nombre_unidad } }));
+                                  }}
+                                >
+                                  Regresar a Operación
+                                </button>
+                                <button
+                                  className="px-3 py-1 text-xs rounded-md border border-purple-300 text-purple-700 hover:bg-purple-50"
+                                  title="Pasar a Inspección (cancela el tiempo)"
+                                  onClick={() => {
+                  const ok = window.confirm(`¿Pasar "${item.nombre_unidad}" a Inspección?\n\nEsto cancelará el cronómetro de operación.`);
+                  if (!ok) return;
+                  window.dispatchEvent(new CustomEvent('devolucion:pasar-inspeccion', { detail: { id: item.id, nombre: item.nombre_unidad } }));
+                                  }}
+                                >
+                                  Pasar a Inspección
+                                </button>
                               </div>
                             </div>
-                            <span className="text-xs text-green-600 font-medium">Devuelto</span>
-                          </div>
-                        ))}
+                          );
+                        })}
                         
                         {/* Paginación */}
                         {totalPaginas > 1 && (
