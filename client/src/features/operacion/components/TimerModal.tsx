@@ -20,28 +20,24 @@ const TimerModal: React.FC<TimerModalProps> = ({
   tipoOperacion,
   cargando = false
 }) => {
-  // Defaults: Congelación starts at 24h by default; Atemperamiento default 30min
-  const [horas, setHoras] = useState<number>(tipoOperacion === 'congelamiento' ? 24 : 0);
-  const [minutos, setMinutos] = useState<number>(tipoOperacion === 'congelamiento' ? 0 : 30);
+  // Defaults: 30 minutos por defecto para cualquier operación
+  const [horas, setHoras] = useState<number>(0);
+  const [minutos, setMinutos] = useState<number>(30);
 
   const handleConfirmar = () => {
     const tiempoTotalMinutos = (horas * 60) + minutos;
-    if (tipoOperacion === 'congelamiento' && tiempoTotalMinutos < 1440) {
-      alert('El tiempo de Congelación debe ser al menos 24 horas (1440 minutos).');
-      return;
-    }
     if (tiempoTotalMinutos > 0) {
       onConfirmar(tiempoTotalMinutos);
-      // Resetear valores (dejar 24h por defecto si es congelación)
-      setHoras(tipoOperacion === 'congelamiento' ? 24 : 0);
-      setMinutos(tipoOperacion === 'congelamiento' ? 0 : 30);
+      // Resetear valores
+      setHoras(0);
+      setMinutos(30);
     }
   };
 
   const handleCancelar = () => {
     // Resetear valores
-    setHoras(tipoOperacion === 'congelamiento' ? 24 : 0);
-    setMinutos(tipoOperacion === 'congelamiento' ? 0 : 30);
+    setHoras(0);
+    setMinutos(30);
     onCancelar();
   };
 
@@ -49,19 +45,12 @@ const TimerModal: React.FC<TimerModalProps> = ({
   if (!mostrarModal) return null;
 
   // Tiempos sugeridos según el tipo de operación
-  const tiemposSugeridos = tipoOperacion === 'congelamiento' 
-    ? [
-        { label: '24 horas', horas: 24, minutos: 0 },
-        { label: '36 horas', horas: 36, minutos: 0 },
-        { label: '48 horas', horas: 48, minutos: 0 },
-        { label: '72 horas', horas: 72, minutos: 0 }
-      ]
-    : [
-        { label: '15 min', horas: 0, minutos: 15 },
-        { label: '30 min', horas: 0, minutos: 30 },
-        { label: '45 min', horas: 0, minutos: 45 },
-        { label: '1 hora', horas: 1, minutos: 0 }
-      ];
+  const tiemposSugeridos = [
+    { label: '15 min', horas: 0, minutos: 15 },
+    { label: '30 min', horas: 0, minutos: 30 },
+    { label: '45 min', horas: 0, minutos: 45 },
+    { label: '1 hora', horas: 1, minutos: 0 }
+  ];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

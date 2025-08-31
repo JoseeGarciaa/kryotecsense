@@ -88,25 +88,6 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         alert('⚠️ Solo pueden escanearse para Atemperamiento las TICs cuyo estado actual es Pre-acondicionamiento y su sub-estado es Congelación.');
         return;
       }
-
-      // Regla de tiempo mínimo: verificar que lleve al menos 24h en Congelación
-      const timerCongelacionActivo = timers.find((t: any) => t.nombre === rfidLimpio && !t.completado && t.tipoOperacion === 'congelamiento');
-      const timerCongelacionCompletado = timers.find((t: any) => t.nombre === rfidLimpio && t.completado && t.tipoOperacion === 'congelamiento');
-      if (!timerCongelacionCompletado) {
-        if (!timerCongelacionActivo) {
-          alert('⚠️ El TIC no tiene un temporizador de Congelación activo o completado. Debe cumplir al menos 24 horas en Congelación.');
-          return;
-        }
-        const inicio = new Date(timerCongelacionActivo.fechaInicio).getTime();
-        const transcurridoSeg = Math.max(0, Math.floor((Date.now() - inicio) / 1000));
-        if (transcurridoSeg < 24 * 3600) {
-          const faltanSeg = 24 * 3600 - transcurridoSeg;
-          const faltanH = Math.floor(faltanSeg / 3600);
-          const faltanM = Math.floor((faltanSeg % 3600) / 60);
-          alert(`⏳ Aún no cumple las 24h mínimas de Congelación. Faltan ${faltanH}h ${faltanM}m.`);
-          return;
-        }
-      }
     }
 
     // Verificar si ya está en la lista
@@ -344,27 +325,6 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         alert('⚠️ Solo pueden agregarse a Atemperamiento las TICs que vienen de Congelación.');
         setRfidInput('');
         return;
-      }
-
-      // Regla de tiempo mínimo: verificar que lleve al menos 24h en Congelación
-      const timerCongelacionActivo = timers.find((t: any) => t.nombre === rfidTrimmed && !t.completado && t.tipoOperacion === 'congelamiento');
-      const timerCongelacionCompletado = timers.find((t: any) => t.nombre === rfidTrimmed && t.completado && t.tipoOperacion === 'congelamiento');
-      if (!timerCongelacionCompletado) {
-        if (!timerCongelacionActivo) {
-          alert('⚠️ El TIC no tiene un temporizador de Congelación activo o completado. Debe cumplir al menos 24 horas en Congelación.');
-          setRfidInput('');
-          return;
-        }
-        const inicio = new Date(timerCongelacionActivo.fechaInicio).getTime();
-        const transcurridoSeg = Math.max(0, Math.floor((Date.now() - inicio) / 1000));
-        if (transcurridoSeg < 24 * 3600) {
-          const faltanSeg = 24 * 3600 - transcurridoSeg;
-          const faltanH = Math.floor(faltanSeg / 3600);
-          const faltanM = Math.floor((faltanSeg % 3600) / 60);
-          alert(`⏳ Aún no cumple las 24h mínimas de Congelación. Faltan ${faltanH}h ${faltanM}m.`);
-          setRfidInput('');
-          return;
-        }
       }
     }
     
@@ -929,18 +889,8 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       );
     }
     
-    // Mostrar conteo ascendente para congelación (tiempo transcurrido) y descendente para atemperamiento
-    let displayTiempo = '';
-    let esUrgente = false;
-    if (!esAtemperamiento && timer.tipoOperacion === 'congelamiento') {
-      const ahora = Date.now();
-      const inicio = new Date(timer.fechaInicio).getTime();
-      const transcurridoSegundos = Math.max(0, Math.floor((ahora - inicio) / 1000));
-      displayTiempo = formatearTiempo(transcurridoSegundos);
-    } else {
-      displayTiempo = formatearTiempo(timer.tiempoRestanteSegundos);
-      esUrgente = timer.tiempoRestanteSegundos < 300; // Menos de 5 minutos
-    }
+  const tiempoFormateado = formatearTiempo(timer.tiempoRestanteSegundos);
+  const esUrgente = timer.tiempoRestanteSegundos < 300; // Menos de 5 minutos
     
     return (
       <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
@@ -949,7 +899,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             esUrgente ? 'text-red-600' : 
             timer.tipoOperacion === 'congelamiento' ? 'text-blue-600' : 'text-orange-600'
           }`}>
-            {displayTiempo}
+            {tiempoFormateado}
           </span>
         </div>
         {!timer.activo && (
@@ -1099,11 +1049,6 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                   <CheckCircle size={16} />
                   Completar todas (Congelación)
                 </button>
-              )}
-              {!timers.some((t: any) => t.completado && t.tipoOperacion === 'congelamiento') && (
-                <div className="text-[11px] text-blue-700/80">
-                  Mínimo 24h de Congelación para poder pasar a Atemperamiento
-                </div>
               )}
               
               <div className="flex gap-2">
