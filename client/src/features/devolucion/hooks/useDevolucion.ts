@@ -42,16 +42,13 @@ export const useDevolucion = () => {
           // Filtrar items pendientes de devolución:
           // 1. Items en operación (en tránsito/en transcurso) -> mostrar tiempo restante de 96h
           // 2. Items completados de operación (operación/entregado)
-          // 3. Items que están listos para despacho (Acondicionamiento/Lista para Despacho)
+          // NOTA: Ya NO incluimos Acondicionamiento/Lista para Despacho para evitar ruido aquí
           const itemsPendientes = inventarioResponse.data.filter((item: any) => {
             const estado = normalize(item.estado);
             const sub = normalize(item.sub_estado);
-            const acond = normalize('Acondicionamiento');
-            const listoDesp = normalize('Lista para Despacho');
             const esOperacionCurso = estado === 'operacion' && (sub === 'en transito' || sub === 'en transcurso');
             const esOperacionEntregado = estado === 'operacion' && (sub === 'entregado' || sub === 'entregada');
-            const esListoDespacho = estado === acond && sub === listoDesp;
-            return esOperacionCurso || esOperacionEntregado || esListoDespacho;
+            return esOperacionCurso || esOperacionEntregado;
           });
           
           // Filtrar items ya devueltos (estado: Devolución, sub_estado: Devuelto)
