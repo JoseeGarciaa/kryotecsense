@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Package, Clock, CheckCircle, X, Play, Pause, Trash2 } from 'lucide-react';
 import { useOperaciones } from '../hooks/useOperaciones';
 import { useEnvio } from '../hooks/useEnvio';
-import { useTimer } from '../hooks/useTimer';
+import { useTimerContext } from '../../../contexts/TimerContext';
 import TimerModal from './TimerModal';
 import WebSocketStatus from '../../../shared/components/WebSocketStatus';
 
@@ -26,7 +26,7 @@ interface ItemEnTransito {
 const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   const { inventarioCompleto, actualizarColumnasDesdeBackend } = useOperaciones();
   const envio = useEnvio(actualizarColumnasDesdeBackend);
-  const { timers, formatearTiempo, pausarTimer, reanudarTimer, eliminarTimer, crearTimer, obtenerTimersCompletados, isConnected } = useTimer();
+  const { timers, formatearTiempo, pausarTimer, reanudarTimer, eliminarTimer, crearTimer, obtenerTimersCompletados, isConnected } = useTimerContext();
   const [busqueda, setBusqueda] = useState('');
   const [itemsEnTransito, setItemsEnTransito] = useState<ItemEnTransito[]>([]);
   const [itemsListosParaDespacho, setItemsListosParaDespacho] = useState<any[]>([]);
