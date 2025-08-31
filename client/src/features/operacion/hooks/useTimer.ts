@@ -613,6 +613,10 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         type: 'PAUSE_TIMER',
         data: { timerId: id }
       });
+      // Refuerzo: forzar broadcast de snapshot para que todos los clientes vean el cambio
+      setTimeout(() => {
+        try { sendMessage({ type: 'FORCE_BROADCAST_SYNC' }); } catch {}
+      }, 100);
     }
   }, [isConnected, sendMessage]);
 
@@ -629,6 +633,10 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         type: 'RESUME_TIMER',
         data: { timerId: id }
       });
+      // Refuerzo: forzar broadcast de snapshot para que todos los clientes vean el cambio
+      setTimeout(() => {
+        try { sendMessage({ type: 'FORCE_BROADCAST_SYNC' }); } catch {}
+      }, 100);
     }
   }, [isConnected, sendMessage]);
 
