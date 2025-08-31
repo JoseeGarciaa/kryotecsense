@@ -144,7 +144,8 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     reanudarTimer,
     eliminarTimer,
   formatearTiempo,
-  forzarSincronizacion
+  forzarSincronizacion,
+  isConnected
   } = useTimerContext();
   
   // Efecto para cargar los datos iniciales
@@ -388,186 +389,96 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   
   // Función para confirmar con temporizador
   const confirmarConTemporizador = async (tiempoMinutos: number): Promise<void> => {
-    let timeoutId: NodeJS.Timeout | undefined;
-    
-    try {
-      setCargandoTemporizador(true);
-      const subEstadoFinal = tipoOperacionTimer === 'congelamiento' ? 'Congelación' : 'Atemperamiento';
-      
-      console.log('🕐 Iniciando configuración de temporizador...');
-      console.log('📋 RFIDs a procesar:', rfidsPendientesTimer);
-      console.log('⏱️ Tiempo configurado:', tiempoMinutos, 'minutos');
-      console.log('🎯 Tipo de operación:', tipoOperacionTimer);
-      console.log('📊 Sub-estado final:', subEstadoFinal);
-      
-      // Configurar timeout de 30 segundos
-      const timeoutPromise = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => {
-          reject(new Error('Timeout: La operación tomó demasiado tiempo (más de 30 segundos)'));
-        }, 30000);
-      });
-      
-      // Procesar los TICs con lotes automáticos y timeout
-      const resultado = await Promise.race([
-        // Usar el nuevo endpoint de lotes automáticos
-        apiServiceClient.patch('/inventory/inventario/asignar-lote-automatico', {
-          rfids: rfidsPendientesTimer,
-          estado: 'Pre-acondicionamiento',
-          sub_estado: subEstadoFinal
-        }),
-        timeoutPromise
-      ]);
-      
-      // Limpiar timeout si la operación se completó
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      
-      console.log('✅ Resultado del backend:', resultado);
-      
-      // El nuevo endpoint retorna información sobre los items actualizados y el lote generado
-      const response = resultado as any; // Tipear como any para evitar errores de TypeScript
-      const itemsActualizados = response.data?.items_actualizados || 0;
-      const loteGenerado = response.data?.lote_generado || '';
-      
-      // Verificar si hay TICs válidos para procesar
-      const hayTicsParaProcesar = rfidsPendientesTimer.length > 0;
-      
-      if (hayTicsParaProcesar && itemsActualizados > 0) {
-        // Crear timers masivos usando el nuevo endpoint optimizado
-        console.log('🔄 Creando temporizadores masivos...');
-        
-        try {
-          // Obtener IDs de los items del inventario que corresponden a estos RFIDs
-          const itemsInventario = operaciones.inventarioCompleto.filter((item: any) => 
-            rfidsPendientesTimer.includes(item.rfid)
-          );
-          
-          if (itemsInventario.length > 0) {
-            console.log(`🔄 Creando timers masivos para ${itemsInventario.length} items:`, itemsInventario);
-            console.log(`📋 Parámetros del endpoint masivo:`, {
-              items_ids: itemsInventario.map((item: any) => item.id),
-              tipoOperacion: tipoOperacionTimer,
-              tiempoMinutos: tiempoMinutos
-            });
-            
-            const timerResponse = await apiServiceClient.post('/inventory/iniciar-timers-masivo', {
-              items_ids: itemsInventario.map((item: any) => item.id),
-              tipoOperacion: tipoOperacionTimer,
-              tiempoMinutos: tiempoMinutos
-            });
-            
-            console.log('✅ Respuesta de timers masivos:', timerResponse.data);
+    // Objetivo: cerrar el modal instantáneamente y crear timers en lotes para no bloquear la UI
+    setCargandoTemporizador(true);
 
-            // Crear timers vía WebSocket para que se reflejen en todos los dispositivos
-            try {
-              rfidsPendientesTimer.forEach((rfid) => {
-                // Evitar duplicado si ya existe uno visible
-                if (!obtenerTemporizadorTIC(rfid)) {
-                  crearTimer(rfid, tipoOperacionTimer, tiempoMinutos);
-                }
-              });
-              // Pedir broadcast sync para asegurar reconciliación en todos los dispositivos
-              setTimeout(() => {
-                forzarSincronizacion();
-              }, 400);
-            } catch (optErr) {
-              console.warn('⚠️ No se pudieron crear timers vía WS:', optErr);
-            }
-            
-            // Limpiar estados ANTES de mostrar el mensaje de éxito
-            setMostrarModalTimer(false);
-            setRfidsPendientesTimer([]);
-            
-            // Mostrar mensaje con información del lote automático generado
-            alert(`✅ Procesamiento exitoso!\n\n🏷️ Lote automático asignado: ${loteGenerado}\n⏰ Temporizadores iniciados para ${timerResponse.data.timers_creados} TIC(s) por ${tiempoMinutos} minutos\n🔄 Total de timers activos: ${timerResponse.data.timers_activos_total}`);
-          } else {
-            // Fallback al método individual si no encontramos items
-            console.warn('⚠️ No se encontraron items en inventario, usando método individual...');
-            const timersCreados: string[] = [];
-            
-            rfidsPendientesTimer.forEach((rfid, index) => {
-              console.log(`⏰ Creando timer ${index + 1}/${rfidsPendientesTimer.length} para RFID: ${rfid}`);
-              console.log(`🎯 Parámetros del timer:`, {
-                rfid,
-                tipoOperacion: tipoOperacionTimer,
-                tiempoMinutos
-              });
-              const timerId = crearTimer(
-                rfid,
-                tipoOperacionTimer,
-                tiempoMinutos
-              );
-              timersCreados.push(timerId);
-              console.log(`✅ Timer creado con ID: ${timerId}`);
-              console.log(`📊 Estado actual de timers después de crear:`, timers.length);
-            });
-            
-            // Limpiar estados ANTES de mostrar el mensaje de éxito
-            setMostrarModalTimer(false);
-            setRfidsPendientesTimer([]);
-            
-            // Mostrar mensaje con información del lote automático generado
-            alert(`✅ Procesamiento exitoso!\n\n🏷️ Lote automático asignado: ${loteGenerado}\n⏰ Temporizadores iniciados para ${timersCreados.length} TIC(s) por ${tiempoMinutos} minutos`);
+    // Copias locales antes de limpiar estado
+    const rfidsSeleccionados = [...rfidsPendientesTimer];
+    const tipoSeleccionado = tipoOperacionTimer;
+    const subEstadoFinal = tipoSeleccionado === 'congelamiento' ? 'Congelación' : 'Atemperamiento';
+
+    // 1) Cerrar modal y limpiar estados primero (para respuesta inmediata)
+    setMostrarModalTimer(false);
+    setRfidsPendientesTimer([]);
+    setRfidSeleccionado('');
+    // Dar un respiro al event loop para pintar el cierre del modal
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    try {
+      // 2) Crear timers en lotes pequeños para evitar frame drops
+      const crear = isConnected ? crearTimer : crearTimerLocal;
+      const CHUNK = 50; // tamaño de lote
+      for (let i = 0; i < rfidsSeleccionados.length; i += CHUNK) {
+        const batch = rfidsSeleccionados.slice(i, i + CHUNK);
+        batch.forEach((rfid, idx) => {
+          if (!obtenerTemporizadorTIC(rfid)) {
+            const id = crear(rfid, tipoSeleccionado, tiempoMinutos);
+            // Log ligero solo por el primero del lote para no saturar
+            if (idx === 0) console.log(`🚀 Timers creados lote ${Math.floor(i / CHUNK) + 1}`);
           }
-        } catch (timerError) {
-          console.error('❌ Error creando timers masivos:', timerError);
-          
-          // Fallback al método individual
-          console.log('🔄 Fallback: Creando timers individualmente...');
-          const timersCreados: string[] = [];
-          
-          rfidsPendientesTimer.forEach((rfid, index) => {
-            console.log(`⏰ Creando timer ${index + 1}/${rfidsPendientesTimer.length} para RFID: ${rfid}`);
-            const timerId = crearTimer(
-              rfid,
-              tipoOperacionTimer,
-              tiempoMinutos
-            );
-            timersCreados.push(timerId);
-            console.log(`✅ Timer creado con ID: ${timerId}`);
-          });
-          
-          // Limpiar estados ANTES de mostrar el mensaje de éxito
-          setMostrarModalTimer(false);
-          setRfidsPendientesTimer([]);
-          
-          // Mostrar mensaje con información del lote automático generado
-          alert(`✅ Procesamiento exitoso!\n\n🏷️ Lote automático asignado: ${loteGenerado}\n⏰ Temporizadores iniciados para ${timersCreados.length} TIC(s) por ${tiempoMinutos} minutos`);
-        }
-        
-        // Recargar datos
-        console.log('🔄 Recargando datos...');
-        await cargarDatos();
-        console.log('✅ Datos recargados');
-      } else {
-        console.error('❌ No hay TICs para procesar o no se actualizaron items');
-        throw new Error('No hay TICs válidos para procesar o no se pudieron actualizar');
+        });
+        // Ceder control para mantener la UI fluida entre lotes
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise(resolve => setTimeout(resolve, 0));
       }
-    } catch (error) {
-      // Limpiar timeout en caso de error
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      
-      console.error('❌ Error al confirmar adición con temporizador:', error);
-      
-      // Mostrar error detallado al usuario
-      let mensajeError = 'Error al configurar los temporizadores';
-      if (error instanceof Error) {
-        if (error.message.includes('Timeout')) {
-          mensajeError = 'La operación tomó demasiado tiempo. Por favor, verifica la conexión e intenta nuevamente.';
-        } else {
-          mensajeError += `: ${error.message}`;
-        }
-      }
-      
-      alert(mensajeError);
-      
-      // No limpiar los estados en caso de error para que el usuario pueda reintentar
-    } finally {
+
       setCargandoTemporizador(false);
-      console.log('🏁 Proceso finalizado, estado de carga limpiado');
+
+      // 3) Sincronización en segundo plano (no bloquea la UI)
+      (async () => {
+        let timeoutId: NodeJS.Timeout | undefined;
+        try {
+          // Timeout más agresivo (10s)
+          const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error('Timeout (10s) en asignación de lote')), 10000);
+          });
+
+          const resultado = await Promise.race([
+            apiServiceClient.patch('/inventory/inventario/asignar-lote-automatico', {
+              rfids: rfidsSeleccionados,
+              estado: 'Pre-acondicionamiento',
+              sub_estado: subEstadoFinal
+            }),
+            timeoutPromise
+          ]);
+
+          if (timeoutId) clearTimeout(timeoutId);
+
+          const response = resultado as any;
+          const itemsActualizados = response?.data?.items_actualizados ?? 0;
+          const loteGenerado = response?.data?.lote_generado ?? '';
+
+          // Si no hay WS, crear timers en backend por endpoint masivo para persistencia
+          if (!isConnected) {
+            const itemsInventario = operaciones.inventarioCompleto.filter((item: any) => rfidsSeleccionados.includes(item.rfid));
+            if (itemsInventario.length > 0) {
+              try {
+                await apiServiceClient.post('/inventory/iniciar-timers-masivo', {
+                  items_ids: itemsInventario.map((i: any) => i.id),
+                  tipoOperacion: tipoSeleccionado,
+                  tiempoMinutos
+                });
+              } catch (e) {
+                console.warn('⚠️ Error en iniciar-timers-masivo (offline WS), continuando:', e);
+              }
+            }
+          }
+
+          // Forzar sync para alinear con otros dispositivos
+          setTimeout(() => {
+            forzarSincronizacion();
+          }, 300);
+
+          // Feedback sutil (no modal bloqueante)
+          console.log(`✅ Lote asignado: ${loteGenerado} • Items actualizados: ${itemsActualizados}`);
+          await cargarDatos();
+        } catch (e) {
+          console.warn('⚠️ Sincronización en background falló:', e);
+        }
+      })();
+    } catch (err) {
+      console.error('❌ Error al iniciar timers de forma optimista:', err);
+      setCargandoTemporizador(false);
     }
   };
   

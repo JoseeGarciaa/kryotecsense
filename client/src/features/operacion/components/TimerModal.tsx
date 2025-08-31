@@ -82,7 +82,7 @@ const TimerModal: React.FC<TimerModalProps> = ({
         <div className="p-6 relative">
           {/* Overlay de carga */}
           {cargando && (
-            <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
+            <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-10 rounded-lg transition-opacity">
               <div className="flex flex-col items-center gap-3">
                 <Loader className={`w-8 h-8 animate-spin ${
                   tipoOperacion === 'congelamiento' ? 'text-blue-600' : 'text-orange-600'
