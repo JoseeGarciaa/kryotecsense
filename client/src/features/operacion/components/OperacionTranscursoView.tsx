@@ -47,6 +47,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   const [loteSeleccionado, setLoteSeleccionado] = useState<string>('');
   const [itemsDelLote, setItemsDelLote] = useState<any[]>([]);
   const [itemsSeleccionadosModal, setItemsSeleccionadosModal] = useState<number[]>([]);
+  const [mostrarSinLote, setMostrarSinLote] = useState(false);
 
   // Estados para modal de temporizador
   const [mostrarModalTimer, setMostrarModalTimer] = useState(false);
@@ -604,6 +605,8 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
 
   // Obtener lotes únicos de items listos para despacho
   const lotesDisponibles = [...new Set(itemsListosDespacho.map(item => item.lote))].filter(Boolean);
+  // Items listos para despacho sin lote
+  const itemsSinLote = itemsListosDespacho.filter(item => !item.lote || item.lote.trim() === '');
 
   // Manejar selección de lote
   const seleccionarLote = (lote: string) => {
@@ -960,7 +963,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
             </div>
             
             <div className="p-4 sm:p-6 flex flex-col md:flex-row gap-4 sm:gap-6 flex-1 overflow-y-auto">
-              {/* Lotes disponibles */}
+              {/* Lotes disponibles e items sin lote */}
               <div className="w-full md:w-1/3">
                 <h3 className="text-base sm:text-lg font-medium text-gray-800 mb-3 sm:mb-4">Lotes disponibles</h3>
                 <div className="space-y-2">
@@ -996,40 +999,57 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                       </p>
                     </div>
                   )}
+                  {/* Separador y opción de items sin lote */}
+                  {itemsSinLote.length > 0 && (
+                    <div className="pt-2 mt-2 border-t border-gray-200">
+                      <button
+                        onClick={() => { setMostrarSinLote(true); setLoteSeleccionado(''); setItemsDelLote(itemsSinLote); }}
+                        className={`w-full text-left p-3 rounded-lg border transition-colors text-sm ${
+                          mostrarSinLote
+                            ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
+                            : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="font-medium">Items sin lote</div>
+                        <div className="text-xs sm:text-sm text-gray-500">
+                          {itemsSinLote.length} TICs disponibles
+                        </div>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
               
-              {/* Items del lote seleccionado */}
+              {/* Items del lote seleccionado o sin lote */}
               <div className="w-full md:w-2/3">
                 <div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <h3 className="text-base sm:text-lg font-medium text-gray-800">TICs del lote</h3>
-                  {loteSeleccionado && itemsDelLote.length > 0 && (
+                  <h3 className="text-base sm:text-lg font-medium text-gray-800">{mostrarSinLote ? 'TICs sin lote' : 'TICs del lote'}</h3>
+                  {(itemsDelLote.length > 0 || (mostrarSinLote && itemsSinLote.length > 0)) && (
                     <button
                       onClick={() => {
-                        const todosSeleccionados = itemsDelLote.every(item => itemsSeleccionadosModal.includes(item.id));
+                        const listado = mostrarSinLote ? itemsSinLote : itemsDelLote;
+                        const todosSeleccionados = listado.every(item => itemsSeleccionadosModal.includes(item.id));
                         if (todosSeleccionados) {
                           // Deseleccionar todos
-                          setItemsSeleccionadosModal(prev => 
-                            prev.filter(id => !itemsDelLote.some(item => item.id === id))
-                          );
+                          setItemsSeleccionadosModal(prev => prev.filter(id => !listado.some(item => item.id === id)));
                         } else {
                           // Seleccionar todos
-                          const idsDelLote = itemsDelLote.map(item => item.id);
+                          const ids = listado.map(item => item.id);
                           setItemsSeleccionadosModal(prev => {
-                            const sinDuplicados = prev.filter(id => !idsDelLote.includes(id));
-                            return [...sinDuplicados, ...idsDelLote];
+                            const sinDuplicados = prev.filter(id => !ids.includes(id));
+                            return [...sinDuplicados, ...ids];
                           });
                         }
                       }}
                       className="text-xs sm:text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                     >
-                      {itemsDelLote.every(item => itemsSeleccionadosModal.includes(item.id)) ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                      {(mostrarSinLote ? itemsSinLote : itemsDelLote).every(item => itemsSeleccionadosModal.includes(item.id)) ? 'Deseleccionar todos' : 'Seleccionar todos'}
                     </button>
                   )}
                 </div>
-                {loteSeleccionado ? (
+                {loteSeleccionado || mostrarSinLote ? (
                   <div className="space-y-2 max-h-64 sm:max-h-96 overflow-y-auto">
-                    {itemsDelLote.map((item) => (
+                    {(mostrarSinLote ? itemsSinLote : itemsDelLote).map((item) => (
                       <div
                         key={item.id}
                         className={`p-3 rounded-lg border cursor-pointer transition-colors text-sm ${
@@ -1062,7 +1082,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                 ) : (
                   <div className="text-center text-gray-500 py-8">
                     <Package className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-gray-400" />
-                    <p>Selecciona un lote para ver sus TICs</p>
+                    <p>Selecciona un lote o "Items sin lote" para ver sus TICs</p>
                   </div>
                 )}
               </div>

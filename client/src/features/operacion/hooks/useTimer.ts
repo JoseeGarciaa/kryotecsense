@@ -23,8 +23,29 @@ let pendingCompletionBatch: Timer[] = [];
 let batchCompletionHandle: number | null = null;
 const BATCH_WINDOW_MS = 700;
 
+// Deduplication: avoid notifying the same timer ID more than once within a TTL window
+const recentlyNotifiedById: Map<string, number> = new Map();
+const DEDUP_TTL_MS = 10_000; // 10s window to ignore duplicates of the same timer
+
+function canNotify(timer: Timer): boolean {
+  const now = Date.now();
+  const last = recentlyNotifiedById.get(timer.id) ?? 0;
+  if (now - last < DEDUP_TTL_MS) {
+    return false;
+  }
+  recentlyNotifiedById.set(timer.id, now);
+  return true;
+}
+
 function queueCompletionNotification(timer: Timer) {
-  pendingCompletionBatch.push(timer);
+  // Skip if this timer was recently notified
+  if (!canNotify(timer)) return;
+
+  // Ensure we don't add duplicates of the same timer into the current batch
+  if (!pendingCompletionBatch.some(t => t.id === timer.id)) {
+    pendingCompletionBatch.push(timer);
+  }
+
   if (batchCompletionHandle !== null) {
     return; // already scheduled
   }
@@ -35,7 +56,7 @@ function queueCompletionNotification(timer: Timer) {
 
     if (items.length === 0) return;
 
-    // Build a single message
+    // Prefer a single OS notification if permitted; otherwise use one alert
     if (Notification.permission === 'granted') {
       if (items.length === 1) {
         const t = items[0];
@@ -50,17 +71,17 @@ function queueCompletionNotification(timer: Timer) {
           icon: '/favicon.ico'
         });
       }
-    }
-
-    // Alert: aggregate into one
-    if (items.length === 1) {
-      const t = items[0];
-      alert(`⏰ Temporizador completado!\n\n${t.nombre}\n${t.tipoOperacion === 'congelamiento' ? 'Congelación' : 'Atemperamiento'} completado`);
     } else {
-      const tipo = items.every(i => i.tipoOperacion === 'congelamiento') ? 'Congelación' : items.every(i => i.tipoOperacion === 'atemperamiento') ? 'Atemperamiento' : 'varios procesos';
-      const nombresPreview = items.slice(0, 5).map(i => i.nombre).join(', ');
-      const resto = items.length > 5 ? ` y ${items.length - 5} más` : '';
-      alert(`⏰ ${items.length} temporizadores completados (${tipo}).\nEjemplo: ${nombresPreview}${resto}`);
+      // Fallback single alert
+      if (items.length === 1) {
+        const t = items[0];
+        alert(`⏰ Temporizador completado!\n\n${t.nombre}\n${t.tipoOperacion === 'congelamiento' ? 'Congelación' : 'Atemperamiento'} completado`);
+      } else {
+        const tipo = items.every(i => i.tipoOperacion === 'congelamiento') ? 'Congelación' : items.every(i => i.tipoOperacion === 'atemperamiento') ? 'Atemperamiento' : 'varios procesos';
+        const nombresPreview = items.slice(0, 5).map(i => i.nombre).join(', ');
+        const resto = items.length > 5 ? ` y ${items.length - 5} más` : '';
+        alert(`⏰ ${items.length} temporizadores completados (${tipo}).\nEjemplo: ${nombresPreview}${resto}`);
+      }
     }
   }, BATCH_WINDOW_MS) as unknown) as number;
 }
