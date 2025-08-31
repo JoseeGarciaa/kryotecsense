@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Package, Scan, CheckCircle, AlertCircle } from 'lucide-react';
 import { useDevolucion } from '../hooks/useDevolucion';
 import { DevolucionScanModal } from './DevolucionScanModal';
+import { useTimerContext } from '../../../contexts/TimerContext';
 
 export const Devolucion: React.FC = () => {
   const {
@@ -17,6 +18,24 @@ export const Devolucion: React.FC = () => {
   const [mostrarModal, setMostrarModal] = useState(false);
   const [paginaActual, setPaginaActual] = useState(1);
   const itemsPorPagina = 5;
+
+  // Timers para mostrar la cuenta regresiva de Operación (96h)
+  const { timers, formatearTiempo } = useTimerContext();
+
+  const tiempoRestantePorItem = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const t of timers) {
+      if (t.tipoOperacion === 'envio' && t.activo && !t.completado) {
+        // Buscar patrón en el nombre: "Envío #<id> - <nombre>"
+        const match = t.nombre.match(/^Envío\s+#(\d+)\s+-/);
+        if (match) {
+          const id = Number(match[1]);
+          map.set(id, formatearTiempo(t.tiempoRestanteSegundos));
+        }
+      }
+    }
+    return map;
+  }, [timers, formatearTiempo]);
 
   useEffect(() => {
     cargarItemsDevolucion();
@@ -187,7 +206,14 @@ export const Devolucion: React.FC = () => {
                             <p className="text-xs text-gray-600 break-all">Lote: {item.lote} • RFID: {item.rfid || 'N/A'}</p>
                           </div>
                         </div>
-                        <span className="text-[10px] sm:text-xs text-blue-600 font-medium bg-blue-100 px-2 py-0.5 rounded">Pendiente</span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-[10px] sm:text-xs text-blue-600 font-medium bg-blue-100 px-2 py-0.5 rounded">Pendiente</span>
+                          {tiempoRestantePorItem.has(item.id) && (
+                            <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
+                              ⏱ {tiempoRestantePorItem.get(item.id)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -218,7 +244,14 @@ export const Devolucion: React.FC = () => {
                             <p className="text-xs text-gray-600 break-all">Lote: {item.lote} • RFID: {item.rfid || 'N/A'}</p>
                           </div>
                         </div>
-                        <span className="text-[10px] sm:text-xs text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">Pendiente</span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-[10px] sm:text-xs text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">Pendiente</span>
+                          {tiempoRestantePorItem.has(item.id) && (
+                            <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
+                              ⏱ {tiempoRestantePorItem.get(item.id)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -249,7 +282,14 @@ export const Devolucion: React.FC = () => {
                             <p className="text-xs text-gray-600 break-all">Lote: {item.lote} • RFID: {item.rfid || 'N/A'}</p>
                           </div>
                         </div>
-                        <span className="text-[10px] sm:text-xs text-yellow-600 font-medium bg-yellow-100 px-2 py-0.5 rounded">Pendiente</span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-[10px] sm:text-xs text-yellow-600 font-medium bg-yellow-100 px-2 py-0.5 rounded">Pendiente</span>
+                          {tiempoRestantePorItem.has(item.id) && (
+                            <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
+                              ⏱ {tiempoRestantePorItem.get(item.id)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

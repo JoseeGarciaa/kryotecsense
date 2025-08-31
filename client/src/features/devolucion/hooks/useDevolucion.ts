@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { apiServiceClient } from '../../../api/apiClient';
+import { useTimerContext } from '../../../contexts/TimerContext';
 
 interface ItemDevolucion {
   id: number;
@@ -17,6 +18,7 @@ export const useDevolucion = () => {
   const [itemsDevueltos, setItemsDevueltos] = useState<ItemDevolucion[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { timers, eliminarTimer } = useTimerContext();
 
   // Cargar items pendientes de devolución
   const cargarItemsDevolucion = useCallback(async () => {
@@ -185,6 +187,17 @@ export const useDevolucion = () => {
         await Promise.all([...promesasEstado, ...promesasActividades]);
 
         console.log(`✅ ${idsValidos.length} items válidos marcados como devueltos en backend`);
+        // Eliminar timers de operación (envío) asociados ahora que pasaron a Devolución
+        try {
+          for (const id of idsValidos) {
+            const timer = timers.find(t => t.tipoOperacion === 'envio' && new RegExp(`^Envío\\s+#${id}\\s+-`).test(t.nombre));
+            if (timer) {
+              eliminarTimer(timer.id);
+            }
+          }
+        } catch (e) {
+          console.warn('No se pudieron eliminar algunos timers tras devolución:', e);
+        }
         
         // Una sola recarga al final
         await cargarItemsDevolucion();
@@ -199,6 +212,18 @@ export const useDevolucion = () => {
           sub_estado: 'Devuelto'
         }))]);
         
+        // Eliminar timers localmente también
+        try {
+          for (const id of itemIds) {
+            const timer = timers.find(t => t.tipoOperacion === 'envio' && new RegExp(`^Envío\\s+#${id}\\s+-`).test(t.nombre));
+            if (timer) {
+              eliminarTimer(timer.id);
+            }
+          }
+        } catch (e) {
+          console.warn('No se pudieron eliminar algunos timers (local) tras devolución:', e);
+        }
+
         console.log(`✅ ${itemIds.length} items marcados como devueltos localmente (modo desarrollo)`);
       }
     } catch (err) {
@@ -206,7 +231,7 @@ export const useDevolucion = () => {
       setError('Error al marcar items como devueltos');
       throw err;
     }
-  }, [itemsDevolucion, cargarItemsDevolucion]);
+  }, [itemsDevolucion, cargarItemsDevolucion, timers, eliminarTimer]);
 
   // Mantener función individual para compatibilidad
   const marcarComoDevuelto = useCallback(async (itemId: number) => {

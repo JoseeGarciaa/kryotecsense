@@ -52,29 +52,33 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
    */
   const iniciarEnvio = useCallback(async (
     itemsSeleccionados: any[],
-    tiempoEnvioMinutos: number = 120 // 2 horas por defecto
+    _tiempoEnvioMinutos: number = 120 // ignorado: siempre 96h
   ) => {
     setCargandoEnvio(true);
     
     try {
       console.log('🚚 ===== INICIANDO PROCESO DE ENVÍO =====');
       console.log('📦 Items seleccionados:', itemsSeleccionados.length);
-      console.log('⏱️ Tiempo estimado de envío:', tiempoEnvioMinutos, 'minutos');
+  console.log('⏱️ Tiempo de operación forzado:', 5760, 'minutos (96h)');
 
       const itemsParaEnvio: ItemEnvio[] = [];
       const actualizacionesEstado = [];
       const actividadesCreadas = [];
 
+      // Forzar tiempo de operación 96 horas (5760 minutos)
+      const tiempoOperacionMin = 5760;
+
       for (const item of itemsSeleccionados) {
-        // Crear temporizador de envío
+        // Crear temporizador de envío (nombre incluye ID para coincidencia fiable en Devolución)
+        const timerNombre = `Envío #${item.id} - ${item.nombre_unidad}`;
         const timerId = crearTimer(
-          `Envío ${item.nombre_unidad}`,
+          timerNombre,
           'envio', // Tipo específico para envíos
-          tiempoEnvioMinutos
+          tiempoOperacionMin
         );
 
         const fechaInicio = new Date();
-        const fechaEstimada = new Date(fechaInicio.getTime() + (tiempoEnvioMinutos * 60 * 1000));
+        const fechaEstimada = new Date(fechaInicio.getTime() + (tiempoOperacionMin * 60 * 1000));
 
         // Preparar item para envío
         const itemEnvio: ItemEnvio = {
@@ -85,7 +89,7 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
           estado: 'operación',
           sub_estado: 'En transito',
           categoria: item.categoria || 'credocube',
-          tiempoEnvio: tiempoEnvioMinutos,
+          tiempoEnvio: tiempoOperacionMin,
           timerId,
           fechaInicioEnvio: fechaInicio,
           fechaEstimadaLlegada: fechaEstimada
@@ -104,7 +108,7 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
         actividadesCreadas.push({
           inventario_id: item.id,
           usuario_id: 1,
-          descripcion: `Iniciado envío de ${item.nombre_unidad} - Tiempo estimado: ${tiempoEnvioMinutos} minutos`,
+          descripcion: `Iniciado envío de ${item.nombre_unidad} - Tiempo de operación: 5760 minutos (96h)`,
           estado_nuevo: 'operación',
           sub_estado_nuevo: 'En transito'
         });
@@ -121,7 +125,7 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
       
       const payload = {
         items_ids: itemsSeleccionados.map(item => item.id),
-        tiempo_envio_minutos: tiempoEnvioMinutos,
+  tiempo_envio_minutos: tiempoOperacionMin,
         descripcion_adicional: 'Envío iniciado desde centro de operaciones'
       };
       
@@ -148,15 +152,15 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
         await refetchInventario();
       }
 
-      console.log('🚚 ===== ENVÍO INICIADO EXITOSAMENTE =====');
-      console.log(`📦 ${itemsParaEnvio.length} items en tránsito`);
-      console.log(`⏱️ Tiempo estimado de llegada: ${formatearTiempo(tiempoEnvioMinutos * 60)}`);
+  console.log('🚚 ===== ENVÍO INICIADO EXITOSAMENTE =====');
+  console.log(`📦 ${itemsParaEnvio.length} items en tránsito`);
+  console.log(`⏱️ Tiempo de operación: ${formatearTiempo(tiempoOperacionMin * 60)} (96h)`);
 
       return {
         success: true,
         message: `Envío iniciado para ${itemsParaEnvio.length} items`,
         itemsEnviados: itemsParaEnvio.length,
-        tiempoEstimado: tiempoEnvioMinutos
+  tiempoEstimado: tiempoOperacionMin
       };
 
     } catch (error: any) {
@@ -189,13 +193,10 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
       
       console.log('✅ Respuesta del backend:', completarResponse.data);
 
-      // Buscar item en estado local para eliminar timer si existe
-      const item = itemsEnEnvio.find(i => i.id === itemId);
-      if (item && item.timerId) {
-        eliminarTimer(item.timerId);
-      }
+  // Mantener el timer activo para que siga visible en "Pendientes de Devolución"
+  const item = itemsEnEnvio.find(i => i.id === itemId);
 
-      // Actualizar estado local si el item existe
+  // Actualizar estado local si el item existe
       if (item) {
         setItemsEnEnvio(prev => 
           prev.map(i => 
@@ -242,7 +243,7 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
       
       console.log('✅ Respuesta del backend:', cancelarResponse.data);
 
-      // Buscar item en estado local para eliminar timer si existe
+  // Buscar item en estado local para eliminar timer de envío si existe
       const item = itemsEnEnvio.find(i => i.id === itemId);
       if (item && item.timerId) {
         eliminarTimer(item.timerId);
