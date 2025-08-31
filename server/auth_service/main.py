@@ -411,6 +411,21 @@ class TimerCompletedEvent(BaseModel):
     timestamp: str
 
 
+def timer_to_json(timer: Timer) -> Dict[str, Any]:
+    """Convert Timer model to JSON-serializable dict with ISO datetime strings."""
+    return {
+        "id": timer.id,
+        "nombre": timer.nombre,
+        "tipoOperacion": timer.tipoOperacion,
+        "tiempoInicialMinutos": int(timer.tiempoInicialMinutos),
+        "tiempoRestanteSegundos": int(timer.tiempoRestanteSegundos),
+        "fechaInicio": timer.fechaInicio.isoformat(),
+        "fechaFin": timer.fechaFin.isoformat(),
+        "activo": bool(timer.activo),
+        "completado": bool(timer.completado),
+    }
+
+
 # Estado global de timers y conexiones
 class TimerManager:
     def __init__(self):
@@ -483,7 +498,8 @@ class TimerManager:
         await self.send_to_client(websocket, {
             "type": "TIMER_SYNC",
             "data": {
-                "timers": [timer.dict() for timer in self.timers.values()]
+                "timers": [timer_to_json(timer) for timer in self.timers.values()],
+                "server_timestamp": int(datetime.utcnow().timestamp() * 1000)
             }
         })
         
@@ -534,7 +550,33 @@ class TimerManager:
             timer_logger.info(f"Timer ya existe, actualizando: {timer_id}")
             await self.update_timer(timer_id, timer_data, websocket)
             return
-        
+
+        # Asegurar campos requeridos cuando el cliente no los envía
+        try:
+            now = datetime.utcnow()
+            # fechaInicio/fechaFin pueden no venir del cliente: calcular en servidor
+            if 'fechaInicio' not in timer_data or not timer_data.get('fechaInicio'):
+                timer_data['fechaInicio'] = now
+            elif isinstance(timer_data.get('fechaInicio'), str):
+                timer_data['fechaInicio'] = datetime.fromisoformat(timer_data['fechaInicio'])
+
+            if 'fechaFin' not in timer_data or not timer_data.get('fechaFin'):
+                minutos = int(timer_data.get('tiempoInicialMinutos', 0) or 0)
+                timer_data['fechaFin'] = (timer_data['fechaInicio'] if isinstance(timer_data['fechaInicio'], datetime) else now) + timedelta(minutes=minutos)
+            elif isinstance(timer_data.get('fechaFin'), str):
+                timer_data['fechaFin'] = datetime.fromisoformat(timer_data['fechaFin'])
+
+            # Calcular tiempo restante en segundos en base a la fechaFin
+            restante = max(0, int((timer_data['fechaFin'] - now).total_seconds()))
+            timer_data['tiempoRestanteSegundos'] = int(timer_data.get('tiempoRestanteSegundos', restante) or restante)
+
+            # Normalizar flags
+            timer_data['completado'] = bool(timer_data.get('completado', False)) or timer_data['tiempoRestanteSegundos'] == 0
+            timer_data['activo'] = bool(timer_data.get('activo', True)) and not timer_data['completado']
+        except Exception as e:
+            timer_logger.error(f"Error normalizando datos de timer nuevo: {e}")
+            raise
+
         timer = Timer(**timer_data)
         self.timers[timer.id] = timer
         
@@ -546,7 +588,7 @@ class TimerManager:
         # Broadcast a todos los clientes excepto el que envió
         await self.broadcast({
             "type": "TIMER_CREATED",
-            "data": {"timer": timer.dict()}
+            "data": {"timer": timer_to_json(timer)}
         }, exclude=websocket)
         
     async def update_timer(self, timer_id: str, updates: Dict, websocket: Optional[WebSocket] = None):
@@ -568,7 +610,7 @@ class TimerManager:
         # Broadcast a todos los clientes excepto el que envió
         await self.broadcast({
             "type": "TIMER_UPDATED",
-            "data": {"timer": timer.dict()}
+            "data": {"timer": timer_to_json(timer)}
         }, exclude=websocket)
         
         return True
@@ -654,7 +696,10 @@ class TimerManager:
                     for update in updated_timers:
                         await self.broadcast({
                             "type": "TIMER_TIME_UPDATE",
-                            "data": update
+                            "data": {
+                                **update,
+                                "server_timestamp": int(datetime.utcnow().timestamp() * 1000)
+                            }
                         })
                 
                 # Guardar en archivo cada 30 segundos si hay cambios
@@ -720,7 +765,17 @@ async def websocket_endpoint(websocket: WebSocket):
                 await timer_manager.send_to_client(websocket, {
                     "type": "TIMER_SYNC",
                     "data": {
-                        "timers": [timer.dict() for timer in timer_manager.timers.values()]
+                        "timers": [timer_to_json(timer) for timer in timer_manager.timers.values()],
+                        "server_timestamp": int(datetime.utcnow().timestamp() * 1000)
+                    }
+                })
+            elif message_type == "SYNC_REQUEST":
+                # Compatibilidad con clientes que usan SYNC_REQUEST
+                await timer_manager.send_to_client(websocket, {
+                    "type": "TIMER_SYNC",
+                    "data": {
+                        "timers": [timer_to_json(timer) for timer in timer_manager.timers.values()],
+                        "server_timestamp": int(datetime.utcnow().timestamp() * 1000)
                     }
                 })
                 
@@ -743,6 +798,15 @@ async def websocket_endpoint(websocket: WebSocket):
                 timer_id = message_data.get("timerId")
                 if timer_id:
                     await timer_manager.delete_timer(timer_id, websocket)
+            elif message_type == "FORCE_BROADCAST_SYNC":
+                # Fuerza un broadcast de sincronización a todos los clientes
+                await timer_manager.broadcast({
+                    "type": "TIMER_SYNC",
+                    "data": {
+                        "timers": [timer_to_json(timer) for timer in timer_manager.timers.values()],
+                        "server_timestamp": int(datetime.utcnow().timestamp() * 1000)
+                    }
+                })
                     
             else:
                 timer_logger.warning(f"Tipo de mensaje no reconocido: {message_type}")
