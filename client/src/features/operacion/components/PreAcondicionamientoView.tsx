@@ -753,34 +753,23 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     });
   }, [eliminarTimer]); // Solo depende de eliminarTimer
 
-  // Función para limpiar todos los timers completados
-  const limpiarTodosLosTimersCompletados = async () => {
+  // Limpiar timers completados por tipo
+  const limpiarTimersCompletadosPorTipo = async (tipo: 'congelamiento' | 'atemperamiento') => {
     try {
-      const timersCompletados = timers.filter((t: any) => t.completado);
-      
-      if (timersCompletados.length === 0) {
-        alert('No hay timers completados para limpiar');
+      const aLimpiar = timers.filter((t: any) => t.completado && t.tipoOperacion === tipo);
+      if (aLimpiar.length === 0) {
+        alert(`No hay timers completados de ${tipo}.`);
         return;
       }
-
-      const confirmar = window.confirm(`¿Limpiar todos los ${timersCompletados.length} timer(s) completado(s)?`);
+      const confirmar = window.confirm(`¿Limpiar ${aLimpiar.length} timer(s) completado(s) de ${tipo}?`);
       if (!confirmar) return;
-
-      console.log(`🧹 Limpiando ${timersCompletados.length} timers completados`);
-      
-      // Eliminar todos los timers completados uno por uno
-      for (const timer of timersCompletados) {
-        console.log(`🗑️ Eliminando timer: ${timer.id} - ${timer.nombre}`);
-        eliminarTimer(timer.id);
-        // Pequeño delay entre eliminaciones para evitar problemas
-        await new Promise(resolve => setTimeout(resolve, 100));
+      for (const t of aLimpiar) {
+        eliminarTimer(t.id);
+        await new Promise(r => setTimeout(r, 80));
       }
-      
-      console.log('✅ Todos los timers completados han sido eliminados');
-      
-    } catch (error) {
-      console.error('❌ Error al limpiar todos los timers:', error);
-      alert('Error al limpiar los timers. Revisa la consola para más detalles.');
+    } catch (e) {
+      console.error('Error limpiando timers por tipo:', e);
+      alert('Error al limpiar timers.');
     }
   };
   
@@ -969,28 +958,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Registrar Pre Acondicionamiento</h1>
       </div>
       
-      {/* Botones de acción global */}
-      {timers.filter((t: any) => t.completado).length > 0 && (
-        <div className="mb-4 p-3 sm:p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-yellow-700 text-sm">
-                Hay {timers.filter((t: any) => t.completado).length} timer(s) completado(s)
-              </span>
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                limpiarTodosLosTimersCompletados();
-              }}
-              className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm transition-colors w-full sm:w-auto"
-            >
-              <X size={16} />
-              Limpiar Todos
-            </button>
-          </div>
-        </div>
-      )}
+  {/* Se removió el banner global de limpiar; ahora se limpia por sección */}
       
       {/* Sección de TICs para Congelamiento */}
       <div className="bg-white rounded-lg shadow-md mb-6 sm:mb-8 overflow-hidden">
@@ -1024,6 +992,17 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 >
                   <Play size={16} />
                   Iniciar Todos ({ticsCongelamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length})
+                </button>
+              )}
+              {/* Limpiar timers completados de congelación */}
+              {timers.some((t: any) => t.completado && t.tipoOperacion === 'congelamiento') && (
+                <button
+                  onClick={() => limpiarTimersCompletadosPorTipo('congelamiento')}
+                  className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm transition-colors"
+                  title="Limpiar timers completados de congelación"
+                >
+                  <X size={16} />
+                  Limpiar (Congelación)
                 </button>
               )}
               {/* Completar todas: Congelamiento → Atemperamiento */}
@@ -1282,6 +1261,17 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 >
                   <Play size={16} />
                   Iniciar Todos ({ticsAtemperamiento.filter(tic => !obtenerTemporizadorTIC(tic.rfid)).length})
+                </button>
+              )}
+              {/* Limpiar timers completados de atemperamiento */}
+              {timers.some((t: any) => t.completado && t.tipoOperacion === 'atemperamiento') && (
+                <button
+                  onClick={() => limpiarTimersCompletadosPorTipo('atemperamiento')}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm font-medium shadow-sm"
+                  title="Limpiar timers completados de atemperamiento"
+                >
+                  <X size={16} />
+                  Limpiar (Atemperamiento)
                 </button>
               )}
               {/* Completar todas: Atemperamiento → Acondicionamiento */}
