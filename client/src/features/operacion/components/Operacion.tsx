@@ -372,6 +372,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
       <InlineCountdown
         endTime={timer.fechaFin}
         seconds={timer.tiempoRestanteSegundos}
+  paused={!timer.activo}
         format={formatearTiempo}
       />
     );

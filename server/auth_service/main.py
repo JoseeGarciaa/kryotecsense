@@ -202,18 +202,31 @@ class TimerManager:
         return False
         
     async def pause_timer(self, timer_id: str, websocket: WebSocket = None):
-        """Pausar temporizador"""
-        return await self.update_timer(timer_id, {"activo": False}, websocket)
-        
-    async def resume_timer(self, timer_id: str, websocket: WebSocket = None):
-        """Reanudar temporizador"""
+        """Pausar temporizador: congelar el tiempo restante en tiempoRestanteSegundos."""
         if timer_id not in self.timers:
             return False
-            
         timer = self.timers[timer_id]
-        if not timer.completado:
-            return await self.update_timer(timer_id, {"activo": True}, websocket)
-        return False
+        # Calcular tiempo restante respecto a ahora usando fechaFin como autoridad
+        try:
+            current_time = get_utc_now()
+            restante = max(0, int((timer.fechaFin - current_time).total_seconds()))
+        except Exception:
+            # Fallback si hubiera inconsistencia en tipos
+            restante = max(0, int(timer.tiempoRestanteSegundos or 0))
+        updates = {"activo": False, "tiempoRestanteSegundos": restante}
+        return await self.update_timer(timer_id, updates, websocket)
+        
+    async def resume_timer(self, timer_id: str, websocket: WebSocket = None):
+        """Reanudar temporizador: recalcular fechaFin a partir del tiempo restante almacenado."""
+        if timer_id not in self.timers:
+            return False
+        timer = self.timers[timer_id]
+        if timer.completado:
+            return False
+        restante = max(0, int(timer.tiempoRestanteSegundos or 0))
+        nueva_fin = get_utc_now() + timedelta(seconds=restante)
+        updates = {"activo": True, "fechaFin": nueva_fin}
+        return await self.update_timer(timer_id, updates, websocket)
         
     async def tick_timers(self):
         """Actualizar todos los timers activos cada segundo"""
@@ -635,18 +648,29 @@ class TimerManager:
         return False
         
     async def pause_timer(self, timer_id: str, websocket: Optional[WebSocket] = None):
-        """Pausar temporizador"""
-        return await self.update_timer(timer_id, {"activo": False}, websocket)
-        
-    async def resume_timer(self, timer_id: str, websocket: Optional[WebSocket] = None):
-        """Reanudar temporizador"""
+        """Pausar temporizador: congelar el tiempo restante en tiempoRestanteSegundos."""
         if timer_id not in self.timers:
             return False
-            
         timer = self.timers[timer_id]
-        if not timer.completado:
-            return await self.update_timer(timer_id, {"activo": True}, websocket)
-        return False
+        try:
+            current_time = datetime.utcnow()
+            restante = max(0, int((timer.fechaFin - current_time).total_seconds()))
+        except Exception:
+            restante = max(0, int(timer.tiempoRestanteSegundos or 0))
+        updates = {"activo": False, "tiempoRestanteSegundos": restante}
+        return await self.update_timer(timer_id, updates, websocket)
+        
+    async def resume_timer(self, timer_id: str, websocket: Optional[WebSocket] = None):
+        """Reanudar temporizador: recalcular fechaFin a partir del tiempo restante almacenado."""
+        if timer_id not in self.timers:
+            return False
+        timer = self.timers[timer_id]
+        if timer.completado:
+            return False
+        restante = max(0, int(timer.tiempoRestanteSegundos or 0))
+        nueva_fin = datetime.utcnow() + timedelta(seconds=restante)
+        updates = {"activo": True, "fechaFin": nueva_fin}
+        return await self.update_timer(timer_id, updates, websocket)
         
     async def tick_timers(self):
         """Actualizar todos los timers activos cada segundo"""
