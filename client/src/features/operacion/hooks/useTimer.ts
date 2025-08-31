@@ -289,11 +289,29 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
                   }
                 }, 0);
               }
-              
+
+              // Evitar sobreescribir el conteo local de 1s con el mismo valor del servidor.
+              // Solo corregir si hay un aumento (p.ej. edición/pausa) o una diferencia significativa (>=2s).
+              let tiempoActualizado = timer.tiempoRestanteSegundos;
+              const diff = nuevoTiempoRestante - (timer.tiempoRestanteSegundos ?? 0);
+
+              if (completado) {
+                tiempoActualizado = 0;
+              } else if (diff >= 2) {
+                // El servidor indica mucho más tiempo (edición/reinicio): aceptar incremento grande
+                tiempoActualizado = nuevoTiempoRestante;
+              } else if (Math.abs(diff) >= 2) {
+                // Corrección de drift notable: aceptar valor del servidor
+                tiempoActualizado = nuevoTiempoRestante;
+              } else {
+                // Diferencia menor a 2s: mantener el valor local para preservar el tick visible de 1s
+                tiempoActualizado = timer.tiempoRestanteSegundos;
+              }
+
               return {
                 ...timer,
-                tiempoRestanteSegundos: nuevoTiempoRestante,
-                completado,
+                tiempoRestanteSegundos: tiempoActualizado,
+                completado: completado || tiempoActualizado === 0,
                 activo,
                 server_timestamp: lastMessage.data.server_timestamp,
                 optimistic: false
