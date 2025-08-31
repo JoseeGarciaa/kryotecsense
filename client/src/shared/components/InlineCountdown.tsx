@@ -5,6 +5,8 @@ type Props = {
   endTime?: Date | string | null;
   // Segundos restantes como respaldo si no hay endTime.
   seconds?: number;
+  // Pausado: no decrementar ni recalcular; mostrar estático.
+  paused?: boolean;
   // Formateador externo (HH:MM:SS o MM:SS)
   format: (s: number) => string;
   // Callback opcional al llegar a cero
@@ -14,7 +16,7 @@ type Props = {
 
 // Countdown ligero y determinístico que recalcula desde endTime cada segundo.
 // Si no hay endTime, usa "seconds" y decrementa localmente.
-const InlineCountdown: React.FC<Props> = ({ endTime, seconds, format, onZero, className }) => {
+const InlineCountdown: React.FC<Props> = ({ endTime, seconds, paused = false, format, onZero, className }) => {
   const targetMs = useMemo(() => {
     if (!endTime) return null;
     try {
@@ -40,6 +42,17 @@ const InlineCountdown: React.FC<Props> = ({ endTime, seconds, format, onZero, cl
 
   // Sincronizar display cuando cambien las props de manera significativa
   useEffect(() => {
+    if (paused) {
+      // En pausa: fijar al valor de seconds si viene, o al cálculo actual si hay endTime
+      const s = typeof secondsRef.current === 'number' ? Math.max(0, Math.floor(secondsRef.current)) : null;
+      if (s !== null) {
+        setDisplay(s);
+      } else if (targetMs) {
+        const calc = Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
+        setDisplay(calc);
+      }
+      return;
+    }
     if (targetMs) {
       const calc = Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
       // Aceptar cambios cuando la diferencia sea notable o se reinicie
@@ -55,8 +68,11 @@ const InlineCountdown: React.FC<Props> = ({ endTime, seconds, format, onZero, cl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetMs]);
 
-  // Tick de 1s: si hay endTime, recalcular; si no, decrementar localmente
+  // Tick de 1s: si hay endTime, recalcular; si no, decrementar localmente. Deshabilitar cuando paused.
   useEffect(() => {
+    if (paused) {
+      return; // No iniciar intervalo si está en pausa
+    }
     const id = setInterval(() => {
       setDisplay(prev => {
         if (targetMs) {
@@ -67,7 +83,7 @@ const InlineCountdown: React.FC<Props> = ({ endTime, seconds, format, onZero, cl
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [targetMs]);
+  }, [targetMs, paused]);
 
   // Disparar onZero una sola vez
   const firedRef = useRef(false);

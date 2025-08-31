@@ -104,11 +104,15 @@ class TimerManager:
         return int(get_utc_now().timestamp() * 1000)
         
     def calculate_remaining_time(self, timer: Timer) -> int:
-        """Calcular tiempo restante basado SOLO en tiempo del servidor"""
+        """Calcular tiempo restante. Si está pausado, devolver el valor almacenado."""
+        if not timer.activo:
+            try:
+                return max(0, int(timer.tiempoRestanteSegundos))
+            except Exception:
+                return 0
         server_now = get_utc_now()
         if timer.fechaFin <= server_now:
             return 0
-        
         remaining_seconds = int((timer.fechaFin - server_now).total_seconds())
         return max(0, remaining_seconds)
         
@@ -285,18 +289,26 @@ class TimerManager:
         return False
         
     async def pause_timer(self, timer_id: str, websocket: Optional[WebSocket] = None):
-        """Pausar temporizador"""
-        return await self.update_timer(timer_id, {"activo": False}, websocket)
-        
-    async def resume_timer(self, timer_id: str, websocket: Optional[WebSocket] = None):
-        """Reanudar temporizador"""
+        """Pausar temporizador: congelar tiempo restante y detener tick."""
         if timer_id not in self.timers:
             return False
-            
         timer = self.timers[timer_id]
-        if not timer.completado:
-            return await self.update_timer(timer_id, {"activo": True}, websocket)
-        return False
+        remaining = self.calculate_remaining_time(timer)
+        updates = {"activo": False, "tiempoRestanteSegundos": remaining}
+        return await self.update_timer(timer_id, updates, websocket)
+        
+    async def resume_timer(self, timer_id: str, websocket: Optional[WebSocket] = None):
+        """Reanudar temporizador: reestablecer fechaFin a ahora + restante."""
+        if timer_id not in self.timers:
+            return False
+        timer = self.timers[timer_id]
+        if timer.completado:
+            return False
+        # Establecer nueva fechaFin basada en tiempo restante almacenado
+        restante = max(0, int(timer.tiempoRestanteSegundos))
+        new_end = get_utc_now() + timedelta(seconds=restante)
+        updates = {"activo": True, "fechaFin": new_end}
+        return await self.update_timer(timer_id, updates, websocket)
         
     async def tick_timers(self):
         """Actualizar todos los timers activos cada segundo - TIEMPO DEL SERVIDOR"""

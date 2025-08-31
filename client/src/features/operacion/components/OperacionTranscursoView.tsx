@@ -415,6 +415,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     <InlineCountdown
       endTime={timer.fechaFin}
       seconds={timer.tiempoRestanteSegundos}
+  paused={!timer.activo}
       format={formatearTiempo}
     />
   );

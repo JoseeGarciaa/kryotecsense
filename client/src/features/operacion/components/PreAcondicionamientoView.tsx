@@ -837,6 +837,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     <InlineCountdown
       endTime={timer.fechaFin}
       seconds={timer.tiempoRestanteSegundos}
+  paused={!timer.activo}
       format={formatearTiempo}
     />
   );
