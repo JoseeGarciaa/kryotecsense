@@ -201,6 +201,8 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
 
     // Estrategia 3: Buscar timer por nombre del item (incluir completados) - MEJORADA
     const posiblesNombres = [
+      `Envío #${item.id} - ${item.nombre_unidad}`,
+      `Envío #${item.id} - ${item.rfid}`,
       `Envío ${item.nombre_unidad}`,
       `Envío ${item.rfid}`,
       item.nombre_unidad,
@@ -506,7 +508,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       // Crear nuevo timer de envío con el tiempo elegido
       const minutosElegidos = tiempoMinutos > 0 ? tiempoMinutos : TIEMPO_ENVIO_MIN;
       const timerId = crearTimer(
-        `Envío ${item.nombre_unidad}`,
+        `Envío #${item.id} - ${item.nombre_unidad}`,
         'envio',
         minutosElegidos
       );
