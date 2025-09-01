@@ -54,13 +54,13 @@ export const useInspeccion = () => {
           .toLowerCase()
           .trim();
       
-      // Pendientes si: (Devolución/Devuelto) o (Inspección/En proceso)
+      // Pendientes SOLAMENTE cuando ya fueron movidos explícitamente a Inspección desde Devolución
+      // i.e., estado = Inspección y sub_estado = En proceso (o Pendiente)
       const itemsPendientes = inventarioCompleto.filter((item: any) => {
         const estado = normalize(item.estado);
         const sub = normalize(item.sub_estado);
-        const esDevuelto = estado === 'devolucion' && sub === 'devuelto';
-        const esEnProceso = estado === 'inspeccion' && (sub === 'en proceso' || sub === 'en proceso');
-        return esDevuelto || esEnProceso;
+        const esPendienteInspeccion = estado === 'inspeccion' && (sub === 'en proceso' || sub === 'pendiente');
+        return esPendienteInspeccion;
       });
       
       // Filtrar items ya inspeccionados
@@ -87,7 +87,7 @@ export const useInspeccion = () => {
     } catch (err) {
       console.warn('Backend no disponible, usando datos de prueba:', err);
       
-      // Datos de prueba para desarrollo
+    // Datos de prueba para desarrollo (solo items ya enviados a Inspección)
       const datosPrueba: ItemInspeccion[] = [
         {
           id: 2001,
@@ -95,8 +95,8 @@ export const useInspeccion = () => {
           categoria: 'Cube',
           lote: 'Lote 1',
           rfid: 'RFID001',
-          estado: 'Devolución',
-          sub_estado: 'Devuelto',
+      estado: 'Inspección',
+      sub_estado: 'En proceso',
           fecha_devolucion: new Date().toISOString(),
           tiempo_en_curso: '2 horas',
           validaciones: {
@@ -111,8 +111,8 @@ export const useInspeccion = () => {
           categoria: 'VIP',
           lote: 'Lote 2',
           rfid: 'RFID002',
-          estado: 'Devolución',
-          sub_estado: 'Devuelto',
+      estado: 'Inspección',
+      sub_estado: 'En proceso',
           fecha_devolucion: new Date().toISOString(),
           tiempo_en_curso: '1.5 horas',
           validaciones: {
@@ -127,8 +127,8 @@ export const useInspeccion = () => {
           categoria: 'TIC',
           lote: 'Lote 1',
           rfid: 'RFID003',
-          estado: 'Devolución',
-          sub_estado: 'Devuelto',
+      estado: 'Inspección',
+      sub_estado: 'En proceso',
           fecha_devolucion: new Date().toISOString(),
           tiempo_en_curso: '3 horas',
           validaciones: {
