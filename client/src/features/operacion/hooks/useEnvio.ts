@@ -52,7 +52,7 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
    */
   const iniciarEnvio = useCallback(async (
     itemsSeleccionados: any[],
-    tiempoEnvioMinutos: number = 5760 // default 96h, pero respetar valor del UI
+    tiempoEnvioMinutos?: number // si no viene, reutilizamos el del timer ya creado (96h desde Ensamblaje)
   ) => {
     setCargandoEnvio(true);
     
@@ -66,7 +66,7 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
       const actividadesCreadas = [];
 
   // Tiempo de operación: usar el proporcionado (UI) con default 96h
-  const tiempoOperacionMin = Math.max(1, Math.floor(tiempoEnvioMinutos));
+  const tiempoOperacionMin = tiempoEnvioMinutos ? Math.max(1, Math.floor(tiempoEnvioMinutos)) : 5760;
 
       for (const item of itemsSeleccionados) {
         // Reusar temporizador existente (creado desde Ensamblaje) si existe y está activo
@@ -96,7 +96,7 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
           fechaInicio = new Date(existingTimer.fechaInicio);
           fechaEstimada = new Date(existingTimer.fechaFin);
           minutosUsados = existingTimer.tiempoInicialMinutos;
-        } else {
+  } else {
           // Crear temporizador de envío (nombre incluye ID para coincidencia fiable en Devolución)
           timerId = crearTimer(
             expectedName,

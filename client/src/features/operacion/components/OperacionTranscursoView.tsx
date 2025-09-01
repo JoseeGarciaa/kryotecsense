@@ -34,20 +34,8 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   const [itemsEnTransito, setItemsEnTransito] = useState<ItemEnTransito[]>([]);
   const [itemsListosParaDespacho, setItemsListosParaDespacho] = useState<any[]>([]);
   const [itemsSeleccionados, setItemsSeleccionados] = useState<number[]>([]);
-  // Tiempo de envío fijo para Operación: 96 horas (5760 minutos)
+  // Tiempo de envío predeterminado para TimerModal individual (96h)
   const TIEMPO_ENVIO_MIN = 96 * 60;
-  // Tiempo de envío editable con default 96h
-  const [tiempoEnvio, setTiempoEnvio] = useState<number>(TIEMPO_ENVIO_MIN);
-  const [tiempoHoras, setTiempoHoras] = useState<number>(Math.floor(TIEMPO_ENVIO_MIN / 60));
-  const [tiempoMinutosRest, setTiempoMinutosRest] = useState<number>(TIEMPO_ENVIO_MIN % 60);
-
-  useEffect(() => {
-    // Mantener horas/minutos en sync si tiempoEnvio cambia
-    const horas = Math.floor(tiempoEnvio / 60);
-    const minutos = tiempoEnvio % 60;
-    setTiempoHoras(horas);
-    setTiempoMinutosRest(minutos);
-  }, [tiempoEnvio]);
   const [mostrarModalSeleccion, setMostrarModalSeleccion] = useState(false);
   const [itemsListosDespacho, setItemsListosDespacho] = useState<any[]>([]);
   const [itemsSeleccionadosModal, setItemsSeleccionadosModal] = useState<number[]>([]);
@@ -663,7 +651,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
         Array.isArray(itemsSeleccionadosModal) && itemsSeleccionadosModal.includes(item.id)
       );
       
-  await envio.iniciarEnvio(itemsParaEnvio, tiempoEnvio);
+  await envio.iniciarEnvio(itemsParaEnvio);
       
       // Cerrar modal y limpiar selección
       setMostrarModalSeleccion(false);
@@ -713,7 +701,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   Array.isArray(itemsSeleccionados) && itemsSeleccionados.includes(item.id)
       );
       
-  await envio.iniciarEnvio(itemsParaEnvio, tiempoEnvio);
+  await envio.iniciarEnvio(itemsParaEnvio);
       setItemsSeleccionados([]);
       
       // Los items se actualizarán automáticamente a través del useEffect
@@ -1048,45 +1036,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
             </div>
             
             {/* Controles del modal */}
-            <div className="p-4 sm:p-6 border-t border-gray-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <label className="text-sm text-gray-600 whitespace-nowrap">Tiempo de envío:</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={tiempoHoras}
-                    onChange={(e) => {
-                      const v = Number(e.target.value) || 0;
-                      setTiempoHoras(v);
-                      setTiempoEnvio(v * 60 + tiempoMinutosRest);
-                    }}
-                    min={0}
-                    max={240}
-                    className="border border-gray-300 rounded px-3 py-1 text-sm w-16 sm:w-20"
-                    aria-label="Horas"
-                  />
-                  <span className="text-sm text-gray-600">h</span>
-
-                  <input
-                    type="number"
-                    value={tiempoMinutosRest}
-                    onChange={(e) => {
-                      let v = Number(e.target.value) || 0;
-                      if (v < 0) v = 0;
-                      if (v > 59) v = 59;
-                      setTiempoMinutosRest(v);
-                      setTiempoEnvio(tiempoHoras * 60 + v);
-                    }}
-                    min={0}
-                    max={59}
-                    className="border border-gray-300 rounded px-3 py-1 text-sm w-16 sm:w-20"
-                    aria-label="Minutos"
-                  />
-                  <span className="text-xs text-gray-500">min</span>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2 sm:gap-3 justify-end">
+            <div className="p-4 sm:p-6 border-t border-gray-200 flex items-center justify-end gap-2 sm:gap-3">
                 <button
                   onClick={() => {
                     setMostrarModalSeleccion(false);
@@ -1108,7 +1058,6 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                 >
                   Iniciar envío ({itemsSeleccionadosModal.length} TICs)
                 </button>
-              </div>
             </div>
           </div>
         </div>
