@@ -188,6 +188,14 @@ export const Inspeccion: React.FC = () => {
         <div className="space-y-2 mb-3">
           <div
             className="flex items-center justify-between cursor-pointer select-none relative z-10"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleValidacionChange(item.id, 'limpieza', !limpieza);
+              }
+            }}
             onClick={(e) => {
               e.stopPropagation();
               handleValidacionChange(item.id, 'limpieza', !limpieza);
@@ -202,7 +210,11 @@ export const Inspeccion: React.FC = () => {
                 type="checkbox"
                 checked={limpieza}
                 readOnly
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 pointer-events-none"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleValidacionChange(item.id, 'limpieza', !limpieza);
+                }}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 aria-hidden="true"
               />
               <span className="ml-2 text-sm text-gray-700 select-none">Hecho</span>
@@ -211,6 +223,14 @@ export const Inspeccion: React.FC = () => {
 
           <div
             className="flex items-center justify-between cursor-pointer select-none relative z-10"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleValidacionChange(item.id, 'goteo', !goteo);
+              }
+            }}
             onClick={(e) => {
               e.stopPropagation();
               handleValidacionChange(item.id, 'goteo', !goteo);
@@ -225,7 +245,11 @@ export const Inspeccion: React.FC = () => {
                 type="checkbox"
                 checked={goteo}
                 readOnly
-                className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 pointer-events-none"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleValidacionChange(item.id, 'goteo', !goteo);
+                }}
+                className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                 aria-hidden="true"
               />
               <span className="ml-2 text-sm text-gray-700 select-none">Hecho</span>
@@ -234,6 +258,14 @@ export const Inspeccion: React.FC = () => {
 
           <div
             className="flex items-center justify-between cursor-pointer select-none relative z-10"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleValidacionChange(item.id, 'desinfeccion', !desinfeccion);
+              }
+            }}
             onClick={(e) => {
               e.stopPropagation();
               handleValidacionChange(item.id, 'desinfeccion', !desinfeccion);
@@ -248,7 +280,11 @@ export const Inspeccion: React.FC = () => {
                 type="checkbox"
                 checked={desinfeccion}
                 readOnly
-                className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 pointer-events-none"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleValidacionChange(item.id, 'desinfeccion', !desinfeccion);
+                }}
+                className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                 aria-hidden="true"
               />
               <span className="ml-2 text-sm text-gray-700 select-none">Hecho</span>

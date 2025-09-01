@@ -189,15 +189,15 @@ export const useInspeccion = () => {
 
       console.log(`🔍 Completando inspección para item ${item.nombre_unidad}...`);
 
-  try {
-        // 1) Guardar validaciones (solo campos de validación)
-        await apiServiceClient.put(`/inventory/inventario/${itemId}`, {
-          validacion_limpieza: 'aprobado',
-          validacion_goteo: 'aprobado',
-          validacion_desinfeccion: 'aprobado'
-        });
+      // 1) Guardar validaciones (solo campos de validación)
+      await apiServiceClient.put(`/inventory/inventario/${itemId}`, {
+        validacion_limpieza: 'aprobado',
+        validacion_goteo: 'aprobado',
+        validacion_desinfeccion: 'aprobado'
+      });
 
-        // Registrar actividad de inspección completa
+      // Registrar actividad de inspección completa (best-effort)
+      try {
         await apiServiceClient.post('/activities/actividades/', {
           inventario_id: itemId,
           usuario_id: 1,
@@ -205,25 +205,27 @@ export const useInspeccion = () => {
           estado_nuevo: 'Inspección',
           sub_estado_nuevo: 'Inspeccionada'
         });
+      } catch {}
 
-        // 2) Marcar estado como Inspección/Inspeccionada (PATCH estado)
-        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-          estado: 'Inspección',
-          sub_estado: 'Inspeccionada'
-        });
+      // 2) Marcar estado como Inspección/Inspeccionada (PATCH estado)
+      await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+        estado: 'Inspección',
+        sub_estado: 'Inspeccionada'
+      });
 
-        // 3) Mover a En bodega/Disponible (PATCH estado)
-        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-          estado: 'En bodega',
-          sub_estado: 'Disponible'
-        });
+      // 3) Mover a En bodega/Disponible (PATCH estado)
+      await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+        estado: 'En bodega',
+        sub_estado: 'Disponible'
+      });
 
-        // 4) Limpiar lote explícitamente (PUT parcial)
-        await apiServiceClient.put(`/inventory/inventario/${itemId}`, {
-          lote: null
-        });
+      // 4) Limpiar lote explícitamente (PUT parcial)
+      await apiServiceClient.put(`/inventory/inventario/${itemId}`, {
+        lote: null
+      });
 
-        // Registrar actividad de movimiento a bodega
+      // Registrar actividad de movimiento a bodega (best-effort)
+      try {
         await apiServiceClient.post('/activities/actividades/', {
           inventario_id: itemId,
           usuario_id: 1,
@@ -231,31 +233,18 @@ export const useInspeccion = () => {
           estado_nuevo: 'En bodega',
           sub_estado_nuevo: 'Disponible'
         });
+      } catch {}
 
-        // 3) Cancelar cronómetro de inspección si existe
-        try {
-          const t = timers.find(t => t.tipoOperacion === 'inspeccion' && new RegExp(`^Inspección\s+#${String(itemId)}\s+-`).test(t.nombre));
-          if (t) eliminarTimer(t.id);
-        } catch {}
+      // Cancelar cronómetro de inspección si existe
+      try {
+        const t = timers.find(t => t.tipoOperacion === 'inspeccion' && new RegExp(`^Inspección\s+#${String(itemId)}\s+-`).test(t.nombre));
+        if (t) eliminarTimer(t.id);
+      } catch {}
 
-        console.log(`✅ Inspección completada para ${item.nombre_unidad}`);
-        
-        // Recargar datos
-        await cargarItemsParaInspeccion();
-        
-      } catch (backendError) {
-        console.warn('Backend no disponible, simulando cambio local:', backendError);
-        
-        // Simular el cambio localmente
-        setItemsParaInspeccion(prev => prev.filter(i => String(i.id) !== String(itemId)));
-        setItemsInspeccionados(prev => [...prev, {
-          ...item,
-          estado: 'En bodega',
-          sub_estado: 'Disponible'
-        }]);
-        
-        console.log(`✅ Inspección completada localmente para ${item.nombre_unidad}`);
-      }
+      console.log(`✅ Inspección completada para ${item.nombre_unidad}`);
+      
+      // Recargar datos
+      await cargarItemsParaInspeccion();
       
     } catch (err) {
       console.error('Error completando inspección:', err);
@@ -309,17 +298,20 @@ export const useInspeccion = () => {
           })
         );
 
-        const promesasActividades = itemsAInspeccionar.map(item =>
-          apiServiceClient.post('/activities/actividades/', {
-            inventario_id: item.id,
-            usuario_id: 1,
-            descripcion: `${item.nombre_unidad} inspeccionado completamente (limpieza, goteo, desinfección)`,
-            estado_nuevo: 'Inspección',
-            sub_estado_nuevo: 'Inspeccionada'
-          })
-        );
+        // Actividades (best-effort)
+        try {
+          await Promise.all(itemsAInspeccionar.map(item =>
+            apiServiceClient.post('/activities/actividades/', {
+              inventario_id: item.id,
+              usuario_id: 1,
+              descripcion: `${item.nombre_unidad} inspeccionado completamente (limpieza, goteo, desinfección)`,
+              estado_nuevo: 'Inspección',
+              sub_estado_nuevo: 'Inspeccionada'
+            })
+          ));
+        } catch {}
 
-        await Promise.all([...promesasValidaciones, ...promesasActividades]);
+        await Promise.all(promesasValidaciones);
 
         // 2) Marcar como Inspección/Inspeccionada (PATCH) en paralelo
         await Promise.all(idsValidos.map(itemId =>
@@ -342,16 +334,18 @@ export const useInspeccion = () => {
           apiServiceClient.put(`/inventory/inventario/${itemId}`, { lote: null })
         ));
 
-        // 5) Registrar actividad de movimiento a bodega
-        await Promise.all(itemsAInspeccionar.map(item =>
-          apiServiceClient.post('/activities/actividades/', {
-            inventario_id: item.id,
-            usuario_id: 1,
-            descripcion: `${item.nombre_unidad} inspeccionado y movido a En bodega (lote limpiado)`,
-            estado_nuevo: 'En bodega',
-            sub_estado_nuevo: 'Disponible'
-          })
-        ));
+        // 5) Registrar actividad de movimiento a bodega (best-effort)
+        try {
+          await Promise.all(itemsAInspeccionar.map(item =>
+            apiServiceClient.post('/activities/actividades/', {
+              inventario_id: item.id,
+              usuario_id: 1,
+              descripcion: `${item.nombre_unidad} inspeccionado y movido a En bodega (lote limpiado)`,
+              estado_nuevo: 'En bodega',
+              sub_estado_nuevo: 'Disponible'
+            })
+          ));
+        } catch {}
 
         // Cancelar cronómetros de inspección
         try {
@@ -362,21 +356,12 @@ export const useInspeccion = () => {
         } catch {}
         console.log(`✅ ${itemIds.length} items inspeccionados en backend`);
         
-        // Recargar datos
-        await cargarItemsParaInspeccion();
+  // Recargar datos
+  await cargarItemsParaInspeccion();
         
       } catch (backendError) {
-        console.warn('Backend no disponible, simulando cambio local:', backendError);
-        
-        // Simular cambios localmente
-        setItemsParaInspeccion(prev => prev.filter(item => !itemIds.map(String).includes(String(item.id))));
-        setItemsInspeccionados(prev => [...prev, ...itemsAInspeccionar.map(item => ({
-          ...item,
-          estado: 'En bodega',
-          sub_estado: 'Disponible'
-        }))]);
-        
-        console.log(`✅ ${itemIds.length} items inspeccionados localmente`);
+        console.warn('Error inspección en lote:', backendError);
+        throw backendError;
       }
       
     } catch (err) {
@@ -492,21 +477,10 @@ export const useInspeccion = () => {
         console.warn(`⚠️ ${fallidos.length} items fallaron`);
       }
       
-      // Actualizar estados localmente sin recargar desde backend
-      const itemsExitosos = exitosos.map(r => r!.item);
-      setItemsParaInspeccion(prev => prev.filter(item => !colaEscaneos.map(String).includes(String(item.id))));
-      setItemsInspeccionados(prev => [...prev, ...itemsExitosos.map(item => ({
-        ...item,
-        estado: 'En bodega',
-  sub_estado: 'Disponible',
-        validaciones: {
-          limpieza: true,
-          goteo: true,
-          desinfeccion: true
-        }
-      }))]);
-      
-      // Limpiar cola y items escaneados
+  // Re-sincronizar desde backend para reflejar estados reales
+  await cargarItemsParaInspeccion();
+
+  // Limpiar cola y items escaneados
       setColaEscaneos([]);
       setItemsEscaneados([]);
       
@@ -516,7 +490,7 @@ export const useInspeccion = () => {
     } finally {
       setProcesandoEscaneos(false);
     }
-  }, [colaEscaneos, itemsParaInspeccion]);
+  }, [colaEscaneos, itemsParaInspeccion, cargarItemsParaInspeccion]);
 
   // Completar inspección mediante escaneo RFID (versión individual rápida)
   const completarInspeccionPorEscaneo = useCallback(async (itemId: number) => {
