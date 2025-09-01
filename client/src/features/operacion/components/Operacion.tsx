@@ -143,7 +143,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
   } = useOperaciones();
   
   // Hook para acceder a los temporizadores
-  const { timers, formatearTiempo } = useTimerContext();
+  const { timers, formatearTiempo, crearTimer } = useTimerContext();
   // Tick local solo para re-render cada segundo (no recalcula tiempo, usa valores sincronizados)
   const [, forceTick] = useState<number>(0);
   useEffect(() => {
@@ -300,12 +300,24 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
   };
 
   // Crear handlers para drag & drop y navegación
+  // Exponer helper para crear temporizador de inspección (36h)
+  const createInspectionTimer = (id: string | number, nombre?: string) => {
+    try {
+      const label = `Inspección #${id} - ${nombre ?? 'Item'}`;
+      // 36h = 2160 minutos
+      crearTimer(label, 'inspeccion', 36 * 60);
+    } catch (e) {
+      console.warn('No se pudo crear temporizador de inspección:', e);
+    }
+  };
+
   const { onDragEnd } = createDragDropHandlers(
     columns,
     setColumns,
     inventarioCompleto,
     actualizarColumnasDesdeBackend,
-    moverItemABodegaConReagrupacion
+    moverItemABodegaConReagrupacion,
+    createInspectionTimer
   );
 
   const {

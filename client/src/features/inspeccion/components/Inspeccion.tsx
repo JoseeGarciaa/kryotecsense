@@ -163,7 +163,7 @@ export const Inspeccion: React.FC = () => {
       }
     };
 
-    return (
+  return (
       <div className={`bg-white rounded-lg p-4 border-2 ${isCompleto ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-3">
@@ -195,11 +195,13 @@ export const Inspeccion: React.FC = () => {
               <input
                 type="checkbox"
                 checked={limpieza}
+                id={`chk-limpieza-${item.id}`}
                 onClick={(e) => e.stopPropagation()}
                 onChange={(e) => handleValidacionChange(item.id, 'limpieza', e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 pointer-events-auto"
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 pointer-events-auto cursor-pointer relative z-10"
                 aria-label="Marcar limpieza como completada"
               />
+              <label htmlFor={`chk-limpieza-${item.id}`} className="ml-2 text-sm text-gray-700 cursor-pointer select-none" onClick={(e)=>e.stopPropagation()}>Hecho</label>
             </div>
           </div>
 
@@ -212,11 +214,13 @@ export const Inspeccion: React.FC = () => {
               <input
                 type="checkbox"
                 checked={goteo}
+                id={`chk-goteo-${item.id}`}
                 onClick={(e) => e.stopPropagation()}
                 onChange={(e) => handleValidacionChange(item.id, 'goteo', e.target.checked)}
-                className="rounded border-gray-300 text-green-600 focus:ring-green-500 pointer-events-auto"
+                className="rounded border-gray-300 text-green-600 focus:ring-green-500 pointer-events-auto cursor-pointer relative z-10"
                 aria-label="Marcar prueba de goteo como completada"
               />
+              <label htmlFor={`chk-goteo-${item.id}`} className="ml-2 text-sm text-gray-700 cursor-pointer select-none" onClick={(e)=>e.stopPropagation()}>Hecho</label>
             </div>
           </div>
 
@@ -229,11 +233,13 @@ export const Inspeccion: React.FC = () => {
               <input
                 type="checkbox"
                 checked={desinfeccion}
+                id={`chk-desinf-${item.id}`}
                 onClick={(e) => e.stopPropagation()}
                 onChange={(e) => handleValidacionChange(item.id, 'desinfeccion', e.target.checked)}
-                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 pointer-events-auto"
+                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 pointer-events-auto cursor-pointer relative z-10"
                 aria-label="Marcar desinfección como completada"
               />
+              <label htmlFor={`chk-desinf-${item.id}`} className="ml-2 text-sm text-gray-700 cursor-pointer select-none" onClick={(e)=>e.stopPropagation()}>Hecho</label>
             </div>
           </div>
         </div>

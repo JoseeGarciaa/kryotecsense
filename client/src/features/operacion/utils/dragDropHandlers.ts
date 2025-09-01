@@ -7,7 +7,8 @@ export const createDragDropHandlers = (
   setColumns: any,
   inventarioCompleto: any[],
   actualizarColumnasDesdeBackend: () => Promise<void>,
-  moverItemABodegaConReagrupacion?: (item: any) => Promise<void>
+  moverItemABodegaConReagrupacion?: (item: any) => Promise<void>,
+  createInspectionTimer?: (id: string | number, nombre: string | undefined) => void
 ) => {
   
   // Función para mover un grupo completo de TICs a pre-acondicionamiento (OPTIMIZADA)
@@ -399,6 +400,19 @@ export const createDragDropHandlers = (
       }
       
       console.log(`✅ [OPTIMIZADO] Actividad y estado actualizados para ${item.nombre_unidad || item.title}`);
+
+      // Si el destino es Inspección, crear un temporizador de 36h para la inspección
+      try {
+        if (destino === 'inspeccion' && typeof createInspectionTimer === 'function') {
+          const id = item.id || item.inventario_id;
+          const nombre = item.nombre_unidad || item.title;
+          if (id) {
+            createInspectionTimer(id, nombre);
+          }
+        }
+      } catch (timerErr) {
+        console.warn('⚠️ No se pudo crear el temporizador de inspección:', timerErr);
+      }
       
     } catch (error: any) {
       console.error('❌ Error creando actividad de movimiento:', error);
