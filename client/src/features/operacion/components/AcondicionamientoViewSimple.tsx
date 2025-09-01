@@ -36,32 +36,37 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   // Utilidad: normalizar texto (quitar acentos, minúsculas y trim)
   const norm = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
-  // Filtrar items disponibles para Ensamblaje: SOLO TICs cuyo atemperamiento haya finalizado
-  // Reglas:
-  //  - Estado/sub-estado aceptados:
-  //    a) Pre-acondicionamiento + sub_estado Atemperamiento COMPLETADO (timer atemperamiento completado)
-  //    b) En bodega con marca de atemperamiento completo (por seguridad)
-  //  - Excluir cualquier estado relacionado con congelación.
+  // Filtrar items disponibles para Ensamblaje: TICs que vengan de la fase anterior
+  // Reglas actualizadas:
+  //  - Incluir TICs en Pre-acondicionamiento con sub_estado Atemperamiento (independiente del estado del timer)
+  //  - También incluir si están en Bodega (fallback)
+  //  - Excluir cualquier estado relacionado con congelación
   const itemsDisponibles = (inventarioCompleto || []).filter(item => {
     const e = norm(item.estado);
     const s = norm((item as any).sub_estado);
-    const categoriaOk = norm((item as any).categoria) === 'tic';
-    if (!categoriaOk) return false;
+    const categoria = norm((item as any).categoria);
     const esPreAcond = e.includes('pre') && e.includes('acond');
-    const esAtemperamiento = s.includes('atemper'); // texto libre: 'atemperamiento' o 'atemperado'
+    const esAtemperamiento = s.includes('atemper'); // 'atemperamiento' o 'atemperado'
     const esCongelacion = e.includes('congel') || s.includes('congel');
+    const enBodega = e.includes('bodega');
     if (esCongelacion) return false;
 
-    // Detectar timer de atemperamiento COMPLETADO para este RFID
-    const tieneAtempCompletado = timers.some(t => norm(t.nombre) === norm(item.rfid) && t.tipoOperacion === 'atemperamiento' && t.completado);
+    if (categoria === 'tic') {
+      // Solo TICs requieren que el tiempo de atemperamiento haya sido completado
+      const tieneAtempCompletado = timers.some(
+        t => norm(t.nombre) === norm(item.rfid) && t.tipoOperacion === 'atemperamiento' && t.completado
+      );
+      const vieneDeFaseAnterior = (esPreAcond && esAtemperamiento) || enBodega;
+      return vieneDeFaseAnterior && tieneAtempCompletado;
+    }
 
-    // Aceptar si está en Pre-acond + Atemperamiento y el timer está completado
-    const candidatoAtemp = esPreAcond && esAtemperamiento && tieneAtempCompletado;
-    // También aceptar si está en bodega y el timer de atemperamiento está completado (por si hubo transición previa)
-    const enBodega = e.includes('bodega');
-    const candidatoBodega = enBodega && tieneAtempCompletado;
+    // VIP y Cube NO requieren tiempo; permitir llevar a Ensamblaje siempre que no estén en congelación
+    if (categoria === 'vip' || categoria === 'cube') {
+      return enBodega || esPreAcond; // permitir desde bodega o pre-acondición
+    }
 
-    return (candidatoAtemp || candidatoBodega);
+    // Otras categorías no se listan por ahora
+    return false;
   });
 
   // Filtrar items disponibles específicamente para Lista para Despacho (solo de Ensamblaje)
