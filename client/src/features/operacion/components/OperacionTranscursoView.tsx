@@ -131,9 +131,8 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
 
   // Filtrar items según búsqueda
   const itemsFiltrados = itemsListosParaDespacho.filter(item =>
-  (typeof item.nombre_unidad === 'string' && item.nombre_unidad.toLowerCase().includes(busqueda.toLowerCase())) ||
-  (typeof item.rfid === 'string' && item.rfid.toLowerCase().includes(busqueda.toLowerCase())) ||
-  (typeof item.lote === 'string' && item.lote.toLowerCase().includes(busqueda.toLowerCase()))
+    (typeof item.nombre_unidad === 'string' && item.nombre_unidad.toLowerCase().includes(busqueda.toLowerCase())) ||
+    (typeof item.rfid === 'string' && item.rfid.toLowerCase().includes(busqueda.toLowerCase()))
   );
 
   const completarEnvio = async (itemId: number) => {
@@ -790,7 +789,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Buscar por RFID, nombre o lote..."
+                placeholder="Buscar por RFID o nombre..."
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
@@ -815,28 +814,10 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                 </div>
                 <div className="mt-2">
                   <div className="text-sm font-semibold text-gray-900 leading-tight">{item.nombre_unidad}</div>
-                  <div className="text-xs text-gray-500">Lote: {item.lote || 'Sin lote'} • {item.categoria?.toUpperCase()}</div>
+                  <div className="text-xs text-gray-500">{item.categoria?.toUpperCase()}</div>
                 </div>
-                <div className="mt-3 flex items-center justify-between gap-2">
+                <div className="mt-3 flex items-center justify-start gap-2">
                   <div>{renderizarTemporizador(item.id)}</div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => completarEnvio(item.id)}
-                      className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors text-xs"
-                      title="Completar envío"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                      Completar
-                    </button>
-                    <button
-                      onClick={() => cancelarEnvio(item.id)}
-                      className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors text-xs"
-                      title="Cancelar envío"
-                    >
-                      <X className="w-4 h-4" />
-                      Cancelar
-                    </button>
-                  </div>
                 </div>
               </div>
             ))}
@@ -854,9 +835,6 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     NOMBRE
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    LOTE
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ESTADO
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -864,9 +842,6 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     TEMPORIZADOR
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ACCIONES
                   </th>
                 </tr>
               </thead>
@@ -889,11 +864,6 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                       </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {item.lote || 'Sin lote'}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
                         En Transcurso
                       </span>
@@ -905,26 +875,6 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       {renderizarTemporizador(item.id)}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => completarEnvio(item.id)}
-                          className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors"
-                          title="Completar envío"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          Completar
-                        </button>
-                        <button
-                          onClick={() => cancelarEnvio(item.id)}
-                          className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors"
-                          title="Cancelar envío"
-                        >
-                          <X className="w-4 h-4" />
-                          Cancelar
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 ))}
