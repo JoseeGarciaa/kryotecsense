@@ -93,17 +93,22 @@ export const useInspeccion = () => {
         return esPendienteInspeccion;
       });
       
-      // Filtrar items ya inspeccionados
+      // Filtrar items ya inspeccionados (validaciones completas), sin depender del estado
       const itemsYaInspeccionados = inventarioCompleto.filter((item: any) => {
-        const estado = normalize(item.estado);
-        const sub = normalize(item.sub_estado);
-        return estado === 'inspeccion' && sub === 'inspeccionada';
+        const v1 = normalize(item.validacion_limpieza);
+        const v2 = normalize(item.validacion_goteo);
+        const v3 = normalize(item.validacion_desinfeccion);
+        return v1 === 'aprobado' && v2 === 'aprobado' && v3 === 'aprobado';
       });
       
       console.log(`📦 Items para inspección encontrados: ${itemsPendientes.length}`);
       console.log(`✅ Items ya inspeccionados: ${itemsYaInspeccionados.length}`);
       
-      setItemsParaInspeccion(itemsPendientes.map((item: any) => ({
+      // Evitar duplicados: excluir de pendientes los que ya están inspeccionados (validaciones completas)
+      const idsInspeccionados = new Set(itemsYaInspeccionados.map((i: any) => String(i.id)));
+      const pendientesSinInspeccionados = itemsPendientes.filter((it: any) => !idsInspeccionados.has(String(it.id)));
+
+      setItemsParaInspeccion(pendientesSinInspeccionados.map((item: any) => ({
         ...item,
         validaciones: {
           limpieza: false,
@@ -112,7 +117,7 @@ export const useInspeccion = () => {
         }
       })));
       
-      setItemsInspeccionados(itemsYaInspeccionados);
+  setItemsInspeccionados(itemsYaInspeccionados);
       
     } catch (err) {
       console.warn('Backend no disponible, usando datos de prueba:', err);
