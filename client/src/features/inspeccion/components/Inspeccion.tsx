@@ -201,15 +201,11 @@ export const Inspeccion: React.FC = () => {
               <input
                 type="checkbox"
                 checked={limpieza}
-                id={`chk-limpieza-${item.id}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-                onChange={(e) => handleValidacionChange(item.id, 'limpieza', e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 pointer-events-auto cursor-pointer relative z-20"
-                aria-label="Marcar limpieza como completada"
+                readOnly
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 pointer-events-none"
+                aria-hidden="true"
               />
-              <label htmlFor={`chk-limpieza-${item.id}`} className="ml-2 text-sm text-gray-700 cursor-pointer select-none" onClick={(e)=>e.stopPropagation()}>Hecho</label>
+              <span className="ml-2 text-sm text-gray-700 select-none">Hecho</span>
             </div>
           </div>
 
@@ -228,15 +224,11 @@ export const Inspeccion: React.FC = () => {
               <input
                 type="checkbox"
                 checked={goteo}
-                id={`chk-goteo-${item.id}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-                onChange={(e) => handleValidacionChange(item.id, 'goteo', e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 pointer-events-auto cursor-pointer relative z-20"
-                aria-label="Marcar prueba de goteo como completada"
+                readOnly
+                className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 pointer-events-none"
+                aria-hidden="true"
               />
-              <label htmlFor={`chk-goteo-${item.id}`} className="ml-2 text-sm text-gray-700 cursor-pointer select-none" onClick={(e)=>e.stopPropagation()}>Hecho</label>
+              <span className="ml-2 text-sm text-gray-700 select-none">Hecho</span>
             </div>
           </div>
 
@@ -255,15 +247,11 @@ export const Inspeccion: React.FC = () => {
               <input
                 type="checkbox"
                 checked={desinfeccion}
-                id={`chk-desinf-${item.id}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-                onChange={(e) => handleValidacionChange(item.id, 'desinfeccion', e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 pointer-events-auto cursor-pointer relative z-20"
-                aria-label="Marcar desinfección como completada"
+                readOnly
+                className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 pointer-events-none"
+                aria-hidden="true"
               />
-              <label htmlFor={`chk-desinf-${item.id}`} className="ml-2 text-sm text-gray-700 cursor-pointer select-none" onClick={(e)=>e.stopPropagation()}>Hecho</label>
+              <span className="ml-2 text-sm text-gray-700 select-none">Hecho</span>
             </div>
           </div>
         </div>
