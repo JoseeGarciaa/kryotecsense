@@ -53,18 +53,9 @@ const InlineCountdown: React.FC<Props> = ({ endTime, seconds, paused = false, fo
     if (!preferSeconds) return;
     const next = Math.max(0, Math.floor(secondsRef.current));
     setDisplay(prev => {
-      if (paused) return next; // en pausa, reflejar tal cual
-      // Suavizado:
-      // - Evitar pequeños incrementos visuales (<5s)
-      if (next > prev) {
-        if (next - prev < 5) return prev;
-        return next;
-      }
-      // - Limitar caídas a -1 por tick para evitar saltos de -2 o más
-      if (next < prev) {
-        return prev - next > 1 ? Math.max(0, prev - 1) : next;
-      }
-      return prev;
+  // Con seconds como fuente de verdad, reflejar exactamente el valor entrante
+  // para evitar retrasos; el hook del contexto ya suaviza y corrige drift.
+  return next;
     });
   }, [preferSeconds, paused, seconds]);
 
