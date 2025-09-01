@@ -22,6 +22,11 @@ export const InspeccionScanModal: React.FC<InspeccionScanModalProps> = ({
   const [mensaje, setMensaje] = useState('');
   const [tipoMensaje, setTipoMensaje] = useState<'success' | 'error' | ''>('');
   const [modoEscaneoMasivo, setModoEscaneoMasivo] = useState(true);
+  
+  // Validación de longitud exacta 24 caracteres
+  const rfidSanitizado = rfidInput.trim();
+  const longitud = rfidSanitizado.length;
+  const rfidValido24 = longitud === 24;
 
   useEffect(() => {
     if (isOpen) {
@@ -50,16 +55,19 @@ export const InspeccionScanModal: React.FC<InspeccionScanModalProps> = ({
   }, [itemsEscaneados.length, itemsDisponibles.length]);
 
   const handleScan = () => {
-    if (!rfidInput.trim()) {
+    if (!rfidSanitizado) {
       setMensaje('Por favor ingresa un código RFID');
       setTipoMensaje('error');
       return;
     }
+    if (!rfidValido24) {
+      setMensaje('El código RFID debe tener exactamente 24 caracteres');
+      setTipoMensaje('error');
+      return;
+    }
 
-    // Buscar el item por RFID
-    const itemEncontrado = itemsDisponibles.find(item => 
-      item.rfid === rfidInput.trim() || item.nombre_unidad.toLowerCase().includes(rfidInput.trim().toLowerCase())
-    );
+    // Buscar el item por RFID (coincidencia exacta)
+    const itemEncontrado = itemsDisponibles.find(item => item.rfid === rfidSanitizado);
 
     if (itemEncontrado) {
       // Verificar si ya fue escaneado
@@ -92,7 +100,7 @@ export const InspeccionScanModal: React.FC<InspeccionScanModalProps> = ({
         }, 2000);
       }
     } else {
-      setMensaje('❌ Item no encontrado o no disponible para inspección');
+  setMensaje('❌ Item no encontrado o no disponible para inspección');
       setTipoMensaje('error');
       
       // Limpiar mensaje de error después de un momento
@@ -105,7 +113,12 @@ export const InspeccionScanModal: React.FC<InspeccionScanModalProps> = ({
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleScan();
+      if (rfidValido24) {
+        handleScan();
+      } else {
+        setMensaje('El código RFID debe tener exactamente 24 caracteres');
+        setTipoMensaje('error');
+      }
     }
   };
 
@@ -131,7 +144,7 @@ export const InspeccionScanModal: React.FC<InspeccionScanModalProps> = ({
         <div className="p-6">
           <div className="mb-4">
             <label htmlFor="rfid-input" className="block text-sm font-medium text-gray-700 mb-2">
-              Código RFID o Nombre del Item
+              Código RFID (24 caracteres)
             </label>
             <input
               id="rfid-input"
@@ -139,10 +152,26 @@ export const InspeccionScanModal: React.FC<InspeccionScanModalProps> = ({
               value={rfidInput}
               onChange={(e) => setRfidInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Escanea o ingresa el código RFID..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Escanea el código RFID (24 caracteres)..."
+              maxLength={24}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:border-transparent ${
+                longitud === 0
+                  ? 'border-gray-300 focus:ring-blue-500'
+                  : rfidValido24
+                    ? 'border-green-300 focus:ring-green-500'
+                    : 'border-red-300 focus:ring-red-500'
+              }`}
               autoComplete="off"
             />
+            <div className="mt-1 text-xs">
+              {longitud === 0 ? (
+                <span className="text-gray-500">Debe tener exactamente 24 caracteres</span>
+              ) : (
+                <span className={rfidValido24 ? 'text-green-600' : longitud < 24 ? 'text-gray-600' : 'text-red-600'}>
+                  {Math.min(longitud, 24)}/24 {longitud > 24 ? '(excede el límite)' : ''}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Mensaje de resultado */}
@@ -209,7 +238,8 @@ export const InspeccionScanModal: React.FC<InspeccionScanModalProps> = ({
           <div className="flex gap-3">
             <button
               onClick={handleScan}
-              disabled={!rfidInput.trim()}
+              disabled={!rfidValido24 || procesandoEscaneos}
+              title={!rfidValido24 ? 'El RFID debe tener 24 caracteres' : undefined}
               className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               <Scan className="w-4 h-4" />
