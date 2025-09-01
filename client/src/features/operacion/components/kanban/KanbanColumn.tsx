@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import KanbanCard from './KanbanCard';
 import { Item, Column as ColumnType } from '../../types';
-import { Plus, ArrowLeft, MoreHorizontal, Package } from 'lucide-react';
-import AgregarItemBodegaModal from '../AgregarItemBodegaModal';
+import { ArrowLeft, MoreHorizontal, Package } from 'lucide-react';
 import InfoItemModal from '../InfoItemModal';
 
 interface KanbanColumnProps {
@@ -99,24 +98,14 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
     const headerColor = columnColors[column.name.toLowerCase().replace(/ /g, '-')] || columnColors['default'];
     
     // Estados para los modales
-    const [mostrarModalAgregar, setMostrarModalAgregar] = useState(false);
+    // Eliminado el modal de agregar a bodega (no se usa)
     const [mostrarModalInfo, setMostrarModalInfo] = useState(false);
     const [filtroModalInfo, setFiltroModalInfo] = useState<'tics' | 'vips' | 'cajas' | null>(null);
     
     // Log optimizado - solo cuando hay cambios significativos
     // (Removido log constante que causaba spam en consola)
 
-    // Función para manejar agregar item
-    const manejarAgregarItem = async (itemsSeleccionados: any[]) => {
-        if (agregarNuevoItemABodega) {
-            const exito = await agregarNuevoItemABodega(itemsSeleccionados);
-            if (exito) {
-                setMostrarModalAgregar(false);
-            }
-            return exito;
-        }
-        return false;
-    };
+    // Modal de agregar items a bodega eliminado por requerimiento
 
     // Función para obtener datos de inventario de bodega
     const obtenerDatosBodega = () => {
@@ -346,17 +335,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
                             </button>
                         )}
                         
-                        {/* Botón de agregar - solo para bodega */}
-                        {columnId === 'en-bodega' && (
-                            <button 
-                                onClick={() => setMostrarModalAgregar(true)}
-                                aria-label="Mover items a bodega" 
-                                className="text-gray-500 hover:text-blue-600 p-1"
-                                title="Mover items de otras fases a bodega"
-                            >
-                                <Plus size={18} />
-                            </button>
-                        )}
+                        {/* Botón de agregar a bodega eliminado */}
                     </div>
                 )}
             </div>
@@ -380,26 +359,17 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
                         ))}
             </div>
             
-            {/* Modales - solo para bodega */}
+            {/* Modal de información para bodega (se mantiene) */}
             {columnId === 'en-bodega' && (
-                <>
-                    <AgregarItemBodegaModal
-                        isOpen={mostrarModalAgregar}
-                        onClose={() => setMostrarModalAgregar(false)}
-                        onConfirm={manejarAgregarItem}
-                        inventarioCompleto={inventarioCompleto || []}
-                    />
-                    
-                    <InfoItemModal
-                        isOpen={mostrarModalInfo}
-                        onClose={() => {
-                            setMostrarModalInfo(false);
-                            setFiltroModalInfo(null); // Resetear filtro al cerrar
-                        }}
-                        inventoryData={obtenerDatosBodega()}
-                        filtroCategoria={filtroModalInfo}
-                    />
-                </>
+                <InfoItemModal
+                    isOpen={mostrarModalInfo}
+                    onClose={() => {
+                        setMostrarModalInfo(false);
+                        setFiltroModalInfo(null); // Resetear filtro al cerrar
+                    }}
+                    inventoryData={obtenerDatosBodega()}
+                    filtroCategoria={filtroModalInfo}
+                />
             )}
         </div>
     );
