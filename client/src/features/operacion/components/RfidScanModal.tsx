@@ -65,12 +65,18 @@ const RfidScanModal: React.FC<RfidScanModalProps> = ({
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      // Validar que el RFID sea válido (alfanumérico: dígitos y letras)
-      if (rfidInput.trim() && /^[a-zA-Z0-9]+$/.test(rfidInput.trim())) {
+      const trimmed = rfidInput.trim();
+      // Validar que el RFID sea exactamente 24 caracteres y alfanumérico
+      if (trimmed) {
+        if (trimmed.length !== 24) {
+          alert('⚠️ Cada RFID debe tener exactamente 24 caracteres.');
+          return;
+        }
+        if (!/^[a-zA-Z0-9]+$/.test(trimmed)) {
+          alert('⚠️ RFID inválido. Solo se permiten dígitos y letras.');
+          return;
+        }
         onEscanearRfid();
-      } else if (rfidInput.trim()) {
-        // Si hay texto pero no es válido, mostrar alerta
-        alert('⚠️ RFID inválido. Solo se permiten dígitos y letras.');
       }
     }
   };
@@ -88,15 +94,16 @@ const RfidScanModal: React.FC<RfidScanModalProps> = ({
         
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Escanear RFID (longitud 24, auto-procesa múltiples escaneos)
+            Escanear RFID (exactamente 24 caracteres; auto-procesa múltiples escaneos)
           </label>
           <input
             type="text"
             value={rfidInput}
             onChange={(e) => handleRfidChange(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Escanea los RFIDs aquí (auto-procesa a 24 chars)..."
+            placeholder="Escanea RFIDs de 24 caracteres (auto-procesa en bloques de 24)..."
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white"
+            maxLength={24}
             autoFocus
             autoComplete="off"
           />
@@ -105,7 +112,7 @@ const RfidScanModal: React.FC<RfidScanModalProps> = ({
               Escaneados: <span className="font-medium text-green-600">{rfidsEscaneados.length}</span> TICs
             </p>
             <p className="text-blue-600">
-              🚀 Auto-procesamiento: Se procesa automáticamente al llegar a 24 caracteres
+              🚀 Auto-procesamiento: se procesan automáticamente los bloques completos de 24 caracteres
             </p>
             <p className="text-orange-600">
               ⚠️ Solo TICs: Se filtran automáticamente VIPs y Cajas

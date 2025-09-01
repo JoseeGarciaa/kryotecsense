@@ -575,21 +575,24 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
 
   // Función para manejar auto-procesamiento de RFIDs de 24 caracteres
   const procesarRfid = (rfid: string) => {
-    if (!rfid.trim()) return;
+    const code = rfid.trim();
+    if (!code) return;
+    if (code.length !== 24) {
+      console.warn(`RFID ignorado por longitud distinta de 24: '${code}'`);
+      return;
+    }
 
-    const itemEncontrado = itemsDisponibles.find(item => 
-      item.rfid === rfid.trim() || item.nombre_unidad === rfid.trim()
-    );
+    const itemEncontrado = itemsDisponibles.find(item => item.rfid === code);
 
     if (itemEncontrado) {
-      if (!rfidsEscaneados.includes(rfid.trim())) {
-        setRfidsEscaneados(prev => [...prev, rfid.trim()]);
-        console.log(`✅ RFID ${rfid.trim()} auto-procesado`);
+      if (!rfidsEscaneados.includes(code)) {
+        setRfidsEscaneados(prev => [...prev, code]);
+        console.log(`✅ RFID ${code} auto-procesado`);
       } else {
-        console.log(`ℹ️ RFID ${rfid.trim()} ya está en la lista`);
+        console.log(`ℹ️ RFID ${code} ya está en la lista`);
       }
     } else {
-      console.log(`❌ RFID ${rfid.trim()} no encontrado en items disponibles`);
+      console.log(`❌ RFID ${code} no encontrado en items disponibles`);
     }
   };
 
@@ -597,8 +600,8 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
   const handleRfidChange = (value: string) => {
     setRfidInput(value);
     
-    // Auto-procesar cada 24 caracteres
-    if (value.length > 0 && value.length % 24 === 0) {
+  // Auto-procesar cada 24 caracteres exactos
+  if (value.length > 0 && value.length % 24 === 0) {
       // Extraer códigos de 24 caracteres
       const codigosCompletos = [];
       for (let i = 0; i < value.length; i += 24) {
@@ -635,23 +638,30 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
 
   // Funciones para manejar el escáner RFID
   const manejarEscanearRfid = () => {
-    if (!rfidInput.trim()) return;
+    const code = rfidInput.trim();
+    if (!code) return;
+    if (code.length !== 24) {
+      alert('Cada RFID debe tener exactamente 24 caracteres.');
+      return;
+    }
+    if (!/^[a-zA-Z0-9]+$/.test(code)) {
+      alert('RFID inválido. Solo se permiten dígitos y letras.');
+      return;
+    }
 
-    const itemEncontrado = itemsDisponibles.find(item => 
-      item.rfid === rfidInput.trim() || item.nombre_unidad === rfidInput.trim()
-    );
+    const itemEncontrado = itemsDisponibles.find(item => item.rfid === code);
 
     if (itemEncontrado) {
       // Verificar si ya está en la lista de RFIDs escaneados
-      if (!rfidsEscaneados.includes(rfidInput.trim())) {
-        setRfidsEscaneados(prev => [...prev, rfidInput.trim()]);
+      if (!rfidsEscaneados.includes(code)) {
+        setRfidsEscaneados(prev => [...prev, code]);
         setRfidInput('');
-        console.log(`✅ RFID ${rfidInput.trim()} agregado`);
+        console.log(`✅ RFID ${code} agregado`);
       } else {
-        console.log(`ℹ️ RFID ${rfidInput.trim()} ya está en la lista`);
+        console.log(`ℹ️ RFID ${code} ya está en la lista`);
       }
     } else {
-      alert(`❌ No se encontró ningún item disponible con RFID: ${rfidInput.trim()}`);
+      alert(`❌ No se encontró ningún item disponible con RFID: ${code}`);
     }
   };
 
@@ -659,7 +669,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
     try {
       // Encontrar todos los items correspondientes a los RFIDs escaneados
       const itemsEncontrados = rfids.map(rfid => 
-        itemsDisponibles.find(item => item.rfid === rfid || item.nombre_unidad === rfid)
+        itemsDisponibles.find(item => item.rfid === rfid)
       ).filter(Boolean);
 
       // Agregar a la selección
