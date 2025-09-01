@@ -209,10 +209,9 @@ export const Inspeccion: React.FC = () => {
               <input
                 type="checkbox"
                 checked={limpieza}
-                readOnly
-                onClick={(e) => {
+                onChange={(e) => {
                   e.stopPropagation();
-                  handleValidacionChange(item.id, 'limpieza', !limpieza);
+                  handleValidacionChange(item.id, 'limpieza', e.target.checked);
                 }}
                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 aria-hidden="true"
@@ -244,10 +243,9 @@ export const Inspeccion: React.FC = () => {
               <input
                 type="checkbox"
                 checked={goteo}
-                readOnly
-                onClick={(e) => {
+                onChange={(e) => {
                   e.stopPropagation();
-                  handleValidacionChange(item.id, 'goteo', !goteo);
+                  handleValidacionChange(item.id, 'goteo', e.target.checked);
                 }}
                 className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                 aria-hidden="true"
@@ -279,10 +277,9 @@ export const Inspeccion: React.FC = () => {
               <input
                 type="checkbox"
                 checked={desinfeccion}
-                readOnly
-                onClick={(e) => {
+                onChange={(e) => {
                   e.stopPropagation();
-                  handleValidacionChange(item.id, 'desinfeccion', !desinfeccion);
+                  handleValidacionChange(item.id, 'desinfeccion', e.target.checked);
                 }}
                 className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                 aria-hidden="true"

@@ -169,6 +169,7 @@ export const useInspeccion = () => {
   // Completar inspección de un item
   const completarInspeccion = useCallback(async (itemId: number) => {
     try {
+  setError(null);
       // Prevenir procesamiento solo de los grupos hardcodeados del sistema específicos
       if (typeof itemId === 'string' && 
           (itemId === 'ensamblaje-grupo' || itemId === 'listo-despacho-grupo')) {
@@ -208,16 +209,33 @@ export const useInspeccion = () => {
       } catch {}
 
       // 2) Marcar estado como Inspección/Inspeccionada (PATCH estado)
-      await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-        estado: 'Inspección',
-        sub_estado: 'Inspeccionada'
-      });
+      try {
+        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+          estado: 'Inspección',
+          sub_estado: 'Inspeccionada'
+        });
+      } catch (e) {
+        // retry once quickly in case of transient conflicts
+        await new Promise(r => setTimeout(r, 200));
+        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+          estado: 'Inspección',
+          sub_estado: 'Inspeccionada'
+        });
+      }
 
       // 3) Mover a En bodega/Disponible (PATCH estado)
-      await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-        estado: 'En bodega',
-        sub_estado: 'Disponible'
-      });
+      try {
+        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+          estado: 'En bodega',
+          sub_estado: 'Disponible'
+        });
+      } catch (e) {
+        await new Promise(r => setTimeout(r, 200));
+        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+          estado: 'En bodega',
+          sub_estado: 'Disponible'
+        });
+      }
 
       // 4) Limpiar lote explícitamente (PUT parcial)
       await apiServiceClient.put(`/inventory/inventario/${itemId}`, {
@@ -246,9 +264,10 @@ export const useInspeccion = () => {
       // Recargar datos
       await cargarItemsParaInspeccion();
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error completando inspección:', err);
-      setError(err instanceof Error ? err.message : 'Error al completar inspección');
+      const detalle = err?.response?.data?.detail || err?.message || 'Error al completar inspección';
+      setError(String(detalle));
       throw err;
     }
   }, [itemsParaInspeccion, cargarItemsParaInspeccion]);
@@ -258,6 +277,7 @@ export const useInspeccion = () => {
     if (itemIds.length === 0) return;
 
     try {
+      setError(null);
       console.log(`🔄 Completando inspección en lote para ${itemIds.length} items...`);
 
       // Verificar que todos los items tengan validaciones completas
@@ -359,14 +379,17 @@ export const useInspeccion = () => {
   // Recargar datos
   await cargarItemsParaInspeccion();
         
-      } catch (backendError) {
+      } catch (backendError: any) {
         console.warn('Error inspección en lote:', backendError);
+        const detalle = backendError?.response?.data?.detail || backendError?.message || 'Error en inspección en lote';
+        setError(String(detalle));
         throw backendError;
       }
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error completando inspección en lote:', err);
-      setError(err instanceof Error ? err.message : 'Error al completar inspección en lote');
+      const detalle = err?.response?.data?.detail || err?.message || 'Error al completar inspección en lote';
+      setError(String(detalle));
       throw err;
     }
   }, [itemsParaInspeccion, cargarItemsParaInspeccion]);
@@ -392,6 +415,7 @@ export const useInspeccion = () => {
     console.log(`🚀 Procesando ${colaEscaneos.length} items escaneados...`);
     
     try {
+      setError(null);
       // Filtrar solo los grupos hardcodeados del sistema específicos
       const idsValidos = colaEscaneos.filter(itemId => {
         // Solo bloquear los grupos del sistema específicos
@@ -468,7 +492,7 @@ export const useInspeccion = () => {
         }
       });
       
-      const resultados = await Promise.all(promesas);
+  const resultados = await Promise.all(promesas);
       const exitosos = resultados.filter(r => r && r.success);
       const fallidos = resultados.filter(r => r && !r.success);
       
@@ -484,9 +508,10 @@ export const useInspeccion = () => {
       setColaEscaneos([]);
       setItemsEscaneados([]);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error procesando cola de escaneos:', error);
-      setError('Error al procesar algunos items escaneados');
+      const detalle = error?.response?.data?.detail || error?.message || 'Error al procesar items escaneados';
+      setError(String(detalle));
     } finally {
       setProcesandoEscaneos(false);
     }
