@@ -533,7 +533,7 @@ const Registro: React.FC = () => {
                 <label htmlFor="rfid" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   <div className="flex items-center">
                     <Scan className="w-4 h-4 mr-2" />
-                    🔫 Escanear RFID (DataWedge)
+                    🔫 Escanear RFID
                   </div>
                 </label>
                 <input
@@ -556,15 +556,6 @@ const Registro: React.FC = () => {
                 <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 space-y-1">
                   <p>
                     Escaneados: <span className="font-medium text-green-600">{lecturasRfid.length}</span> elementos
-                  </p>
-                  <p className="text-blue-600">
-                    🚀 Auto-procesamiento: Se procesa automáticamente al llegar a exactamente 24 caracteres
-                  </p>
-                  <p className="text-green-600">
-                    ✅ Se verifican automáticamente los códigos duplicados en el sistema
-                  </p>
-                  <p className="text-red-600">
-                    ⚠️ Límite estricto: Máximo 24 caracteres alfanuméricos
                   </p>
                 </div>
               </div>
