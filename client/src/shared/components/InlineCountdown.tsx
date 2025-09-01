@@ -54,9 +54,17 @@ const InlineCountdown: React.FC<Props> = ({ endTime, seconds, paused = false, fo
     const next = Math.max(0, Math.floor(secondsRef.current));
     setDisplay(prev => {
       if (paused) return next; // en pausa, reflejar tal cual
-      // Evitar pequeños incrementos visuales (<5s) que se perciben como "saltos hacia arriba"
-      if (next > prev && next - prev < 5) return prev;
-      return next;
+      // Suavizado:
+      // - Evitar pequeños incrementos visuales (<5s)
+      if (next > prev) {
+        if (next - prev < 5) return prev;
+        return next;
+      }
+      // - Limitar caídas a -1 por tick para evitar saltos de -2 o más
+      if (next < prev) {
+        return prev - next > 1 ? Math.max(0, prev - 1) : next;
+      }
+      return prev;
     });
   }, [preferSeconds, paused, seconds]);
 
@@ -74,8 +82,9 @@ const InlineCountdown: React.FC<Props> = ({ endTime, seconds, paused = false, fo
     if (targetMs) {
       const calc = Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
       setDisplay(prev => {
-        // Aceptar rebajas o reinicios; suprimir incrementos pequeños para evitar saltos
+        // Suprimir incrementos pequeños; limitar caídas a -1 por tick
         if (calc > prev && calc - prev < 5) return prev;
+        if (calc < prev && prev - calc > 1) return Math.max(0, prev - 1);
         return calc;
       });
     }
@@ -88,9 +97,12 @@ const InlineCountdown: React.FC<Props> = ({ endTime, seconds, paused = false, fo
       return; // Sin intervalo si está en pausa o si el padre provee seconds
     }
     const id = setInterval(() => {
-      setDisplay(() => {
+      setDisplay(prev => {
         if (targetMs) {
           const calc = Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
+          // Suprimir incrementos pequeños; limitar caídas a -1 por tick
+          if (calc > prev && calc - prev < 5) return prev;
+          if (calc < prev && prev - calc > 1) return Math.max(0, prev - 1);
           return calc;
         }
         return 0;
