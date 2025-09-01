@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Package, Search, Loader, Scan } from 'lucide-react';
 import { useOperaciones } from '../hooks/useOperaciones';
 import { apiServiceClient } from '../../../api/apiClient';
@@ -34,38 +34,50 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   // Utilidad: normalizar texto (quitar acentos, minúsculas y trim)
   const norm = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
-  // Filtrar items disponibles para traer a acondicionamiento
-  // TICs: solo desde Pre-acondicionamiento → Atemperamiento (excluir cualquier Congelación/Congelamiento)
-  // Para Lista para Despacho: solo items de Acondicionamiento - Ensamblaje
-  const itemsDisponibles = inventarioCompleto?.filter(item => {
-    // Excluir cualquier item que esté en bodega
-    const e = norm(item.estado);
-    if (e.includes('bodega')) {
-      return false;
-    }
-
-    // Excluir items que ya están en acondicionamiento
-    if (item.estado === 'Acondicionamiento') {
-      return false;
-    }
-    
-    // Si es TIC, solo mostrar si está en Pre-acondicionamiento - Atemperamiento (variantes aceptadas)
-    if (item.categoria === 'TIC') {
-      const s = norm(item.sub_estado);
-      const esPreAcond = e === 'pre-acondicionamiento' || e === 'preacondicionamiento';
-      const esAtemperamiento = s === 'atemperamiento';
-      const esCongelacion = s.includes('congel');
-      return esPreAcond && esAtemperamiento && !esCongelacion;
-    }
-    
-    // Para otras categorías, mostrar de cualquier estado excepto Acondicionamiento ni Bodega
-    return true;
-  }) || [];
+  // Filtrar items disponibles para Ensamblaje: únicamente desde Bodega (cualquier variante)
+  const itemsDisponibles = inventarioCompleto?.filter(item => norm(item.estado).includes('bodega')) || [];
 
   // Filtrar items disponibles específicamente para Lista para Despacho (solo de Ensamblaje)
   const itemsDisponiblesParaDespacho = inventarioCompleto?.filter(item => 
     item.estado === 'Acondicionamiento' && item.sub_estado === 'Ensamblaje'
   ) || [];
+
+  // Normalizar: en Ensamblaje todos los lotes deben ser null
+  useEffect(() => {
+    const normalizar = async () => {
+      try {
+        const conLote = itemsEnsamblaje.filter((it: any) => it.lote);
+        if (conLote.length === 0) return;
+        setCargandoActualizacion(true);
+        await Promise.all(
+          conLote.map((item: any) => {
+            const actualizacionItem = {
+              modelo_id: item.modelo_id,
+              nombre_unidad: item.nombre_unidad,
+              rfid: item.rfid,
+              lote: null,
+              estado: item.estado,
+              sub_estado: item.sub_estado,
+              validacion_limpieza: item.validacion_limpieza || null,
+              validacion_goteo: item.validacion_goteo || null,
+              validacion_desinfeccion: item.validacion_desinfeccion || null,
+              categoria: item.categoria || null
+            };
+            return apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionItem);
+          })
+        );
+        await actualizarColumnasDesdeBackend();
+      } catch (e) {
+        console.warn('No se pudo normalizar lotes en Ensamblaje:', e);
+      } finally {
+        setCargandoActualizacion(false);
+      }
+    };
+
+    if (isOpen && itemsEnsamblaje.length > 0) {
+      normalizar();
+    }
+  }, [isOpen, itemsEnsamblaje, actualizarColumnasDesdeBackend]);
 
   // Función para cancelar cronómetros de items movidos
   const cancelarCronometrosDeItems = (itemsMovidos: any[]) => {
@@ -294,7 +306,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
         <AgregarItemsModal
           isOpen={mostrarModalTraerEnsamblaje}
           onClose={() => setMostrarModalTraerEnsamblaje(false)}
-          itemsDisponibles={itemsDisponibles} // Items de cualquier estado (excepto Acondicionamiento) para Ensamblaje
+          itemsDisponibles={itemsDisponibles} // Solo items que están en Bodega para Ensamblaje
           subEstadoDestino="Ensamblaje"
           cargando={cargandoEnsamblaje}
           onConfirm={async (items, subEstado) => {
@@ -307,12 +319,12 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               cancelarCronometrosDeItems(items);
               
               const promesas = items.map(async (item) => {
-                // Usar la misma lógica que el modal de bodega
+                // Ajuste: al mover a Ensamblaje, los lotes quedan nulos
                 const actualizacionItem = {
                   modelo_id: item.modelo_id,
                   nombre_unidad: item.nombre_unidad,
                   rfid: item.rfid,
-                  lote: item.lote || null,
+                  lote: null,
                   estado: 'Acondicionamiento',
                   sub_estado: subEstado,
                   validacion_limpieza: item.validacion_limpieza || null,
