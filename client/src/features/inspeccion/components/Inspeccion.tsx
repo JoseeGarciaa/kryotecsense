@@ -213,10 +213,18 @@ export const Inspeccion: React.FC = () => {
                   e.stopPropagation();
                   handleValidacionChange(item.id, 'limpieza', e.target.checked);
                 }}
+                onClick={(e) => e.stopPropagation()}
                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 aria-hidden="true"
+                id={`chk-${item.id}-limpieza`}
               />
-              <span className="ml-2 text-sm text-gray-700 select-none">Hecho</span>
+              <label
+                htmlFor={`chk-${item.id}-limpieza`}
+                onClick={(e) => e.stopPropagation()}
+                className="ml-2 text-sm text-gray-700 select-none cursor-pointer"
+              >
+                Hecho
+              </label>
             </div>
           </div>
 
@@ -247,10 +255,18 @@ export const Inspeccion: React.FC = () => {
                   e.stopPropagation();
                   handleValidacionChange(item.id, 'goteo', e.target.checked);
                 }}
+                onClick={(e) => e.stopPropagation()}
                 className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                 aria-hidden="true"
+                id={`chk-${item.id}-goteo`}
               />
-              <span className="ml-2 text-sm text-gray-700 select-none">Hecho</span>
+              <label
+                htmlFor={`chk-${item.id}-goteo`}
+                onClick={(e) => e.stopPropagation()}
+                className="ml-2 text-sm text-gray-700 select-none cursor-pointer"
+              >
+                Hecho
+              </label>
             </div>
           </div>
 
@@ -281,10 +297,18 @@ export const Inspeccion: React.FC = () => {
                   e.stopPropagation();
                   handleValidacionChange(item.id, 'desinfeccion', e.target.checked);
                 }}
+                onClick={(e) => e.stopPropagation()}
                 className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                 aria-hidden="true"
+                id={`chk-${item.id}-desinfeccion`}
               />
-              <span className="ml-2 text-sm text-gray-700 select-none">Hecho</span>
+              <label
+                htmlFor={`chk-${item.id}-desinfeccion`}
+                onClick={(e) => e.stopPropagation()}
+                className="ml-2 text-sm text-gray-700 select-none cursor-pointer"
+              >
+                Hecho
+              </label>
             </div>
           </div>
         </div>

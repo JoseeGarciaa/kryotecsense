@@ -38,6 +38,26 @@ export const useInspeccion = () => {
   const [itemsEscaneados, setItemsEscaneados] = useState<ItemInspeccion[]>([]);
   const [procesandoEscaneos, setProcesandoEscaneos] = useState(false);
 
+  // Helper: actualizar campos de inventario con fallback a bulk-update si falla el PUT directo
+  const actualizarInventarioConFallback = useCallback(
+    async (itemId: number, campos: Record<string, any>) => {
+      try {
+        return await apiServiceClient.put(`/inventory/inventario/${itemId}`, campos);
+      } catch (e: any) {
+        // Intento de fallback utilizando bulk-update
+        try {
+          const payload = { updates: [{ id: itemId, ...campos }] };
+          return await apiServiceClient.post('/inventory/inventario/bulk-update', payload);
+        } catch (e2: any) {
+          // Propagar el error del fallback con detalle
+          const detalle = e2?.response?.data?.detail || e?.response?.data?.detail || e2?.message || e?.message;
+          throw new Error(detalle || 'Error actualizando inventario');
+        }
+      }
+    },
+    []
+  );
+
   // Cargar items pendientes de inspección
   const cargarItemsParaInspeccion = useCallback(async () => {
     setCargando(true);
@@ -191,7 +211,7 @@ export const useInspeccion = () => {
       console.log(`🔍 Completando inspección para item ${item.nombre_unidad}...`);
 
       // 1) Guardar validaciones (solo campos de validación)
-      await apiServiceClient.put(`/inventory/inventario/${itemId}`, {
+  await actualizarInventarioConFallback(itemId, {
         validacion_limpieza: 'aprobado',
         validacion_goteo: 'aprobado',
         validacion_desinfeccion: 'aprobado'
@@ -238,9 +258,7 @@ export const useInspeccion = () => {
       }
 
       // 4) Limpiar lote explícitamente (PUT parcial)
-      await apiServiceClient.put(`/inventory/inventario/${itemId}`, {
-        lote: null
-      });
+  await actualizarInventarioConFallback(itemId, { lote: null });
 
       // Registrar actividad de movimiento a bodega (best-effort)
       try {
@@ -311,7 +329,7 @@ export const useInspeccion = () => {
         
         // 1) Guardar validaciones en paralelo (solo campos de validación)
         const promesasValidaciones = idsValidos.map(itemId =>
-          apiServiceClient.put(`/inventory/inventario/${itemId}`, {
+          actualizarInventarioConFallback(itemId, {
             validacion_limpieza: 'aprobado',
             validacion_goteo: 'aprobado',
             validacion_desinfeccion: 'aprobado'
@@ -350,9 +368,7 @@ export const useInspeccion = () => {
         ));
 
         // 4) Limpiar lote (PUT) en paralelo
-        await Promise.all(idsValidos.map(itemId =>
-          apiServiceClient.put(`/inventory/inventario/${itemId}`, { lote: null })
-        ));
+  await Promise.all(idsValidos.map(itemId => actualizarInventarioConFallback(itemId, { lote: null })));
 
         // 5) Registrar actividad de movimiento a bodega (best-effort)
         try {
@@ -440,7 +456,7 @@ export const useInspeccion = () => {
         
         try {
           // 1) Guardar validaciones
-          await apiServiceClient.put(`/inventory/inventario/${itemId}`, {
+          await actualizarInventarioConFallback(itemId, {
             validacion_limpieza: 'aprobado',
             validacion_goteo: 'aprobado',
             validacion_desinfeccion: 'aprobado'
@@ -468,7 +484,7 @@ export const useInspeccion = () => {
           });
 
           // 4) Limpiar lote
-          await apiServiceClient.put(`/inventory/inventario/${itemId}`, { lote: null });
+          await actualizarInventarioConFallback(itemId, { lote: null });
 
           // Actividad de movimiento a bodega
           await apiServiceClient.post('/activities/actividades/', {
