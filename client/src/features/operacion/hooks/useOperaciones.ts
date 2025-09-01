@@ -1544,10 +1544,16 @@ export const useOperaciones = () => {
       }
 
       // Preparar la actualización solo con estado y sub_estado
+      const debeLimpiarLote = (
+        nuevoEstado === 'En bodega' ||
+        (nuevoEstado === 'Acondicionamiento' &&
+          ((nuevoSubEstado || '').toLowerCase() === 'ensamblaje'))
+      );
+
       const actualizacionItem = {
         estado: nuevoEstado,
         sub_estado: nuevoSubEstado || item.sub_estado,
-        ...(nuevoEstado === 'En bodega' ? { lote: null } : {})
+        ...(debeLimpiarLote ? { lote: null } : {})
       };
 
       // Actualizar en el backend usando el nuevo endpoint específico
