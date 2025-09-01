@@ -216,8 +216,8 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RFID</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NOMBRE</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LOTE</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ESTADO</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CRONÓMETRO</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CATEGORÍA</th>
                 </tr>
               </thead>
@@ -237,25 +237,26 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                     <tr key={item.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.rfid}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.nombre_unidad}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.lote || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
                             {item.sub_estado}
                           </span>
-                          {(() => {
-                            const normalize = (s: string) => s?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-                            const info = infoPorId.get(item.id)
-                              || infoPorNombre.get(normalize(item.nombre_unidad))
-                              || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
-                            if (!info) return null;
-                            return (
-                              <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
-                                ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
-                              </span>
-                            );
-                          })()}
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {(() => {
+                          const normalize = (s: string) => s?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                          const info = infoPorId.get(item.id)
+                            || infoPorNombre.get(normalize(item.nombre_unidad))
+                            || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
+                          if (!info) return <span className="text-xs text-gray-400">—</span>;
+                          return (
+                            <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
+                              ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -314,8 +315,8 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RFID</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NOMBRE</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LOTE</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ESTADO</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CRONÓMETRO</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CATEGORÍA</th>
                 </tr>
               </thead>
@@ -335,25 +336,26 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                     <tr key={item.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.rfid}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.nombre_unidad}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.lote || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
                             {item.sub_estado}
                           </span>
-                          {(() => {
-                            const normalize = (s: string) => s?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-                            const info = infoPorId.get(item.id)
-                              || infoPorNombre.get(normalize(item.nombre_unidad))
-                              || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
-                            if (!info) return null;
-                            return (
-                              <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
-                                ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
-                              </span>
-                            );
-                          })()}
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {(() => {
+                          const normalize = (s: string) => s?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                          const info = infoPorId.get(item.id)
+                            || infoPorNombre.get(normalize(item.nombre_unidad))
+                            || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
+                          if (!info) return <span className="text-xs text-gray-400">—</span>;
+                          return (
+                            <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
+                              ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
