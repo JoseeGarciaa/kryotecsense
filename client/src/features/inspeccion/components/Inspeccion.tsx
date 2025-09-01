@@ -186,130 +186,55 @@ export const Inspeccion: React.FC = () => {
 
         {/* Validaciones */}
         <div className="space-y-2 mb-3">
-          <div
-            className="flex items-center justify-between cursor-pointer select-none relative z-10"
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleValidacionChange(item.id, 'limpieza', !limpieza);
-              }
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleValidacionChange(item.id, 'limpieza', !limpieza);
-            }}
-          >
+          {/* Limpieza */}
+          <div className="flex items-center justify-between select-none">
             <div className="flex items-center gap-2">
               <Settings className="h-4 w-4 text-blue-500" />
               <span className="text-sm text-gray-700">Limpieza</span>
             </div>
-            <div className="flex items-center">
+            <label className="flex items-center cursor-pointer">
               <input
                 type="checkbox"
                 checked={limpieza}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  handleValidacionChange(item.id, 'limpieza', e.target.checked);
-                }}
-                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => handleValidacionChange(item.id, 'limpieza', e.target.checked)}
                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                aria-hidden="true"
-                id={`chk-${item.id}-limpieza`}
               />
-              <label
-                htmlFor={`chk-${item.id}-limpieza`}
-                onClick={(e) => e.stopPropagation()}
-                className="ml-2 text-sm text-gray-700 select-none cursor-pointer"
-              >
-                Hecho
-              </label>
-            </div>
+              <span className="ml-2 text-sm text-gray-700">Hecho</span>
+            </label>
           </div>
 
-          <div
-            className="flex items-center justify-between cursor-pointer select-none relative z-10"
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleValidacionChange(item.id, 'goteo', !goteo);
-              }
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleValidacionChange(item.id, 'goteo', !goteo);
-            }}
-          >
+          {/* Prueba de Goteo */}
+          <div className="flex items-center justify-between select-none">
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-green-500" />
               <span className="text-sm text-gray-700">Prueba de Goteo</span>
             </div>
-            <div className="flex items-center">
+            <label className="flex items-center cursor-pointer">
               <input
                 type="checkbox"
                 checked={goteo}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  handleValidacionChange(item.id, 'goteo', e.target.checked);
-                }}
-                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => handleValidacionChange(item.id, 'goteo', e.target.checked)}
                 className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                aria-hidden="true"
-                id={`chk-${item.id}-goteo`}
               />
-              <label
-                htmlFor={`chk-${item.id}-goteo`}
-                onClick={(e) => e.stopPropagation()}
-                className="ml-2 text-sm text-gray-700 select-none cursor-pointer"
-              >
-                Hecho
-              </label>
-            </div>
+              <span className="ml-2 text-sm text-gray-700">Hecho</span>
+            </label>
           </div>
 
-          <div
-            className="flex items-center justify-between cursor-pointer select-none relative z-10"
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleValidacionChange(item.id, 'desinfeccion', !desinfeccion);
-              }
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleValidacionChange(item.id, 'desinfeccion', !desinfeccion);
-            }}
-          >
+          {/* Desinfección */}
+          <div className="flex items-center justify-between select-none">
             <div className="flex items-center gap-2">
               <Shield className="h-4 w-4 text-purple-500" />
               <span className="text-sm text-gray-700">Desinfección</span>
             </div>
-            <div className="flex items-center">
+            <label className="flex items-center cursor-pointer">
               <input
                 type="checkbox"
                 checked={desinfeccion}
-                onChange={(e) => {
-                  e.stopPropagation();
-                  handleValidacionChange(item.id, 'desinfeccion', e.target.checked);
-                }}
-                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => handleValidacionChange(item.id, 'desinfeccion', e.target.checked)}
                 className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                aria-hidden="true"
-                id={`chk-${item.id}-desinfeccion`}
               />
-              <label
-                htmlFor={`chk-${item.id}-desinfeccion`}
-                onClick={(e) => e.stopPropagation()}
-                className="ml-2 text-sm text-gray-700 select-none cursor-pointer"
-              >
-                Hecho
-              </label>
-            </div>
+              <span className="ml-2 text-sm text-gray-700">Hecho</span>
+            </label>
           </div>
         </div>
 

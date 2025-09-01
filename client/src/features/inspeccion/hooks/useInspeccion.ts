@@ -38,10 +38,11 @@ export const useInspeccion = () => {
   const [itemsEscaneados, setItemsEscaneados] = useState<ItemInspeccion[]>([]);
   const [procesandoEscaneos, setProcesandoEscaneos] = useState(false);
 
-  // Helper: actualizar campos de inventario con fallback a bulk-update si falla el PUT directo
+  // Helper: actualizar campos de inventario con fallbacks robustos
   const actualizarInventarioConFallback = useCallback(
     async (itemId: number, campos: Record<string, any>) => {
       try {
+        // Intentar PUT directo (parcial permitido por backend via model_dump(exclude_unset))
         return await apiServiceClient.put(`/inventory/inventario/${itemId}`, campos);
       } catch (e: any) {
         // Intento de fallback utilizando bulk-update
@@ -49,9 +50,16 @@ export const useInspeccion = () => {
           const payload = { updates: [{ id: itemId, ...campos }] };
           return await apiServiceClient.post('/inventory/inventario/bulk-update', payload);
         } catch (e2: any) {
-          // Propagar el error del fallback con detalle
-          const detalle = e2?.response?.data?.detail || e?.response?.data?.detail || e2?.message || e?.message;
-          throw new Error(detalle || 'Error actualizando inventario');
+          // Último fallback: intentar campo por campo con PUT para aislar el error
+          try {
+            for (const [k, v] of Object.entries(campos)) {
+              await apiServiceClient.put(`/inventory/inventario/${itemId}`, { [k]: v });
+            }
+            return { data: { message: 'Actualización por campos aplicada' } } as any;
+          } catch (e3: any) {
+            const detalle = e2?.response?.data?.detail || e?.response?.data?.detail || e3?.message || e2?.message || e?.message;
+            throw new Error(detalle || 'Error actualizando inventario');
+          }
         }
       }
     },
@@ -351,24 +359,21 @@ export const useInspeccion = () => {
 
         await Promise.all(promesasValidaciones);
 
-        // 2) Marcar como Inspección/Inspeccionada (PATCH) en paralelo
-        await Promise.all(idsValidos.map(itemId =>
-          apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+        // 2) y 3) y 4) aplicar de forma secuencial por item para evitar errores 500 masivos
+        for (const itemId of idsValidos) {
+          // Inspección/Inspeccionada
+          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
             estado: 'Inspección',
             sub_estado: 'Inspeccionada'
-          })
-        ));
-
-        // 3) Mover a En bodega/Disponible (PATCH) en paralelo
-        await Promise.all(idsValidos.map(itemId =>
-          apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+          });
+          // En bodega/Disponible
+          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
             estado: 'En bodega',
             sub_estado: 'Disponible'
-          })
-        ));
-
-        // 4) Limpiar lote (PUT) en paralelo
-  await Promise.all(idsValidos.map(itemId => actualizarInventarioConFallback(itemId, { lote: null })));
+          });
+          // Limpiar lote
+          await actualizarInventarioConFallback(itemId, { lote: null });
+        }
 
         // 5) Registrar actividad de movimiento a bodega (best-effort)
         try {
