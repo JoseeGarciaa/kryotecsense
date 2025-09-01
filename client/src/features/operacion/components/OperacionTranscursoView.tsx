@@ -50,13 +50,10 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   }, [tiempoEnvio]);
   const [mostrarModalSeleccion, setMostrarModalSeleccion] = useState(false);
   const [itemsListosDespacho, setItemsListosDespacho] = useState<any[]>([]);
-  const [loteSeleccionado, setLoteSeleccionado] = useState<string>('');
-  const [itemsDelLote, setItemsDelLote] = useState<any[]>([]);
   const [itemsSeleccionadosModal, setItemsSeleccionadosModal] = useState<number[]>([]);
-  const [mostrarSinLote, setMostrarSinLote] = useState(false);
   // Filtros para el modal (diseño sin lotes)
   const [modalBusqueda, setModalBusqueda] = useState('');
-  const [categoriaFiltro, setCategoriaFiltro] = useState<'todos' | 'cube' | 'vip' | 'tics'>('todos');
+  
 
   // Estados para modal de temporizador
   const [mostrarModalTimer, setMostrarModalTimer] = useState(false);
@@ -623,28 +620,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     }
   };
 
-  // Obtener lotes únicos de items listos para despacho
-  const lotesDisponibles = [...new Set(itemsListosDespacho.map(item => item.lote))].filter(Boolean);
-  // Items listos para despacho sin lote
-  const itemsSinLote = itemsListosDespacho.filter(item => !item.lote || item.lote.trim() === '');
-
-  // Items visibles en el modal según filtros (sin lotes)
-  const itemsModalVisibles = itemsListosDespacho.filter(item => {
-    const coincideBusqueda =
-      (typeof item.nombre_unidad === 'string' && item.nombre_unidad.toLowerCase().includes(modalBusqueda.toLowerCase())) ||
-      (typeof item.rfid === 'string' && item.rfid.toLowerCase().includes(modalBusqueda.toLowerCase()));
-    const coincideCategoria = categoriaFiltro === 'todos' || (item.categoria?.toLowerCase?.() === categoriaFiltro);
-    const coincideLote = !mostrarSinLote || !item.lote || item.lote.trim() === '';
-    return coincideBusqueda && coincideCategoria && coincideLote;
-  });
-
-  // Manejar selección de lote
-  const seleccionarLote = (lote: string) => {
-    setLoteSeleccionado(lote);
-    const itemsDelLoteSeleccionado = itemsListosDespacho.filter(item => item.lote === lote);
-    setItemsDelLote(itemsDelLoteSeleccionado);
-    setItemsSeleccionadosModal([]);
-  };
+  // (modal sin lotes): no se requieren lotes ni filtros adicionales
 
   // Manejar selección de items en el modal
   const toggleSeleccionItemModal = (itemId: number) => {
@@ -675,12 +651,8 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       
       // Cerrar modal y limpiar selección
       setMostrarModalSeleccion(false);
-      setLoteSeleccionado('');
-      setItemsDelLote([]);
       setItemsSeleccionadosModal([]);
-      setModalBusqueda('');
-      setCategoriaFiltro('todos');
-      setMostrarSinLote(false);
+  setModalBusqueda('');
     } catch (error) {
       console.error('Error iniciando envío:', error);
     }
@@ -980,12 +952,8 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
               <button
                 onClick={() => {
                   setMostrarModalSeleccion(false);
-                  setLoteSeleccionado('');
-                  setItemsDelLote([]);
                   setItemsSeleccionadosModal([]);
                   setModalBusqueda('');
-                  setCategoriaFiltro('todos');
-                  setMostrarSinLote(false);
                 }}
                 aria-label="Cerrar"
                 className="text-gray-500 hover:text-gray-700 p-1 -mt-1"
@@ -1007,62 +975,29 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {(['todos','cube','vip','tics'] as const).map(cat => (
-                    <button
-                      key={cat}
-                      onClick={() => setCategoriaFiltro(cat)}
-                      className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${categoriaFiltro === cat ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
-                    >
-                      {cat === 'todos' ? 'Todos' : cat.toUpperCase()}
-                    </button>
-                  ))}
-                  <label className="ml-auto inline-flex items-center gap-2 text-xs text-gray-700 select-none">
-                    <input
-                      type="checkbox"
-                      checked={mostrarSinLote}
-                      onChange={(e) => setMostrarSinLote(e.target.checked)}
-                      className="rounded border-gray-300"
-                    />
-                    Solo sin lote ({itemsSinLote.length})
-                  </label>
-                </div>
+                {/* filtros por categoría y 'Solo sin lote' removidos */}
                 <div className="flex items-center justify-between">
-                  <div className="text-xs text-gray-600">Mostrando {itemsModalVisibles.length} items</div>
-                  {itemsModalVisibles.length > 0 && (
-                    <button
-                      onClick={() => {
-                        const visiblesIds = itemsModalVisibles.map(i => i.id);
-                        const todosVisiblesSeleccionados = visiblesIds.every(id => itemsSeleccionadosModal.includes(id));
-                        if (todosVisiblesSeleccionados) {
-                          // Quitar visibles de la selección
-                          setItemsSeleccionadosModal(prev => prev.filter(id => !visiblesIds.includes(id)));
-                        } else {
-                          // Agregar visibles a la selección
-                          setItemsSeleccionadosModal(prev => {
-                            const setPrev = new Set(prev);
-                            visiblesIds.forEach(id => setPrev.add(id));
-                            return Array.from(setPrev);
-                          });
-                        }
-                      }}
-                      className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                    >
-                      {itemsModalVisibles.every(i => itemsSeleccionadosModal.includes(i.id)) ? 'Deseleccionar visibles' : 'Seleccionar visibles'}
-                    </button>
-                  )}
+                  <div className="text-xs text-gray-600">Resultados filtrados por búsqueda</div>
                 </div>
               </div>
 
               {/* Lista de items */}
               <div className="space-y-2 max-h-[50vh] sm:max-h-[55vh] overflow-y-auto pr-1">
-                {itemsModalVisibles.length === 0 ? (
+                {itemsListosDespacho.filter(item =>
+                  (typeof item.nombre_unidad === 'string' && item.nombre_unidad.toLowerCase().includes(modalBusqueda.toLowerCase())) ||
+                  (typeof item.rfid === 'string' && item.rfid.toLowerCase().includes(modalBusqueda.toLowerCase()))
+                ).length === 0 ? (
                   <div className="text-center text-gray-500 py-8">
                     <Package className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-gray-400" />
-                    <p>No hay items que coincidan con los filtros</p>
+                    <p>No hay items que coincidan con la búsqueda</p>
                   </div>
                 ) : (
-                  itemsModalVisibles.map((item) => (
+                  itemsListosDespacho
+                    .filter(item =>
+                      (typeof item.nombre_unidad === 'string' && item.nombre_unidad.toLowerCase().includes(modalBusqueda.toLowerCase())) ||
+                      (typeof item.rfid === 'string' && item.rfid.toLowerCase().includes(modalBusqueda.toLowerCase()))
+                    )
+                    .map((item) => (
                     <button
                       key={item.id}
                       onClick={() => toggleSeleccionItemModal(item.id)}
@@ -1133,12 +1068,8 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                 <button
                   onClick={() => {
                     setMostrarModalSeleccion(false);
-                    setLoteSeleccionado('');
-                    setItemsDelLote([]);
                     setItemsSeleccionadosModal([]);
                     setModalBusqueda('');
-                    setCategoriaFiltro('todos');
-                    setMostrarSinLote(false);
                   }}
                   className="px-3 py-2 sm:px-4 sm:py-2 text-gray-600 bg-white rounded-lg hover:bg-white transition-colors text-sm"
                 >
