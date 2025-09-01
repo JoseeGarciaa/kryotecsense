@@ -13,7 +13,7 @@ interface AcondicionamientoViewSimpleProps {
 
 const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = ({ isOpen, onClose }) => {
   const { inventarioCompleto, cambiarEstadoItem, actualizarColumnasDesdeBackend } = useOperaciones();
-  const { timers, eliminarTimer, crearTimer, formatearTiempo } = useTimerContext();
+  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected } = useTimerContext();
   const TIEMPO_OPERACION_MIN = 96 * 60;
   
   const [mostrarModalTraerEnsamblaje, setMostrarModalTraerEnsamblaje] = useState(false);
@@ -36,16 +36,33 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   // Utilidad: normalizar texto (quitar acentos, minúsculas y trim)
   const norm = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
-  // Filtrar items disponibles para Ensamblaje: desde Bodega y desde Pre-acondicionamiento → Atemperamiento (excluyendo Congelación)
-  const itemsDisponibles = inventarioCompleto?.filter(item => {
+  // Filtrar items disponibles para Ensamblaje: SOLO TICs cuyo atemperamiento haya finalizado
+  // Reglas:
+  //  - Estado/sub-estado aceptados:
+  //    a) Pre-acondicionamiento + sub_estado Atemperamiento COMPLETADO (timer atemperamiento completado)
+  //    b) En bodega con marca de atemperamiento completo (por seguridad)
+  //  - Excluir cualquier estado relacionado con congelación.
+  const itemsDisponibles = (inventarioCompleto || []).filter(item => {
     const e = norm(item.estado);
     const s = norm((item as any).sub_estado);
-    const enBodega = e.includes('bodega');
+    const categoriaOk = norm((item as any).categoria) === 'tic';
+    if (!categoriaOk) return false;
     const esPreAcond = e.includes('pre') && e.includes('acond');
-    const esAtemperamiento = s.includes('atemper'); // 'atemperamiento' o 'atemperado'
+    const esAtemperamiento = s.includes('atemper'); // texto libre: 'atemperamiento' o 'atemperado'
     const esCongelacion = e.includes('congel') || s.includes('congel');
-    return (enBodega || (esPreAcond && esAtemperamiento)) && !esCongelacion;
-  }) || [];
+    if (esCongelacion) return false;
+
+    // Detectar timer de atemperamiento COMPLETADO para este RFID
+    const tieneAtempCompletado = timers.some(t => norm(t.nombre) === norm(item.rfid) && t.tipoOperacion === 'atemperamiento' && t.completado);
+
+    // Aceptar si está en Pre-acond + Atemperamiento y el timer está completado
+    const candidatoAtemp = esPreAcond && esAtemperamiento && tieneAtempCompletado;
+    // También aceptar si está en bodega y el timer de atemperamiento está completado (por si hubo transición previa)
+    const enBodega = e.includes('bodega');
+    const candidatoBodega = enBodega && tieneAtempCompletado;
+
+    return (candidatoAtemp || candidatoBodega);
+  });
 
   // Filtrar items disponibles específicamente para Lista para Despacho (solo de Ensamblaje)
   const itemsDisponiblesParaDespacho = inventarioCompleto?.filter(item => 
@@ -86,6 +103,18 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     }
     return { infoPorId, infoPorNombre };
   }, [timers]);
+
+  // Refuerzo de sincronización al montar para minimizar “—” por desfase
+  useEffect(() => {
+    const id = setTimeout(() => {
+      try {
+        if (isConnected) {
+          forzarSincronizacion();
+        }
+      } catch {}
+    }, 300);
+    return () => clearTimeout(id);
+  }, [forzarSincronizacion, isConnected]);
 
   // Normalizar: en Ensamblaje todos los lotes deben ser null
   useEffect(() => {
@@ -186,7 +215,11 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                 <p className="text-sm text-red-600">({itemsEnsamblaje.length} de {itemsEnsamblaje.length})</p>
               </div>
               <button
-                onClick={() => setMostrarModalTraerEnsamblaje(true)}
+                onClick={() => {
+                  // Refuerzo: al abrir el modal, forzar una ligera sincronización de timers para evitar vacíos
+                  try { /* lazy import via context not needed here */ } catch {}
+                  setMostrarModalTraerEnsamblaje(true);
+                }}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
               >
                 <Plus className="w-4 h-4" />

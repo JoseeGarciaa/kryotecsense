@@ -130,23 +130,33 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   
   const { isConnected, sendMessage, lastMessage } = useWebSocket(timerWsUrl);
 
-  // Cargar timers del localStorage al inicializar (SOLO como respaldo)
+  // Cargar timers del localStorage al inicializar (siempre como pre-hidratación) y recalcular restante
   useEffect(() => {
     const cargarTimersLocales = () => {
       const timersGuardados = localStorage.getItem('kryotec_timers');
-      if (timersGuardados && !isConnected) {
+      if (timersGuardados) {
         try {
           const timersParseados = JSON.parse(timersGuardados);
-          const timersConFechas = timersParseados.map((timer: Timer) => ({
-            ...timer,
-            fechaInicio: new Date(timer.fechaInicio),
-            fechaFin: new Date(timer.fechaFin)
-          }));
+          const ahora = new Date();
+          const timersConFechas = timersParseados.map((timer: Timer) => {
+            const inicio = new Date(timer.fechaInicio);
+            const fin = new Date(timer.fechaFin);
+            const tiempoRestanteMs = fin.getTime() - ahora.getTime();
+            const tiempoRestanteSegundos = Math.max(0, Math.floor(tiempoRestanteMs / 1000));
+            return {
+              ...timer,
+              fechaInicio: inicio,
+              fechaFin: fin,
+              tiempoRestanteSegundos,
+              completado: tiempoRestanteSegundos === 0,
+              activo: tiempoRestanteSegundos > 0 && timer.activo
+            } as Timer;
+          });
           setTimers(timersConFechas);
-          console.log('💾 Timers cargados desde localStorage (respaldo):', timersConFechas.length);
+          console.log('💾 Timers pre-hidratados desde localStorage:', timersConFechas.length);
           return timersConFechas;
         } catch (error) {
-          console.error('Error al cargar timers:', error);
+          console.error('Error al cargar timers desde localStorage:', error);
         }
       }
       return [];
@@ -154,7 +164,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
 
     cargarTimersLocales();
     setIsInitialized(true);
-  }, [isConnected]);
+  }, []);
 
   // Escuchar mensajes de WebSocket - EL SERVIDOR ES LA ÚNICA FUENTE DE VERDAD
   useEffect(() => {
@@ -428,13 +438,15 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   // Detectar cambios de pestaña y sincronizar SOLO cuando es necesario
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isConnected && !syncRequested) {
+      if (document.visibilityState === 'visible') {
         // Solo sincronizar si la pestaña estuvo oculta por más de 5 segundos
-        const lastVisibilityChange = Date.now() - (localStorage.getItem('last_visibility_hidden') ? parseInt(localStorage.getItem('last_visibility_hidden')!) : 0);
-        if (lastVisibilityChange > 5000) {
-          console.log('👁️ Pestaña visible después de estar oculta - Sincronizando');
+        const lastHidden = localStorage.getItem('last_visibility_hidden');
+        const elapsed = lastHidden ? Date.now() - parseInt(lastHidden) : 0;
+        if (isConnected && elapsed > 5000) {
+          console.log('👁️ Pestaña visible tras >5s oculta - Forzando sincronización');
           sendMessage({ type: 'REQUEST_SYNC' });
           sendMessage({ type: 'SYNC_REQUEST' });
+          // No dependas de syncRequested para esta re-sincronización puntual
         }
       } else if (document.visibilityState === 'hidden') {
         localStorage.setItem('last_visibility_hidden', Date.now().toString());
@@ -446,7 +458,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isConnected, sendMessage, syncRequested]);
+  }, [isConnected, sendMessage]);
 
   // Actualizar timers cada segundo de forma determinística (sin depender del reloj local):
   // Disminuimos 1 segundo por tick sobre el valor sincronizado. El servidor seguirá corrigiendo por WS.
