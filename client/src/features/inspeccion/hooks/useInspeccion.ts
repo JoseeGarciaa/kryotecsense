@@ -190,17 +190,14 @@ export const useInspeccion = () => {
       console.log(`🔍 Completando inspección para item ${item.nombre_unidad}...`);
 
       try {
-        // Actualizar estado y validaciones en el backend
-        // 1) Marcar como inspeccionado (Inspección/Inspeccionada) y guardar validaciones
+        // 1) Guardar validaciones y marcar como Inspeccionada con un solo PUT
         await Promise.all([
-          apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-            estado: 'Inspección',
-            sub_estado: 'Inspeccionada'
-          }),
-          apiServiceClient.patch(`/inventory/inventario/${itemId}/`, {
+          apiServiceClient.put(`/inventory/inventario/${itemId}`, {
             validacion_limpieza: 'aprobado',
             validacion_goteo: 'aprobado',
-            validacion_desinfeccion: 'aprobado'
+            validacion_desinfeccion: 'aprobado',
+            estado: 'Inspección',
+            sub_estado: 'Inspeccionada'
           }),
           apiServiceClient.post('/activities/actividades/', {
             inventario_id: itemId,
@@ -211,9 +208,9 @@ export const useInspeccion = () => {
           })
         ]);
 
-        // 2) Mover inmediatamente a En bodega (limpiar lote)
+        // 2) Mover inmediatamente a En bodega y limpiar lote
         await Promise.all([
-          apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+          apiServiceClient.put(`/inventory/inventario/${itemId}`, {
             estado: 'En bodega',
             sub_estado: null,
             lote: null
@@ -295,20 +292,14 @@ export const useInspeccion = () => {
           throw new Error('No hay IDs válidos para procesar en inspección.');
         }
         
-        // Procesar todos los items válidos en paralelo
-  const promesasEstado = idsValidos.map(itemId => 
-          apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-            estado: 'Inspección',
-            sub_estado: 'Inspeccionada'
-          })
-        );
-
-        // Actualizar validaciones para todos los items
-        const promesasValidaciones = itemIds.map(itemId => 
-          apiServiceClient.patch(`/inventory/inventario/${itemId}/`, {
+        // Procesar todos los items válidos en paralelo (guardar validaciones y marcar Inspeccionada)
+        const promesasEstadoYValid = idsValidos.map(itemId =>
+          apiServiceClient.put(`/inventory/inventario/${itemId}`, {
             validacion_limpieza: 'aprobado',
             validacion_goteo: 'aprobado',
-            validacion_desinfeccion: 'aprobado'
+            validacion_desinfeccion: 'aprobado',
+            estado: 'Inspección',
+            sub_estado: 'Inspeccionada'
           })
         );
 
@@ -322,11 +313,11 @@ export const useInspeccion = () => {
           })
         );
 
-        await Promise.all([...promesasEstado, ...promesasValidaciones, ...promesasActividades]);
+  await Promise.all([...promesasEstadoYValid, ...promesasActividades]);
 
         // Mover a En bodega y registrar actividad para cada item
         const promesasBodega = idsValidos.map(itemId => 
-          apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+          apiServiceClient.put(`/inventory/inventario/${itemId}`, {
             estado: 'En bodega',
             sub_estado: null,
             lote: null
@@ -421,17 +412,14 @@ export const useInspeccion = () => {
         if (!item) return null;
         
         try {
-          // Actualizar estado y validaciones en el backend
+          // Actualizar estado y validaciones en el backend y marcar Inspeccionada
           await Promise.all([
-            apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-              estado: 'Inspección',
-              sub_estado: 'Inspeccionada'
-            }),
-            // Actualizar las validaciones en el inventario
-            apiServiceClient.patch(`/inventory/inventario/${itemId}/`, {
+            apiServiceClient.put(`/inventory/inventario/${itemId}`, {
               validacion_limpieza: 'aprobado',
               validacion_goteo: 'aprobado',
-              validacion_desinfeccion: 'aprobado'
+              validacion_desinfeccion: 'aprobado',
+              estado: 'Inspección',
+              sub_estado: 'Inspeccionada'
             }),
             apiServiceClient.post('/activities/actividades/', {
               inventario_id: itemId,
@@ -444,7 +432,7 @@ export const useInspeccion = () => {
 
           // Mover a En bodega y registrar actividad
           await Promise.all([
-            apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+            apiServiceClient.put(`/inventory/inventario/${itemId}`, {
               estado: 'En bodega',
               sub_estado: null,
               lote: null

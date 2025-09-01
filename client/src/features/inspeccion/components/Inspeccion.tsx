@@ -191,15 +191,16 @@ export const Inspeccion: React.FC = () => {
               <Settings className="h-4 w-4 text-blue-500" />
               <span className="text-sm text-gray-700">Limpieza</span>
             </div>
-            <label className="flex items-center">
+            <div className="flex items-center">
               <input
                 type="checkbox"
                 checked={limpieza}
+                onClick={(e) => e.stopPropagation()}
                 onChange={(e) => handleValidacionChange(item.id, 'limpieza', e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 pointer-events-auto"
                 aria-label="Marcar limpieza como completada"
               />
-            </label>
+            </div>
           </div>
 
           <div className="flex items-center justify-between">
@@ -207,15 +208,16 @@ export const Inspeccion: React.FC = () => {
               <Package className="h-4 w-4 text-green-500" />
               <span className="text-sm text-gray-700">Prueba de Goteo</span>
             </div>
-            <label className="flex items-center">
+            <div className="flex items-center">
               <input
                 type="checkbox"
                 checked={goteo}
+                onClick={(e) => e.stopPropagation()}
                 onChange={(e) => handleValidacionChange(item.id, 'goteo', e.target.checked)}
-                className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                className="rounded border-gray-300 text-green-600 focus:ring-green-500 pointer-events-auto"
                 aria-label="Marcar prueba de goteo como completada"
               />
-            </label>
+            </div>
           </div>
 
           <div className="flex items-center justify-between">
@@ -223,15 +225,16 @@ export const Inspeccion: React.FC = () => {
               <Shield className="h-4 w-4 text-purple-500" />
               <span className="text-sm text-gray-700">Desinfección</span>
             </div>
-            <label className="flex items-center">
+            <div className="flex items-center">
               <input
                 type="checkbox"
                 checked={desinfeccion}
+                onClick={(e) => e.stopPropagation()}
                 onChange={(e) => handleValidacionChange(item.id, 'desinfeccion', e.target.checked)}
-                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 pointer-events-auto"
                 aria-label="Marcar desinfección como completada"
               />
-            </label>
+            </div>
           </div>
         </div>
 
