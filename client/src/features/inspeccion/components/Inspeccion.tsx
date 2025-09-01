@@ -186,7 +186,13 @@ export const Inspeccion: React.FC = () => {
 
         {/* Validaciones */}
         <div className="space-y-2 mb-3">
-          <div className="flex items-center justify-between">
+          <div
+            className="flex items-center justify-between cursor-pointer select-none relative z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleValidacionChange(item.id, 'limpieza', !limpieza);
+            }}
+          >
             <div className="flex items-center gap-2">
               <Settings className="h-4 w-4 text-blue-500" />
               <span className="text-sm text-gray-700">Limpieza</span>
@@ -196,16 +202,24 @@ export const Inspeccion: React.FC = () => {
                 type="checkbox"
                 checked={limpieza}
                 id={`chk-limpieza-${item.id}`}
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
                 onChange={(e) => handleValidacionChange(item.id, 'limpieza', e.target.checked)}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 pointer-events-auto cursor-pointer relative z-10"
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 pointer-events-auto cursor-pointer relative z-20"
                 aria-label="Marcar limpieza como completada"
               />
               <label htmlFor={`chk-limpieza-${item.id}`} className="ml-2 text-sm text-gray-700 cursor-pointer select-none" onClick={(e)=>e.stopPropagation()}>Hecho</label>
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
+          <div
+            className="flex items-center justify-between cursor-pointer select-none relative z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleValidacionChange(item.id, 'goteo', !goteo);
+            }}
+          >
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-green-500" />
               <span className="text-sm text-gray-700">Prueba de Goteo</span>
@@ -215,16 +229,24 @@ export const Inspeccion: React.FC = () => {
                 type="checkbox"
                 checked={goteo}
                 id={`chk-goteo-${item.id}`}
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
                 onChange={(e) => handleValidacionChange(item.id, 'goteo', e.target.checked)}
-                className="rounded border-gray-300 text-green-600 focus:ring-green-500 pointer-events-auto cursor-pointer relative z-10"
+                className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 pointer-events-auto cursor-pointer relative z-20"
                 aria-label="Marcar prueba de goteo como completada"
               />
               <label htmlFor={`chk-goteo-${item.id}`} className="ml-2 text-sm text-gray-700 cursor-pointer select-none" onClick={(e)=>e.stopPropagation()}>Hecho</label>
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
+          <div
+            className="flex items-center justify-between cursor-pointer select-none relative z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleValidacionChange(item.id, 'desinfeccion', !desinfeccion);
+            }}
+          >
             <div className="flex items-center gap-2">
               <Shield className="h-4 w-4 text-purple-500" />
               <span className="text-sm text-gray-700">Desinfección</span>
@@ -234,9 +256,11 @@ export const Inspeccion: React.FC = () => {
                 type="checkbox"
                 checked={desinfeccion}
                 id={`chk-desinf-${item.id}`}
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
                 onChange={(e) => handleValidacionChange(item.id, 'desinfeccion', e.target.checked)}
-                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 pointer-events-auto cursor-pointer relative z-10"
+                className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 pointer-events-auto cursor-pointer relative z-20"
                 aria-label="Marcar desinfección como completada"
               />
               <label htmlFor={`chk-desinf-${item.id}`} className="ml-2 text-sm text-gray-700 cursor-pointer select-none" onClick={(e)=>e.stopPropagation()}>Hecho</label>
