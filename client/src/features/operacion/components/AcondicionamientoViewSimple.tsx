@@ -34,8 +34,16 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   // Utilidad: normalizar texto (quitar acentos, minúsculas y trim)
   const norm = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
-  // Filtrar items disponibles para Ensamblaje: únicamente desde Bodega (cualquier variante)
-  const itemsDisponibles = inventarioCompleto?.filter(item => norm(item.estado).includes('bodega')) || [];
+  // Filtrar items disponibles para Ensamblaje: desde Bodega y desde Pre-acondicionamiento → Atemperamiento (excluyendo Congelación)
+  const itemsDisponibles = inventarioCompleto?.filter(item => {
+    const e = norm(item.estado);
+    const s = norm((item as any).sub_estado);
+    const enBodega = e.includes('bodega');
+    const esPreAcond = e.includes('pre') && e.includes('acond');
+    const esAtemperamiento = s.includes('atemper'); // 'atemperamiento' o 'atemperado'
+    const esCongelacion = e.includes('congel') || s.includes('congel');
+    return (enBodega || (esPreAcond && esAtemperamiento)) && !esCongelacion;
+  }) || [];
 
   // Filtrar items disponibles específicamente para Lista para Despacho (solo de Ensamblaje)
   const itemsDisponiblesParaDespacho = inventarioCompleto?.filter(item => 
@@ -306,7 +314,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
         <AgregarItemsModal
           isOpen={mostrarModalTraerEnsamblaje}
           onClose={() => setMostrarModalTraerEnsamblaje(false)}
-          itemsDisponibles={itemsDisponibles} // Solo items que están en Bodega para Ensamblaje
+          itemsDisponibles={itemsDisponibles} // Bodega o Pre-acond → Atemperamiento (sin Congelación)
           subEstadoDestino="Ensamblaje"
           cargando={cargandoEnsamblaje}
           onConfirm={async (items, subEstado) => {
