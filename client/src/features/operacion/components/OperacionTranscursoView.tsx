@@ -54,6 +54,9 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   const [itemsDelLote, setItemsDelLote] = useState<any[]>([]);
   const [itemsSeleccionadosModal, setItemsSeleccionadosModal] = useState<number[]>([]);
   const [mostrarSinLote, setMostrarSinLote] = useState(false);
+  // Filtros para el modal (diseño sin lotes)
+  const [modalBusqueda, setModalBusqueda] = useState('');
+  const [categoriaFiltro, setCategoriaFiltro] = useState<'todos' | 'cube' | 'vip' | 'tics'>('todos');
 
   // Estados para modal de temporizador
   const [mostrarModalTimer, setMostrarModalTimer] = useState(false);
@@ -625,6 +628,16 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   // Items listos para despacho sin lote
   const itemsSinLote = itemsListosDespacho.filter(item => !item.lote || item.lote.trim() === '');
 
+  // Items visibles en el modal según filtros (sin lotes)
+  const itemsModalVisibles = itemsListosDespacho.filter(item => {
+    const coincideBusqueda =
+      (typeof item.nombre_unidad === 'string' && item.nombre_unidad.toLowerCase().includes(modalBusqueda.toLowerCase())) ||
+      (typeof item.rfid === 'string' && item.rfid.toLowerCase().includes(modalBusqueda.toLowerCase()));
+    const coincideCategoria = categoriaFiltro === 'todos' || (item.categoria?.toLowerCase?.() === categoriaFiltro);
+    const coincideLote = !mostrarSinLote || !item.lote || item.lote.trim() === '';
+    return coincideBusqueda && coincideCategoria && coincideLote;
+  });
+
   // Manejar selección de lote
   const seleccionarLote = (lote: string) => {
     setLoteSeleccionado(lote);
@@ -653,8 +666,9 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     if (itemsSeleccionadosModal.length === 0) return;
     
     try {
-      const itemsParaEnvio = itemsDelLote.filter(item => 
-  Array.isArray(itemsSeleccionadosModal) && itemsSeleccionadosModal.includes(item.id)
+      // Enfoque sin lotes: tomar los items seleccionados desde el inventario filtrado general
+      const itemsParaEnvio = itemsListosDespacho.filter(item =>
+        Array.isArray(itemsSeleccionadosModal) && itemsSeleccionadosModal.includes(item.id)
       );
       
   await envio.iniciarEnvio(itemsParaEnvio, tiempoEnvio);
@@ -664,6 +678,9 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       setLoteSeleccionado('');
       setItemsDelLote([]);
       setItemsSeleccionadosModal([]);
+      setModalBusqueda('');
+      setCategoriaFiltro('todos');
+      setMostrarSinLote(false);
     } catch (error) {
       console.error('Error iniciando envío:', error);
     }
@@ -951,18 +968,14 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
         </div>
       </div>
 
-      {/* Modal de Selección de Items */}
+      {/* Modal de Selección de Items (diseño sin lotes, mobile-first) */}
       {mostrarModalSeleccion && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white rounded-lg shadow-xl w-[92vw] max-w-md sm:max-w-2xl md:max-w-4xl max-h-[88vh] overflow-hidden flex flex-col">
             <div className="p-4 sm:p-6 border-b border-gray-200 flex items-start justify-between gap-2">
               <div>
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
-                  Seleccionar Items por Lote para Envío
-                </h2>
-                <p className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-2">
-                  Items disponibles: {itemsListosDespacho.length} | Lotes: {lotesDisponibles.length}
-                </p>
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Seleccionar items para envío</h2>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-2">Items disponibles: {itemsListosDespacho.length}</p>
               </div>
               <button
                 onClick={() => {
@@ -970,6 +983,9 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                   setLoteSeleccionado('');
                   setItemsDelLote([]);
                   setItemsSeleccionadosModal([]);
+                  setModalBusqueda('');
+                  setCategoriaFiltro('todos');
+                  setMostrarSinLote(false);
                 }}
                 aria-label="Cerrar"
                 className="text-gray-500 hover:text-gray-700 p-1 -mt-1"
@@ -978,129 +994,98 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                 <span className="text-xl leading-none">×</span>
               </button>
             </div>
-            
-            <div className="p-4 sm:p-6 flex flex-col md:flex-row gap-4 sm:gap-6 flex-1 overflow-y-auto">
-              {/* Lotes disponibles e items sin lote */}
-              <div className="w-full md:w-1/3">
-                <h3 className="text-base sm:text-lg font-medium text-gray-800 mb-3 sm:mb-4">Lotes disponibles</h3>
-                <div className="space-y-2">
-                  {lotesDisponibles.length > 0 ? (
-                    lotesDisponibles.map((lote) => {
-                      const itemsEnLote = itemsListosDespacho.filter(item => item.lote === lote);
-                      return (
-                        <button
-                          key={lote}
-                          onClick={() => seleccionarLote(lote)}
-                          className={`w-full text-left p-3 rounded-lg border transition-colors text-sm ${
-                            loteSeleccionado === lote
-                              ? 'bg-blue-50 border-blue-200 text-blue-800'
-                              : 'bg-white border-gray-200 hover:bg-gray-50'
-                          }`}
-                        >
-                          <div className="font-medium">{lote}</div>
-                          <div className="text-xs sm:text-sm text-gray-500">
-                            {itemsEnLote.length} TICs disponibles
-                          </div>
-                          <div className="text-[11px] text-gray-400 mt-1">
-                            Estado: {itemsEnLote[0]?.estado}/{itemsEnLote[0]?.sub_estado}
-                          </div>
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center text-gray-500 py-8">
-                      <Package className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-gray-400" />
-                      <p>No hay lotes disponibles</p>
-                      <p className="text-sm text-gray-400 mt-1">
-                        Los items deben completar acondicionamiento primero
-                      </p>
-                    </div>
-                  )}
-                  {/* Separador y opción de items sin lote */}
-                  {itemsSinLote.length > 0 && (
-                    <div className="pt-2 mt-2 border-t border-gray-200">
-                      <button
-                        onClick={() => { setMostrarSinLote(true); setLoteSeleccionado(''); setItemsDelLote(itemsSinLote); }}
-                        className={`w-full text-left p-3 rounded-lg border transition-colors text-sm ${
-                          mostrarSinLote
-                            ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
-                            : 'bg-white border-gray-200 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="font-medium">Items sin lote</div>
-                        <div className="text-xs sm:text-sm text-gray-500">
-                          {itemsSinLote.length} TICs disponibles
-                        </div>
-                      </button>
-                    </div>
-                  )}
+            <div className="p-4 sm:p-6 flex flex-col gap-4 sm:gap-6 flex-1 overflow-y-auto">
+              {/* Filtros y búsqueda */}
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por RFID o nombre..."
+                    value={modalBusqueda}
+                    onChange={(e) => setModalBusqueda(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
                 </div>
-              </div>
-              
-              {/* Items del lote seleccionado o sin lote */}
-              <div className="w-full md:w-2/3">
-                <div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <h3 className="text-base sm:text-lg font-medium text-gray-800">{mostrarSinLote ? 'TICs sin lote' : 'TICs del lote'}</h3>
-                  {(itemsDelLote.length > 0 || (mostrarSinLote && itemsSinLote.length > 0)) && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {(['todos','cube','vip','tics'] as const).map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setCategoriaFiltro(cat)}
+                      className={`px-3 py-1.5 rounded-full text-xs border transition-colors ${categoriaFiltro === cat ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                    >
+                      {cat === 'todos' ? 'Todos' : cat.toUpperCase()}
+                    </button>
+                  ))}
+                  <label className="ml-auto inline-flex items-center gap-2 text-xs text-gray-700 select-none">
+                    <input
+                      type="checkbox"
+                      checked={mostrarSinLote}
+                      onChange={(e) => setMostrarSinLote(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    Solo sin lote ({itemsSinLote.length})
+                  </label>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-gray-600">Mostrando {itemsModalVisibles.length} items</div>
+                  {itemsModalVisibles.length > 0 && (
                     <button
                       onClick={() => {
-                        const listado = mostrarSinLote ? itemsSinLote : itemsDelLote;
-                        const todosSeleccionados = listado.every(item => itemsSeleccionadosModal.includes(item.id));
-                        if (todosSeleccionados) {
-                          // Deseleccionar todos
-                          setItemsSeleccionadosModal(prev => prev.filter(id => !listado.some(item => item.id === id)));
+                        const visiblesIds = itemsModalVisibles.map(i => i.id);
+                        const todosVisiblesSeleccionados = visiblesIds.every(id => itemsSeleccionadosModal.includes(id));
+                        if (todosVisiblesSeleccionados) {
+                          // Quitar visibles de la selección
+                          setItemsSeleccionadosModal(prev => prev.filter(id => !visiblesIds.includes(id)));
                         } else {
-                          // Seleccionar todos
-                          const ids = listado.map(item => item.id);
+                          // Agregar visibles a la selección
                           setItemsSeleccionadosModal(prev => {
-                            const sinDuplicados = prev.filter(id => !ids.includes(id));
-                            return [...sinDuplicados, ...ids];
+                            const setPrev = new Set(prev);
+                            visiblesIds.forEach(id => setPrev.add(id));
+                            return Array.from(setPrev);
                           });
                         }
                       }}
-                      className="text-xs sm:text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                     >
-                      {(mostrarSinLote ? itemsSinLote : itemsDelLote).every(item => itemsSeleccionadosModal.includes(item.id)) ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                      {itemsModalVisibles.every(i => itemsSeleccionadosModal.includes(i.id)) ? 'Deseleccionar visibles' : 'Seleccionar visibles'}
                     </button>
                   )}
                 </div>
-                {loteSeleccionado || mostrarSinLote ? (
-                  <div className="space-y-2 max-h-64 sm:max-h-96 overflow-y-auto">
-                    {(mostrarSinLote ? itemsSinLote : itemsDelLote).map((item) => (
-                      <div
-                        key={item.id}
-                        className={`p-3 rounded-lg border cursor-pointer transition-colors text-sm ${
-                          itemsSeleccionadosModal.includes(item.id)
-                            ? 'bg-blue-50 border-blue-200'
-                            : 'bg-white border-gray-200 hover:bg-gray-50'
-                        }`}
-                        onClick={() => toggleSeleccionItemModal(item.id)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium">{item.nombre_unidad}</div>
-                            <div className="text-xs sm:text-sm text-gray-500">RFID: {item.rfid}</div>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={itemsSeleccionadosModal.includes(item.id)}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              toggleSeleccionItemModal(item.id);
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="rounded border-gray-300"
-                            aria-label={`Seleccionar ${item.nombre_unidad}`}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
+              </div>
+
+              {/* Lista de items */}
+              <div className="space-y-2 max-h-[50vh] sm:max-h-[55vh] overflow-y-auto pr-1">
+                {itemsModalVisibles.length === 0 ? (
                   <div className="text-center text-gray-500 py-8">
                     <Package className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-gray-400" />
-                    <p>Selecciona un lote o "Items sin lote" para ver sus TICs</p>
+                    <p>No hay items que coincidan con los filtros</p>
                   </div>
+                ) : (
+                  itemsModalVisibles.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => toggleSeleccionItemModal(item.id)}
+                      className={`w-full text-left p-3 rounded-lg border transition-colors text-sm flex items-center justify-between ${
+                        itemsSeleccionadosModal.includes(item.id)
+                          ? 'bg-blue-50 border-blue-200'
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{item.nombre_unidad}</div>
+                        <div className="text-xs text-gray-500 truncate">RFID: {item.rfid} • {item.lote || 'Sin lote'} • {item.categoria?.toUpperCase?.()}</div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={itemsSeleccionadosModal.includes(item.id)}
+                        onChange={(e) => e.stopPropagation()}
+                        className="rounded border-gray-300 ml-3"
+                        aria-label={`Seleccionar ${item.nombre_unidad}`}
+                        readOnly
+                      />
+                    </button>
+                  ))
                 )}
               </div>
             </div>
@@ -1151,6 +1136,9 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     setLoteSeleccionado('');
                     setItemsDelLote([]);
                     setItemsSeleccionadosModal([]);
+                    setModalBusqueda('');
+                    setCategoriaFiltro('todos');
+                    setMostrarSinLote(false);
                   }}
                   className="px-3 py-2 sm:px-4 sm:py-2 text-gray-600 bg-white rounded-lg hover:bg-white transition-colors text-sm"
                 >
