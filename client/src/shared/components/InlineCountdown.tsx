@@ -14,8 +14,11 @@ type Props = {
   className?: string;
 };
 
-// Countdown ligero y determinístico que recalcula desde endTime cada segundo.
-// Si no hay endTime, usa "seconds" y decrementa localmente.
+// Countdown ligero y determinístico:
+// - Si viene "seconds", lo usamos como fuente de verdad (suele venir ya
+//   sincronizado por el contexto y evita saltos hacia arriba). No creamos
+//   intervalo interno; el padre actualizará los segundos cada tick.
+// - Si NO viene "seconds", recalculamos desde endTime cada segundo.
 const InlineCountdown: React.FC<Props> = ({ endTime, seconds, paused = false, format, onZero, className }) => {
   const targetMs = useMemo(() => {
     if (!endTime) return null;
@@ -29,25 +32,40 @@ const InlineCountdown: React.FC<Props> = ({ endTime, seconds, paused = false, fo
   }, [endTime]);
 
   // Estado interno de segundos visibles
+  const preferSeconds = seconds !== undefined && seconds !== null;
   const [display, setDisplay] = useState<number>(() => {
+    if (preferSeconds) {
+      return Math.max(0, Math.floor((seconds as number) || 0));
+    }
     if (targetMs) {
       return Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
     }
-    return Math.max(0, Math.floor(seconds ?? 0));
+    return 0;
   });
 
   // Mantener "seconds" como respaldo en un ref para detectar cambios fuertes
   const secondsRef = useRef<number>(seconds ?? 0);
   useEffect(() => { secondsRef.current = seconds ?? 0; }, [seconds]);
 
-  // Sincronizar display cuando cambien las props de manera significativa
+  // Sincronización cuando cambian props:
+  // 1) Si preferimos seconds, seguir ese valor (con suavizado para evitar saltos hacia arriba pequeños)
   useEffect(() => {
+    if (!preferSeconds) return;
+    const next = Math.max(0, Math.floor(secondsRef.current));
+    setDisplay(prev => {
+      if (paused) return next; // en pausa, reflejar tal cual
+      // Evitar pequeños incrementos visuales (<5s) que se perciben como "saltos hacia arriba"
+      if (next > prev && next - prev < 5) return prev;
+      return next;
+    });
+  }, [preferSeconds, paused, seconds]);
+
+  // 2) Si no hay seconds, usar endTime y recalcular de ser necesario
+  useEffect(() => {
+    if (preferSeconds) return;
     if (paused) {
-      // En pausa: fijar al valor de seconds si viene, o al cálculo actual si hay endTime
-      const s = typeof secondsRef.current === 'number' ? Math.max(0, Math.floor(secondsRef.current)) : null;
-      if (s !== null) {
-        setDisplay(s);
-      } else if (targetMs) {
+      // En pausa, mostrar el cálculo actual desde endTime (estático)
+      if (targetMs) {
         const calc = Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
         setDisplay(calc);
       }
@@ -55,35 +73,31 @@ const InlineCountdown: React.FC<Props> = ({ endTime, seconds, paused = false, fo
     }
     if (targetMs) {
       const calc = Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
-      // Aceptar cambios cuando la diferencia sea notable o se reinicie
-      if (display === 0 || Math.abs(calc - display) >= 2 || calc > display) {
-        setDisplay(calc);
-      }
-    } else if (typeof secondsRef.current === 'number') {
-      const s = Math.max(0, Math.floor(secondsRef.current));
-      if (display === 0 || Math.abs(s - display) >= 2 || s > display) {
-        setDisplay(s);
-      }
+      setDisplay(prev => {
+        // Aceptar rebajas o reinicios; suprimir incrementos pequeños para evitar saltos
+        if (calc > prev && calc - prev < 5) return prev;
+        return calc;
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetMs]);
+  }, [targetMs, preferSeconds, paused]);
 
-  // Tick de 1s: si hay endTime, recalcular; si no, decrementar localmente. Deshabilitar cuando paused.
+  // Tick de 1s: solo necesario cuando NO tenemos seconds (endTime fallback)
   useEffect(() => {
-    if (paused) {
-      return; // No iniciar intervalo si está en pausa
+    if (paused || preferSeconds) {
+      return; // Sin intervalo si está en pausa o si el padre provee seconds
     }
     const id = setInterval(() => {
-      setDisplay(prev => {
+      setDisplay(() => {
         if (targetMs) {
           const calc = Math.max(0, Math.floor((targetMs - Date.now()) / 1000));
           return calc;
         }
-        return prev > 0 ? prev - 1 : 0;
+        return 0;
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [targetMs, paused]);
+  }, [targetMs, paused, preferSeconds]);
 
   // Disparar onZero una sola vez
   const firedRef = useRef(false);
