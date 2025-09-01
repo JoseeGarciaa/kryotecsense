@@ -189,40 +189,48 @@ export const useInspeccion = () => {
 
       console.log(`🔍 Completando inspección para item ${item.nombre_unidad}...`);
 
-      try {
-        // 1) Guardar validaciones y marcar como Inspeccionada con un solo PUT
-        await Promise.all([
-          apiServiceClient.put(`/inventory/inventario/${itemId}`, {
-            validacion_limpieza: 'aprobado',
-            validacion_goteo: 'aprobado',
-            validacion_desinfeccion: 'aprobado',
-            estado: 'Inspección',
-            sub_estado: 'Inspeccionada'
-          }),
-          apiServiceClient.post('/activities/actividades/', {
-            inventario_id: itemId,
-            usuario_id: 1,
-            descripcion: `${item.nombre_unidad} inspeccionado completamente (limpieza, goteo, desinfección)`,
-            estado_nuevo: 'Inspección',
-            sub_estado_nuevo: 'Inspeccionada'
-          })
-        ]);
+  try {
+        // 1) Guardar validaciones (solo campos de validación)
+        await apiServiceClient.put(`/inventory/inventario/${itemId}`, {
+          validacion_limpieza: 'aprobado',
+          validacion_goteo: 'aprobado',
+          validacion_desinfeccion: 'aprobado'
+        });
 
-        // 2) Mover inmediatamente a En bodega y limpiar lote
-        await Promise.all([
-          apiServiceClient.put(`/inventory/inventario/${itemId}`, {
-            estado: 'En bodega',
-            sub_estado: null,
-            lote: null
-          }),
-          apiServiceClient.post('/activities/actividades/', {
-            inventario_id: itemId,
-            usuario_id: 1,
-            descripcion: `${item.nombre_unidad} inspeccionado y movido a En bodega (lote limpiado)`,
-            estado_nuevo: 'En bodega',
-            sub_estado_nuevo: null
-          })
-        ]);
+        // Registrar actividad de inspección completa
+        await apiServiceClient.post('/activities/actividades/', {
+          inventario_id: itemId,
+          usuario_id: 1,
+          descripcion: `${item.nombre_unidad} inspeccionado completamente (limpieza, goteo, desinfección)`,
+          estado_nuevo: 'Inspección',
+          sub_estado_nuevo: 'Inspeccionada'
+        });
+
+        // 2) Marcar estado como Inspección/Inspeccionada (PATCH estado)
+        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+          estado: 'Inspección',
+          sub_estado: 'Inspeccionada'
+        });
+
+        // 3) Mover a En bodega/Disponible (PATCH estado)
+        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+          estado: 'En bodega',
+          sub_estado: 'Disponible'
+        });
+
+        // 4) Limpiar lote explícitamente (PUT parcial)
+        await apiServiceClient.put(`/inventory/inventario/${itemId}`, {
+          lote: null
+        });
+
+        // Registrar actividad de movimiento a bodega
+        await apiServiceClient.post('/activities/actividades/', {
+          inventario_id: itemId,
+          usuario_id: 1,
+          descripcion: `${item.nombre_unidad} inspeccionado y movido a En bodega (lote limpiado)`,
+          estado_nuevo: 'En bodega',
+          sub_estado_nuevo: 'Disponible'
+        });
 
         // 3) Cancelar cronómetro de inspección si existe
         try {
@@ -243,7 +251,7 @@ export const useInspeccion = () => {
         setItemsInspeccionados(prev => [...prev, {
           ...item,
           estado: 'En bodega',
-          sub_estado: ''
+          sub_estado: 'Disponible'
         }]);
         
         console.log(`✅ Inspección completada localmente para ${item.nombre_unidad}`);
@@ -292,18 +300,16 @@ export const useInspeccion = () => {
           throw new Error('No hay IDs válidos para procesar en inspección.');
         }
         
-        // Procesar todos los items válidos en paralelo (guardar validaciones y marcar Inspeccionada)
-        const promesasEstadoYValid = idsValidos.map(itemId =>
+        // 1) Guardar validaciones en paralelo (solo campos de validación)
+        const promesasValidaciones = idsValidos.map(itemId =>
           apiServiceClient.put(`/inventory/inventario/${itemId}`, {
             validacion_limpieza: 'aprobado',
             validacion_goteo: 'aprobado',
-            validacion_desinfeccion: 'aprobado',
-            estado: 'Inspección',
-            sub_estado: 'Inspeccionada'
+            validacion_desinfeccion: 'aprobado'
           })
         );
 
-        const promesasActividades = itemsAInspeccionar.map(item => 
+        const promesasActividades = itemsAInspeccionar.map(item =>
           apiServiceClient.post('/activities/actividades/', {
             inventario_id: item.id,
             usuario_id: 1,
@@ -313,27 +319,39 @@ export const useInspeccion = () => {
           })
         );
 
-  await Promise.all([...promesasEstadoYValid, ...promesasActividades]);
+        await Promise.all([...promesasValidaciones, ...promesasActividades]);
 
-        // Mover a En bodega y registrar actividad para cada item
-        const promesasBodega = idsValidos.map(itemId => 
-          apiServiceClient.put(`/inventory/inventario/${itemId}`, {
-            estado: 'En bodega',
-            sub_estado: null,
-            lote: null
+        // 2) Marcar como Inspección/Inspeccionada (PATCH) en paralelo
+        await Promise.all(idsValidos.map(itemId =>
+          apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+            estado: 'Inspección',
+            sub_estado: 'Inspeccionada'
           })
-        );
-        const promesasActBodega = itemsAInspeccionar.map(item => 
+        ));
+
+        // 3) Mover a En bodega/Disponible (PATCH) en paralelo
+        await Promise.all(idsValidos.map(itemId =>
+          apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+            estado: 'En bodega',
+            sub_estado: 'Disponible'
+          })
+        ));
+
+        // 4) Limpiar lote (PUT) en paralelo
+        await Promise.all(idsValidos.map(itemId =>
+          apiServiceClient.put(`/inventory/inventario/${itemId}`, { lote: null })
+        ));
+
+        // 5) Registrar actividad de movimiento a bodega
+        await Promise.all(itemsAInspeccionar.map(item =>
           apiServiceClient.post('/activities/actividades/', {
             inventario_id: item.id,
             usuario_id: 1,
             descripcion: `${item.nombre_unidad} inspeccionado y movido a En bodega (lote limpiado)`,
             estado_nuevo: 'En bodega',
-            sub_estado_nuevo: null
+            sub_estado_nuevo: 'Disponible'
           })
-        );
-
-        await Promise.all([...promesasBodega, ...promesasActBodega]);
+        ));
 
         // Cancelar cronómetros de inspección
         try {
@@ -355,7 +373,7 @@ export const useInspeccion = () => {
         setItemsInspeccionados(prev => [...prev, ...itemsAInspeccionar.map(item => ({
           ...item,
           estado: 'En bodega',
-          sub_estado: ''
+          sub_estado: 'Disponible'
         }))]);
         
         console.log(`✅ ${itemIds.length} items inspeccionados localmente`);
@@ -412,39 +430,45 @@ export const useInspeccion = () => {
         if (!item) return null;
         
         try {
-          // Actualizar estado y validaciones en el backend y marcar Inspeccionada
-          await Promise.all([
-            apiServiceClient.put(`/inventory/inventario/${itemId}`, {
-              validacion_limpieza: 'aprobado',
-              validacion_goteo: 'aprobado',
-              validacion_desinfeccion: 'aprobado',
-              estado: 'Inspección',
-              sub_estado: 'Inspeccionada'
-            }),
-            apiServiceClient.post('/activities/actividades/', {
-              inventario_id: itemId,
-              usuario_id: 1,
-              descripcion: `${item.nombre_unidad} inspeccionado completamente mediante escaneo RFID (limpieza, goteo, desinfección automática)`,
-              estado_nuevo: 'Inspección',
-              sub_estado_nuevo: 'Inspeccionada'
-            })
-          ]);
+          // 1) Guardar validaciones
+          await apiServiceClient.put(`/inventory/inventario/${itemId}`, {
+            validacion_limpieza: 'aprobado',
+            validacion_goteo: 'aprobado',
+            validacion_desinfeccion: 'aprobado'
+          });
 
-          // Mover a En bodega y registrar actividad
-          await Promise.all([
-            apiServiceClient.put(`/inventory/inventario/${itemId}`, {
-              estado: 'En bodega',
-              sub_estado: null,
-              lote: null
-            }),
-            apiServiceClient.post('/activities/actividades/', {
-              inventario_id: itemId,
-              usuario_id: 1,
-              descripcion: `${item.nombre_unidad} inspeccionado (escaneo) y movido a En bodega (lote limpiado)`,
-              estado_nuevo: 'En bodega',
-              sub_estado_nuevo: null
-            })
-          ]);
+          // Actividad de inspección completa por escaneo
+          await apiServiceClient.post('/activities/actividades/', {
+            inventario_id: itemId,
+            usuario_id: 1,
+            descripcion: `${item.nombre_unidad} inspeccionado completamente mediante escaneo RFID (limpieza, goteo, desinfección automática)`,
+            estado_nuevo: 'Inspección',
+            sub_estado_nuevo: 'Inspeccionada'
+          });
+
+          // 2) Marcar Inspección/Inspeccionada
+          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+            estado: 'Inspección',
+            sub_estado: 'Inspeccionada'
+          });
+
+          // 3) Mover a En bodega/Disponible
+          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+            estado: 'En bodega',
+            sub_estado: 'Disponible'
+          });
+
+          // 4) Limpiar lote
+          await apiServiceClient.put(`/inventory/inventario/${itemId}`, { lote: null });
+
+          // Actividad de movimiento a bodega
+          await apiServiceClient.post('/activities/actividades/', {
+            inventario_id: itemId,
+            usuario_id: 1,
+            descripcion: `${item.nombre_unidad} inspeccionado (escaneo) y movido a En bodega (lote limpiado)`,
+            estado_nuevo: 'En bodega',
+            sub_estado_nuevo: 'Disponible'
+          });
 
           // Cancelar cronómetro de inspección si existe
           try {
@@ -474,7 +498,7 @@ export const useInspeccion = () => {
       setItemsInspeccionados(prev => [...prev, ...itemsExitosos.map(item => ({
         ...item,
         estado: 'En bodega',
-        sub_estado: '',
+  sub_estado: 'Disponible',
         validaciones: {
           limpieza: true,
           goteo: true,
