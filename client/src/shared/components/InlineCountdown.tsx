@@ -47,17 +47,30 @@ const InlineCountdown: React.FC<Props> = ({ endTime, seconds, paused = false, fo
   const secondsRef = useRef<number>(seconds ?? 0);
   useEffect(() => { secondsRef.current = seconds ?? 0; }, [seconds]);
 
-  // Sincronización cuando cambian props:
-  // 1) Si preferimos seconds, seguir ese valor (con suavizado para evitar saltos hacia arriba pequeños)
+  // Sincronización cuando cambian props (modo seconds):
+  // - Inicializar display desde seconds.
+  // - Solo aceptar correcciones grandes (|diff| >= 2) o incrementos (edición/pausa/reinicio).
   useEffect(() => {
     if (!preferSeconds) return;
     const next = Math.max(0, Math.floor(secondsRef.current));
     setDisplay(prev => {
-  // Con seconds como fuente de verdad, reflejar exactamente el valor entrante
-  // para evitar retrasos; el hook del contexto ya suaviza y corrige drift.
-  return next;
+      if (prev === undefined || Number.isNaN(prev)) return next;
+      const diff = next - prev;
+      if (paused) return next; // en pausa reflejar fuente
+      if (next > prev) return next; // incrementos se aceptan
+      if (Math.abs(diff) >= 2) return next; // corrección grande
+      return prev; // dif -1 se ignora (nuestro tick local ya lo aplicará)
     });
   }, [preferSeconds, paused, seconds]);
+
+  // Tick de 1s propio cuando usamos seconds: garantiza decremento 1x1 estable
+  useEffect(() => {
+    if (!preferSeconds || paused) return;
+    const id = setInterval(() => {
+      setDisplay(prev => Math.max(0, (prev || 0) - 1));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [preferSeconds, paused]);
 
   // 2) Si no hay seconds, usar endTime y recalcular de ser necesario
   useEffect(() => {
