@@ -45,21 +45,21 @@ export const useInspeccion = () => {
         // Intentar PUT directo (parcial permitido por backend via model_dump(exclude_unset))
         return await apiServiceClient.put(`/inventory/inventario/${itemId}`, campos);
       } catch (e: any) {
-        // Intento de fallback utilizando bulk-update
+        // Fallback: intentar campo por campo con PUT para aislar el error (sin usar bulk-update)
         try {
-          const payload = { updates: [{ id: itemId, ...campos }] };
-          return await apiServiceClient.post('/inventory/inventario/bulk-update', payload);
-        } catch (e2: any) {
-          // Último fallback: intentar campo por campo con PUT para aislar el error
-          try {
-            for (const [k, v] of Object.entries(campos)) {
+          for (const [k, v] of Object.entries(campos)) {
+            try {
+              await apiServiceClient.put(`/inventory/inventario/${itemId}`, { [k]: v });
+            } catch {
+              // retry rápido por si fue condición transitoria
+              await new Promise(r => setTimeout(r, 150));
               await apiServiceClient.put(`/inventory/inventario/${itemId}`, { [k]: v });
             }
-            return { data: { message: 'Actualización por campos aplicada' } } as any;
-          } catch (e3: any) {
-            const detalle = e2?.response?.data?.detail || e?.response?.data?.detail || e3?.message || e2?.message || e?.message;
-            throw new Error(detalle || 'Error actualizando inventario');
           }
+          return { data: { message: 'Actualización por campos aplicada' } } as any;
+        } catch (e3: any) {
+          const detalle = e?.response?.data?.detail || e3?.response?.data?.detail || e3?.message || e?.message;
+          throw new Error(detalle || 'Error actualizando inventario');
         }
       }
     },
@@ -340,14 +340,14 @@ export const useInspeccion = () => {
           throw new Error('No hay IDs válidos para procesar en inspección.');
         }
         
-        // 1) Guardar validaciones en paralelo (solo campos de validación)
-        const promesasValidaciones = idsValidos.map(itemId =>
-          actualizarInventarioConFallback(itemId, {
+        // 1) Guardar validaciones (secuencial por item para evitar errores masivos)
+        for (const itemId of idsValidos) {
+          await actualizarInventarioConFallback(itemId, {
             validacion_limpieza: 'aprobado',
             validacion_goteo: 'aprobado',
             validacion_desinfeccion: 'aprobado'
-          })
-        );
+          });
+        }
 
         // Actividades (best-effort)
         try {
@@ -362,7 +362,7 @@ export const useInspeccion = () => {
           ));
         } catch {}
 
-        await Promise.all(promesasValidaciones);
+  // Validaciones ya aplicadas arriba
 
         // 2) y 3) y 4) aplicar de forma secuencial por item para evitar errores 500 masivos
         for (const itemId of idsValidos) {
