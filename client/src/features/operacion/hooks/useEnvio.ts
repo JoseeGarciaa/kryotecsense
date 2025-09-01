@@ -19,7 +19,7 @@ export interface ItemEnvio {
 export const useEnvio = (refetchInventario?: () => Promise<void>) => {
   const [itemsEnEnvio, setItemsEnEnvio] = useState<ItemEnvio[]>([]);
   const [cargandoEnvio, setCargandoEnvio] = useState(false);
-  const { crearTimer, eliminarTimer, formatearTiempo } = useTimerContext();
+  const { timers, crearTimer, eliminarTimer, formatearTiempo } = useTimerContext();
 
   // Cargar items en envío del localStorage al inicializar
   useEffect(() => {
@@ -69,16 +69,43 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
   const tiempoOperacionMin = Math.max(1, Math.floor(tiempoEnvioMinutos));
 
       for (const item of itemsSeleccionados) {
-        // Crear temporizador de envío (nombre incluye ID para coincidencia fiable en Devolución)
-        const timerNombre = `Envío #${item.id} - ${item.nombre_unidad}`;
-        const timerId = crearTimer(
-          timerNombre,
-          'envio', // Tipo específico para envíos
-          tiempoOperacionMin
-        );
+        // Reusar temporizador existente (creado desde Ensamblaje) si existe y está activo
+        const normalize = (s: string) =>
+          (s || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .trim();
 
-        const fechaInicio = new Date();
-        const fechaEstimada = new Date(fechaInicio.getTime() + (tiempoOperacionMin * 60 * 1000));
+        const expectedName = `Envío #${item.id} - ${item.nombre_unidad}`;
+        const expectedNameNorm = normalize(expectedName);
+        const existingTimer = timers.find(t => {
+          if (t.tipoOperacion !== 'envio' || t.completado !== false) return false;
+          const n = normalize(t.nombre);
+          return n === expectedNameNorm || /envio\s+#\d+\s+-/i.test(n) && n.includes(`#${item.id} -`.toLowerCase());
+        });
+
+        let timerId: string;
+        let fechaInicio: Date;
+        let fechaEstimada: Date;
+        let minutosUsados = tiempoOperacionMin;
+
+        if (existingTimer) {
+          // Reusar existente
+          timerId = existingTimer.id;
+          fechaInicio = new Date(existingTimer.fechaInicio);
+          fechaEstimada = new Date(existingTimer.fechaFin);
+          minutosUsados = existingTimer.tiempoInicialMinutos;
+        } else {
+          // Crear temporizador de envío (nombre incluye ID para coincidencia fiable en Devolución)
+          timerId = crearTimer(
+            expectedName,
+            'envio', // Tipo específico para envíos
+            tiempoOperacionMin
+          );
+          fechaInicio = new Date();
+          fechaEstimada = new Date(fechaInicio.getTime() + (tiempoOperacionMin * 60 * 1000));
+        }
 
         // Preparar item para envío
         const itemEnvio: ItemEnvio = {
@@ -89,7 +116,7 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
           estado: 'operación',
           sub_estado: 'En transito',
           categoria: item.categoria || 'credocube',
-          tiempoEnvio: tiempoOperacionMin,
+          tiempoEnvio: minutosUsados,
           timerId,
           fechaInicioEnvio: fechaInicio,
           fechaEstimadaLlegada: fechaEstimada

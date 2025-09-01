@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Package, Search, Loader, Scan } from 'lucide-react';
 import { useOperaciones } from '../hooks/useOperaciones';
 import { apiServiceClient } from '../../../api/apiClient';
 import RfidScanModal from './RfidScanModal';
 import { useTimerContext } from '../../../contexts/TimerContext';
+import InlineCountdown from '../../../shared/components/InlineCountdown';
 
 interface AcondicionamientoViewSimpleProps {
   isOpen: boolean;
@@ -12,7 +13,8 @@ interface AcondicionamientoViewSimpleProps {
 
 const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = ({ isOpen, onClose }) => {
   const { inventarioCompleto, cambiarEstadoItem, actualizarColumnasDesdeBackend } = useOperaciones();
-  const { timers, eliminarTimer } = useTimerContext();
+  const { timers, eliminarTimer, crearTimer, formatearTiempo } = useTimerContext();
+  const TIEMPO_OPERACION_MIN = 96 * 60;
   
   const [mostrarModalTraerEnsamblaje, setMostrarModalTraerEnsamblaje] = useState(false);
   const [mostrarModalTraerDespacho, setMostrarModalTraerDespacho] = useState(false);
@@ -49,6 +51,41 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   const itemsDisponiblesParaDespacho = inventarioCompleto?.filter(item => 
     item.estado === 'Acondicionamiento' && item.sub_estado === 'Ensamblaje'
   ) || [];
+
+  // Índices de timers de envío activos para lookup rápido (por id y por nombre normalizado)
+  const { infoPorId, infoPorNombre } = useMemo(() => {
+    const normalize = (s: string) =>
+      s
+        ?.normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim() ?? '';
+    const extractFromNombre = (nombre: string): { id?: number; base: string } => {
+      const n = normalize(nombre);
+      const re = /^envio\s+(?:#(\d+)\s*-\s*)?(.*)$/i;
+      const m = n.match(re);
+      if (m) {
+        const id = m[1] ? Number(m[1]) : undefined;
+        const base = (m[2] || '').trim();
+        return { id, base };
+      }
+      return { base: n };
+    };
+    const infoPorId = new Map<number, { seconds: number; endTime: Date }>();
+    const infoPorNombre = new Map<string, { seconds: number; endTime: Date }>();
+    for (const t of timers) {
+      if (t.tipoOperacion === 'envio' && t.activo && !t.completado) {
+        const data = { seconds: t.tiempoRestanteSegundos, endTime: t.fechaFin };
+        const { id, base } = extractFromNombre(t.nombre);
+        if (typeof id === 'number' && !Number.isNaN(id)) infoPorId.set(id, data);
+        const normBase = normalize(base);
+        if (normBase) infoPorNombre.set(normBase, data);
+        const normFull = normalize(t.nombre);
+        if (normFull && !infoPorNombre.has(normFull)) infoPorNombre.set(normFull, data);
+      }
+    }
+    return { infoPorId, infoPorNombre };
+  }, [timers]);
 
   // Normalizar: en Ensamblaje todos los lotes deben ser null
   useEffect(() => {
@@ -202,9 +239,23 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.nombre_unidad}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.lote || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
-                          {item.sub_estado}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                            {item.sub_estado}
+                          </span>
+                          {(() => {
+                            const normalize = (s: string) => s?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                            const info = infoPorId.get(item.id)
+                              || infoPorNombre.get(normalize(item.nombre_unidad))
+                              || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
+                            if (!info) return null;
+                            return (
+                              <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
+                                ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
+                              </span>
+                            );
+                          })()}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -286,9 +337,23 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.nombre_unidad}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.lote || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                          {item.sub_estado}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                            {item.sub_estado}
+                          </span>
+                          {(() => {
+                            const normalize = (s: string) => s?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                            const info = infoPorId.get(item.id)
+                              || infoPorNombre.get(normalize(item.nombre_unidad))
+                              || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
+                            if (!info) return null;
+                            return (
+                              <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
+                                ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
+                              </span>
+                            );
+                          })()}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -342,7 +407,22 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                 };
                 
                 // Usar PUT en lugar de PATCH, igual que el modal de bodega
-                return apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionItem);
+                await apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionItem);
+
+                // Iniciar cronómetro de Operación (96h) al ingresar a Ensamblaje, si no existe ya
+                const existe = timers.some(t =>
+                  t.tipoOperacion === 'envio' &&
+                  /envio\s+#\d+\s+-/i.test((t.nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')) &&
+                  (t.nombre || '').includes(`#${item.id} -`) &&
+                  !t.completado
+                );
+                if (!existe) {
+                  try {
+                    crearTimer(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio', TIEMPO_OPERACION_MIN);
+                  } catch (err) {
+                    console.warn('No se pudo crear timer de operación para item', item.id, err);
+                  }
+                }
               });
               
               await Promise.all(promesas);
