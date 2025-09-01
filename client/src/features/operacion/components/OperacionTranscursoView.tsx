@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, Package, Clock, CheckCircle, X, Play, Pause, Trash2 } from 'lucide-react';
 import { useOperaciones } from '../hooks/useOperaciones';
 import { useEnvio } from '../hooks/useEnvio';
@@ -53,6 +53,15 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   const [itemsSeleccionadosModal, setItemsSeleccionadosModal] = useState<number[]>([]);
   // Filtros para el modal (diseño sin lotes)
   const [modalBusqueda, setModalBusqueda] = useState('');
+  
+  // Lista filtrada para el modal (memoizada)
+  const itemsFiltradosModal = useMemo(() => {
+    const term = modalBusqueda.toLowerCase();
+    return itemsListosDespacho.filter(item =>
+      (typeof item.nombre_unidad === 'string' && item.nombre_unidad.toLowerCase().includes(term)) ||
+      (typeof item.rfid === 'string' && item.rfid.toLowerCase().includes(term))
+    );
+  }, [itemsListosDespacho, modalBusqueda]);
   
 
   // Estados para modal de temporizador
@@ -637,6 +646,13 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     });
   };
 
+  // Seleccionar/Deseleccionar todos los resultados filtrados en el modal
+  const toggleSeleccionTodosModal = () => {
+    const idsFiltrados = itemsFiltradosModal.map(i => i.id);
+    const todosSeleccionados = idsFiltrados.length > 0 && idsFiltrados.every(id => itemsSeleccionadosModal.includes(id));
+    setItemsSeleccionadosModal(todosSeleccionados ? [] : idsFiltrados);
+  };
+
   // Confirmar selección e iniciar envío
   const confirmarSeleccion = async () => {
     if (itemsSeleccionadosModal.length === 0) return;
@@ -977,27 +993,33 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                 </div>
                 {/* filtros por categoría y 'Solo sin lote' removidos */}
                 <div className="flex items-center justify-between">
-                  <div className="text-xs text-gray-600">Resultados filtrados por búsqueda</div>
+                  <div className="text-xs text-gray-600">
+                    Resultados: {itemsFiltradosModal.length}
+                    {itemsFiltradosModal.length > 0 && (
+                      <span className="ml-2 text-gray-400">• Seleccionados: {itemsSeleccionadosModal.length}</span>
+                    )}
+                  </div>
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700 select-none cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300"
+                      checked={itemsFiltradosModal.length > 0 && itemsFiltradosModal.every(i => itemsSeleccionadosModal.includes(i.id))}
+                      onChange={toggleSeleccionTodosModal}
+                    />
+                    Seleccionar todo
+                  </label>
                 </div>
               </div>
 
               {/* Lista de items */}
               <div className="space-y-2 max-h-[50vh] sm:max-h-[55vh] overflow-y-auto pr-1">
-                {itemsListosDespacho.filter(item =>
-                  (typeof item.nombre_unidad === 'string' && item.nombre_unidad.toLowerCase().includes(modalBusqueda.toLowerCase())) ||
-                  (typeof item.rfid === 'string' && item.rfid.toLowerCase().includes(modalBusqueda.toLowerCase()))
-                ).length === 0 ? (
+                {itemsFiltradosModal.length === 0 ? (
                   <div className="text-center text-gray-500 py-8">
                     <Package className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-gray-400" />
                     <p>No hay items que coincidan con la búsqueda</p>
                   </div>
                 ) : (
-                  itemsListosDespacho
-                    .filter(item =>
-                      (typeof item.nombre_unidad === 'string' && item.nombre_unidad.toLowerCase().includes(modalBusqueda.toLowerCase())) ||
-                      (typeof item.rfid === 'string' && item.rfid.toLowerCase().includes(modalBusqueda.toLowerCase()))
-                    )
-                    .map((item) => (
+                  itemsFiltradosModal.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => toggleSeleccionItemModal(item.id)}
