@@ -94,6 +94,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   // Cache de completados recientes para mostrar "Completo" aunque el servidor limpie el timer enseguida
   // key = `${tipo}|${norm(nombre)}`
   const recentCompletionsRef = useRef<Map<string, { minutes: number; at: number; startMs: number }>>(new Map());
+  // Fallback adicional por ID de item (para 'envio'): key = `${tipo}|id|${itemId}`
+  const recentCompletionsByIdRef = useRef<Map<string, { minutes: number; at: number; startMs: number }>>(new Map());
   const RECENT_TTL_MS = 3 * 60 * 1000; // 3 minutos
   const norm = (s: string | null | undefined) => (s ?? '')
     .normalize('NFD')
@@ -105,6 +107,17 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       const key = `${t.tipoOperacion}|${norm(t.nombre)}`;
       const startMs = (t.fechaInicio instanceof Date ? t.fechaInicio.getTime() : new Date(t.fechaInicio).getTime());
       recentCompletionsRef.current.set(key, { minutes: t.tiempoInicialMinutos, at: Date.now(), startMs });
+      // Si es 'envio', guardar también por ID extraído del nombre
+      if (t.tipoOperacion === 'envio') {
+        const m = (t.nombre || '').match(/#(\d+)\s*-\s*/);
+        if (m && m[1]) {
+          const id = Number(m[1]);
+          if (!Number.isNaN(id)) {
+            const keyId = `${t.tipoOperacion}|id|${id}`;
+            recentCompletionsByIdRef.current.set(keyId, { minutes: t.tiempoInicialMinutos, at: Date.now(), startMs });
+          }
+        }
+      }
     } catch {}
   };
   const getRecentCompletion = (
@@ -117,6 +130,19 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     if (Date.now() - val.at > RECENT_TTL_MS) {
       // Expirado
       recentCompletionsRef.current.delete(key);
+      return null;
+    }
+    return val;
+  };
+  const getRecentCompletionById = (
+    tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion',
+    itemId: number
+  ): { minutes: number; at: number; startMs: number } | null => {
+    const key = `${tipoOperacion}|id|${itemId}`;
+    const val = recentCompletionsByIdRef.current.get(key);
+    if (!val) return null;
+    if (Date.now() - val.at > RECENT_TTL_MS) {
+      recentCompletionsByIdRef.current.delete(key);
       return null;
     }
     return val;
@@ -768,7 +794,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     obtenerTimersCompletados,
     forzarSincronizacion,
   isConnected,
-  getRecentCompletion
+  getRecentCompletion,
+  getRecentCompletionById
   };
 };
 

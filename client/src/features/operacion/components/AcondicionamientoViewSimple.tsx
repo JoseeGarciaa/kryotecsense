@@ -14,7 +14,7 @@ interface AcondicionamientoViewSimpleProps {
 
 const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = ({ isOpen, onClose }) => {
   const { inventarioCompleto, cambiarEstadoItem, actualizarColumnasDesdeBackend } = useOperaciones();
-  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer, getRecentCompletion } = useTimerContext();
+  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer, getRecentCompletion, getRecentCompletionById } = useTimerContext();
   
   const [mostrarModalTraerEnsamblaje, setMostrarModalTraerEnsamblaje] = useState(false);
   const [mostrarModalTraerDespacho, setMostrarModalTraerDespacho] = useState(false);
@@ -354,12 +354,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                           const timerCompletado = completadosPorId.get(item.id);
 
                           // Fallback a reciente completado si el servidor lo limpió (usar etiquetas con ID únicamente)
-                          const reciente = !timerCompletado
-                            ? (getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
-                              || (item.rfid ? getRecentCompletion(`Envío #${item.id} - ${item.rfid}`, 'envio') : null)
-                              || getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
-                              || (item.rfid ? getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.rfid}`, 'envio') : null))
-                            : null;
+                          const reciente = !timerCompletado ? (getRecentCompletionById('envio', item.id)) : null;
                           // Mostrar completo en estos casos:
                           // 1) Hay un timer completado persistente y pasó la compuerta por llegada a la etapa.
                           // 2) Hay un "reciente completado" (mostrar siempre, sin compuerta) para evitar parpadeos a "Sin cronómetro".
@@ -570,12 +565,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                           const timerActivo = activosPorId.get(item.id);
                           const timerCompletado = completadosPorId.get(item.id);
 
-                          const reciente = !timerCompletado
-                            ? (getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
-                              || getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
-                              || (item.rfid ? getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.rfid}`, 'envio') : null)
-                              || (item.rfid ? getRecentCompletion(`Envío #${item.id} - ${item.rfid}`, 'envio') : null))
-                            : null;
+                          const reciente = !timerCompletado ? (getRecentCompletionById('envio', item.id)) : null;
                           const mostrarCompleto = (() => {
                             if (reciente) return true;
                             if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
