@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, Package, Clock, CheckCircle, X, Play, Pause, Trash2 } from 'lucide-react';
+import { Search, Package, Clock, CheckCircle, X, Play, Pause, Trash2, Edit } from 'lucide-react';
 import { useOperaciones } from '../hooks/useOperaciones';
 import { useEnvio } from '../hooks/useEnvio';
 import { useTimerContext } from '../../../contexts/TimerContext';
@@ -54,83 +54,11 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     );
   }, [itemsListosDespacho, modalBusqueda]);
   
-
   // Estados para modal de cronómetro
   const [mostrarModalTimer, setMostrarModalTimer] = useState(false);
   const [itemIdParaTimer, setItemIdParaTimer] = useState<number | null>(null);
   const [timerEnEdicion, setTimerEnEdicion] = useState<any>(null);
   const [cargandoTimer, setCargandoTimer] = useState(false);
-
-  // Obtener items en tránsito
-  useEffect(() => {
-    const itemsTransito = inventarioCompleto.filter((item: any) => 
-      item.estado === 'operación' && item.sub_estado === 'En transito'
-    );
-
-    // Combinar con información de timers
-    const itemsConTimers = itemsTransito.map((item: any) => {
-      const itemEnvio = envio.itemsEnEnvio.find((envioItem: any) => envioItem.id === item.id);
-      const timer = itemEnvio?.timerId ? timers.find(t => t.id === itemEnvio.timerId) : null;
-      
-      return {
-        ...item,
-        timerId: itemEnvio?.timerId,
-        tiempoRestante: timer ? formatearTiempo(timer.tiempoRestanteSegundos || 0) : undefined,
-        fechaInicio: itemEnvio?.fechaInicioEnvio?.toString() || undefined
-      };
-    });
-
-    setItemsEnTransito(itemsConTimers);
-  }, [inventarioCompleto, envio.itemsEnEnvio, timers, formatearTiempo]);
-
-  // Obtener items en transcurso (estado operación, sub_estado En transito)
-  useEffect(() => {
-    if (!inventarioCompleto) return;
-    
-    console.log('📦 Inventario completo recibido:', inventarioCompleto.length, 'items');
-    
-    // Filtrar items que están en transcurso (operación/En transito)
-    const itemsEnTranscurso = inventarioCompleto.filter(item => {
-      return item.estado === 'operación' && item.sub_estado === 'En transito';
-    });
-    
-    console.log('🚚 Items en transcurso:', itemsEnTranscurso);
-    setItemsListosParaDespacho(itemsEnTranscurso); // Reutilizamos el estado pero con items en transcurso
-  }, [inventarioCompleto]);
-
-  // Obtener items listos para despacho (desde acondicionamiento)
-  useEffect(() => {
-    if (!inventarioCompleto) return;
-    
-    console.log('🔍 DEBUG: Analizando inventario completo:', inventarioCompleto.length, 'items');
-    console.log('🔍 DEBUG: Muestra de items:', inventarioCompleto.slice(0, 3));
-    
-    // Buscar todos los items en acondicionamiento
-    const itemsAcondicionamiento = inventarioCompleto.filter(item => 
-      item.estado === 'acondicionamiento'
-    );
-    console.log('🏢 Items en acondicionamiento:', itemsAcondicionamiento.length);
-    
-    // Mostrar estados disponibles
-    const estadosUnicos = [...new Set(inventarioCompleto.map(item => `${item.estado}/${item.sub_estado}`))];
-    console.log('📊 Estados disponibles:', estadosUnicos);
-    
-    // Filtrar items que están listos para envío (según la DB real)
-    const itemsListos = inventarioCompleto.filter(item => {
-      // Verificar si está en Acondicionamiento con sub_estado Lista para Despacho
-      const esListoParaDespacho = 
-        item.estado === 'Acondicionamiento' && 
-        item.sub_estado === 'Lista para Despacho';
-      
-      console.log(`🔍 Item ${item.id}: estado="${item.estado}", sub_estado="${item.sub_estado}", esListoParaDespacho=${esListoParaDespacho}`);
-      
-      return esListoParaDespacho;
-    });
-    
-    console.log('📦 Items listos para despacho encontrados:', itemsListos.length);
-    console.log('📦 Items listos detalle:', itemsListos);
-    setItemsListosDespacho(itemsListos);
-  }, [inventarioCompleto]);
 
   // Filtrar items según búsqueda
   const itemsFiltrados = itemsListosParaDespacho.filter(item =>
@@ -362,47 +290,44 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     const timer = obtenerTemporizadorParaItem(itemId);
     if (!timer) {
       return (
-        <div className="flex flex-col items-center space-y-2">
-          <span className="text-gray-400 text-xs">Sin cronómetro</span>
+        <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
+          <span className="text-gray-400 text-xs text-center">Sin cronómetro</span>
           <button
             onClick={() => iniciarTemporizadorParaItem(itemId)}
-            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors text-xs"
-            title="Iniciar cronómetro de envío"
+            className="flex items-center justify-center p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs transition-colors"
+            title="Iniciar cronómetro"
           >
-            <Clock className="w-3 h-3" />
-            Iniciar
+            <Play className="w-3 h-3" />
           </button>
         </div>
       );
     }
 
-  // Si el cronómetro está completado, mostrar estado completado
+    // Cronómetro completado (diseño unificado)
     if (timer.completado) {
       return (
-        <div className="flex flex-col items-center space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-green-600">
-              ✅ Completado
-            </span>
-            <span className="text-xs text-gray-500">({timer.tipoOperacion})</span>
+        <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
+          <span className="text-green-600 text-xs font-medium flex items-center gap-1">
+            <CheckCircle className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">Completo</span>
+          </span>
+          <div className="text-xs text-gray-500 text-center truncate">
+            {timer.tiempoInicialMinutos}min
           </div>
-          <div className="text-xs text-gray-500">
-            Tiempo: {timer.tiempoInicialMinutos}min
-          </div>
-          <div className="flex items-center space-x-1">
-            <button
-              onClick={() => editarTemporizadorItem(itemId, timer)}
-              className="p-1 rounded-md hover:bg-gray-100 transition-colors"
-              title="Crear nuevo cronómetro"
-            >
-              <Clock className="w-3 h-3 text-blue-600" />
-            </button>
+          <div className="flex gap-1">
             <button
               onClick={() => eliminarTimer(timer.id)}
-              className="p-1 rounded-md hover:bg-gray-100 transition-colors"
-              title="Eliminar registro"
+              className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
+              title="Limpiar"
             >
-              <Trash2 className="w-3 h-3 text-red-600" />
+              <X className="w-3 h-3" />
+            </button>
+            <button
+              onClick={() => editarTemporizadorItem(itemId, timer)}
+              className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
+              title="Crear nuevo cronómetro"
+            >
+              <Play className="w-3 h-3" />
             </button>
           </div>
         </div>
@@ -410,66 +335,43 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     }
 
     // Timer activo o pausado
-  const tiempoFormateado = (
-    <InlineCountdown
-      endTime={timer.fechaFin}
-      seconds={timer.tiempoRestanteSegundos}
-  paused={!timer.activo}
-      format={formatearTiempo}
-    />
-  );
     const esUrgente = timer.tiempoRestanteSegundos < 300;
-    
-    // Determinar color según tipo de operación
-    const getColorPorTipo = (tipo: string) => {
-      switch (tipo) {
-        case 'envio':
-          return esUrgente ? 'text-red-600' : 'text-green-600';
-        case 'congelamiento':
-          return esUrgente ? 'text-red-600' : 'text-blue-600';
-        case 'atemperamiento':
-          return esUrgente ? 'text-red-600' : 'text-orange-600';
-        default:
-          return esUrgente ? 'text-red-600' : 'text-gray-600';
-      }
-    };
-
     return (
-      <div className="flex flex-col items-center space-y-2">
-        <div className="flex items-center gap-2">
-          <span className={`text-sm font-medium ${getColorPorTipo(timer.tipoOperacion)}`}>
-            {tiempoFormateado}
+      <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
+        <div className="flex items-center justify-center">
+          <span className={`font-mono text-xs font-medium truncate ${esUrgente ? 'text-red-600' : 'text-indigo-600'}`}>
+            <InlineCountdown
+              endTime={timer.fechaFin}
+              seconds={timer.tiempoRestanteSegundos}
+              paused={!timer.activo}
+              format={formatearTiempo}
+            />
           </span>
-          <span className="text-xs text-gray-500">({timer.tipoOperacion})</span>
-          {!timer.activo && (
-            <span className="text-xs text-gray-500">(Pausado)</span>
-          )}
         </div>
-        <div className="flex items-center space-x-1">
+        {!timer.activo && (
+          <span className="text-xs text-gray-500">Pausado</span>
+        )}
+        <div className="flex items-center gap-1">
           <button
-            onClick={() => timer.activo ? pausarTimer(timer.id) : reanudarTimer(timer.id)}
-            className="p-1 rounded-md hover:bg-gray-100 transition-colors"
-            title={timer.activo ? "Pausar" : "Reanudar"}
+            onClick={() => (timer.activo ? pausarTimer(timer.id) : reanudarTimer(timer.id))}
+            className={`p-1.5 rounded text-xs transition-colors ${timer.activo ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700' : 'bg-green-100 hover:bg-green-200 text-green-700'}`}
+            title={timer.activo ? 'Pausar' : 'Reanudar'}
           >
-            {timer.activo ? (
-              <Pause className="w-3 h-3 text-yellow-600" />
-            ) : (
-              <Play className="w-3 h-3 text-green-600" />
-            )}
+            {timer.activo ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
           </button>
           <button
             onClick={() => editarTemporizadorItem(itemId, timer)}
-            className="p-1 rounded-md hover:bg-gray-100 transition-colors"
+            className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
             title="Editar cronómetro"
           >
-            <Clock className="w-3 h-3 text-blue-600" />
+            <Edit className="w-3 h-3" />
           </button>
           <button
             onClick={() => eliminarTimer(timer.id)}
-            className="p-1 rounded-md hover:bg-gray-100 transition-colors"
-            title="Eliminar"
+            className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs transition-colors"
+            title="Eliminar cronómetro"
           >
-            <Trash2 className="w-3 h-3 text-red-600" />
+            <Trash2 className="w-3 h-3" />
           </button>
         </div>
       </div>

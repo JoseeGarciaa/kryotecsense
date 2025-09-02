@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Package, Search, Loader, Scan, Play } from 'lucide-react';
+import { Plus, Package, Search, Loader, Scan, Play, Pause, Edit, Trash2, X, CheckCircle } from 'lucide-react';
 import { useOperaciones } from '../hooks/useOperaciones';
 import { apiServiceClient } from '../../../api/apiClient';
 import RfidScanModal from './RfidScanModal';
@@ -14,7 +14,7 @@ interface AcondicionamientoViewSimpleProps {
 
 const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = ({ isOpen, onClose }) => {
   const { inventarioCompleto, cambiarEstadoItem, actualizarColumnasDesdeBackend } = useOperaciones();
-  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected } = useTimerContext();
+  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer } = useTimerContext();
   
   const [mostrarModalTraerEnsamblaje, setMostrarModalTraerEnsamblaje] = useState(false);
   const [mostrarModalTraerDespacho, setMostrarModalTraerDespacho] = useState(false);
@@ -79,8 +79,8 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     item.estado === 'Acondicionamiento' && item.sub_estado === 'Ensamblaje'
   ) || [];
 
-  // Índices de timers de envío activos para lookup rápido (por id y por nombre normalizado)
-  const { infoPorId, infoPorNombre } = useMemo(() => {
+  // Índices de timers de envío (activos y completados) para lookup rápido por id y nombre normalizado
+  const { activosPorId, activosPorNombre, completadosPorId, completadosPorNombre } = useMemo(() => {
     const normalize = (s: string) =>
       s
         ?.normalize('NFD')
@@ -109,20 +109,22 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
       }
       return { base: n };
     };
-    const infoPorId = new Map<number, { seconds: number; endTime: Date }>();
-    const infoPorNombre = new Map<string, { seconds: number; endTime: Date }>();
+    const activosPorId = new Map<number, any>();
+    const activosPorNombre = new Map<string, any>();
+    const completadosPorId = new Map<number, any>();
+    const completadosPorNombre = new Map<string, any>();
     for (const t of timers) {
-      if (t.tipoOperacion === 'envio' && t.activo && !t.completado) {
-        const data = { seconds: t.tiempoRestanteSegundos, endTime: t.fechaFin };
-        const { id, base } = extractFromNombre(t.nombre);
-        if (typeof id === 'number' && !Number.isNaN(id)) infoPorId.set(id, data);
-        const normBase = normalize(base);
-        if (normBase) infoPorNombre.set(normBase, data);
-        const normFull = normalize(t.nombre);
-        if (normFull && !infoPorNombre.has(normFull)) infoPorNombre.set(normFull, data);
-      }
+      if (t.tipoOperacion !== 'envio') continue;
+      const { id, base } = extractFromNombre(t.nombre || '');
+      const normBase = normalize(base);
+      const normFull = normalize(t.nombre || '');
+      const targetIdMap = t.completado ? completadosPorId : activosPorId;
+      const targetNameMap = t.completado ? completadosPorNombre : activosPorNombre;
+      if (typeof id === 'number' && !Number.isNaN(id)) targetIdMap.set(id, t);
+      if (normBase) targetNameMap.set(normBase, t);
+      if (normFull && !targetNameMap.has(normFull)) targetNameMap.set(normFull, t);
     }
-    return { infoPorId, infoPorNombre };
+    return { activosPorId, activosPorNombre, completadosPorId, completadosPorNombre };
   }, [timers]);
 
   // Refuerzo de sincronización al montar para minimizar “—” por desfase
@@ -347,27 +349,103 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                       <td className="px-6 py-4 whitespace-nowrap">
                         {(() => {
                           const normalize = (s: string) => s?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-                          const info = infoPorId.get(item.id)
-                            || infoPorNombre.get(normalize(item.nombre_unidad))
-                            || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
-                          if (!info) {
+                          const timerActivo = activosPorId.get(item.id)
+                            || activosPorNombre.get(normalize(item.nombre_unidad))
+                            || (item.rfid ? activosPorNombre.get(normalize(item.rfid)) : undefined);
+                          const timerCompletado = completadosPorId.get(item.id)
+                            || completadosPorNombre.get(normalize(item.nombre_unidad))
+                            || (item.rfid ? completadosPorNombre.get(normalize(item.rfid)) : undefined);
+
+                          // Completado → mostrar estado 'Completo' con limpiar/editar
+                          if (timerCompletado) {
                             return (
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-500">Sin cronómetro</span>
+                              <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
+                                <span className="text-green-600 text-xs font-medium flex items-center gap-1">
+                                  <CheckCircle className="w-3 h-3 flex-shrink-0" />
+                                  <span className="truncate">Completo</span>
+                                </span>
+                                <div className="text-xs text-gray-500 text-center truncate">
+                                  {timerCompletado.tiempoInicialMinutos}min
+                                </div>
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      const confirmar = window.confirm(`¿Limpiar el cronómetro completado de ${item.rfid}?`);
+                                      if (confirmar) {
+                                        try { eliminarTimer(timerCompletado.id); } catch {}
+                                      }
+                                    }}
+                                    className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
+                                    title="Limpiar"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => abrirTemporizadorParaItem(item, 'Ensamblaje')}
+                                    className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
+                                    title="Crear nuevo cronómetro"
+                                  >
+                                    <Play className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // Sin cronómetro → botón iniciar
+                          if (!timerActivo) {
+                            return (
+                              <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
+                                <span className="text-gray-400 text-xs text-center">Sin cronómetro</span>
                                 <button
                                   onClick={() => abrirTemporizadorParaItem(item, 'Ensamblaje')}
-                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
-                                  title="Configurar cronómetro"
+                                  className="flex items-center justify-center p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs transition-colors"
+                                  title="Iniciar cronómetro"
                                 >
-                                  <Play className="w-3.5 h-3.5" />
+                                  <Play className="w-3 h-3" />
                                 </button>
                               </div>
                             );
                           }
+
+                          // Activo → diseño unificado
+                          const esUrgente = timerActivo.tiempoRestanteSegundos < 300;
                           return (
-                            <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación">
-                              ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
-                            </span>
+                            <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
+                              <div className="flex items-center justify-center">
+                                <span className={`font-mono text-xs font-medium truncate ${esUrgente ? 'text-red-600' : 'text-indigo-600'}`}>
+                                  <InlineCountdown endTime={timerActivo.fechaFin} seconds={timerActivo.tiempoRestanteSegundos} paused={!timerActivo.activo} format={formatearTiempo} />
+                                </span>
+                              </div>
+                              {!timerActivo.activo && (
+                                <span className="text-xs text-gray-500">Pausado</span>
+                              )}
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => (timerActivo.activo ? pausarTimer(timerActivo.id) : reanudarTimer(timerActivo.id))}
+                                  className={`p-1.5 rounded text-xs transition-colors ${timerActivo.activo ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700' : 'bg-green-100 hover:bg-green-200 text-green-700'}`}
+                                  title={timerActivo.activo ? 'Pausar' : 'Reanudar'}
+                                >
+                                  {timerActivo.activo ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                                </button>
+                                <button
+                                  onClick={() => abrirTemporizadorParaItem(item, 'Ensamblaje')}
+                                  className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
+                                  title="Editar cronómetro"
+                                >
+                                  <Edit className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => eliminarTimer(timerActivo.id)}
+                                  className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs transition-colors"
+                                  title="Eliminar cronómetro"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
                           );
                         })()}
                       </td>
@@ -463,27 +541,100 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                       <td className="px-6 py-4 whitespace-nowrap">
                         {(() => {
                           const normalize = (s: string) => s?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-                          const info = infoPorId.get(item.id)
-                            || infoPorNombre.get(normalize(item.nombre_unidad))
-                            || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
-                          if (!info) {
+                          const timerActivo = activosPorId.get(item.id)
+                            || activosPorNombre.get(normalize(item.nombre_unidad))
+                            || (item.rfid ? activosPorNombre.get(normalize(item.rfid)) : undefined);
+                          const timerCompletado = completadosPorId.get(item.id)
+                            || completadosPorNombre.get(normalize(item.nombre_unidad))
+                            || (item.rfid ? completadosPorNombre.get(normalize(item.rfid)) : undefined);
+
+                          if (timerCompletado) {
                             return (
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-500">Sin cronómetro</span>
+                              <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
+                                <span className="text-green-600 text-xs font-medium flex items-center gap-1">
+                                  <CheckCircle className="w-3 h-3 flex-shrink-0" />
+                                  <span className="truncate">Completo</span>
+                                </span>
+                                <div className="text-xs text-gray-500 text-center truncate">
+                                  {timerCompletado.tiempoInicialMinutos}min
+                                </div>
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      const confirmar = window.confirm(`¿Limpiar el cronómetro completado de ${item.rfid}?`);
+                                      if (confirmar) {
+                                        try { eliminarTimer(timerCompletado.id); } catch {}
+                                      }
+                                    }}
+                                    className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
+                                    title="Limpiar"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => abrirTemporizadorParaItem(item, 'Lista para Despacho')}
+                                    className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
+                                    title="Crear nuevo cronómetro"
+                                  >
+                                    <Play className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          if (!timerActivo) {
+                            return (
+                              <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
+                                <span className="text-gray-400 text-xs text-center">Sin cronómetro</span>
                                 <button
                                   onClick={() => abrirTemporizadorParaItem(item, 'Lista para Despacho')}
-                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
-                                  title="Configurar cronómetro"
+                                  className="flex items-center justify-center p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs transition-colors"
+                                  title="Iniciar cronómetro"
                                 >
-                                  <Play className="w-3.5 h-3.5" />
+                                  <Play className="w-3 h-3" />
                                 </button>
                               </div>
                             );
                           }
+
+                          const esUrgente = timerActivo.tiempoRestanteSegundos < 300;
                           return (
-                            <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación">
-                              ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
-                            </span>
+                            <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
+                              <div className="flex items-center justify-center">
+                                <span className={`font-mono text-xs font-medium truncate ${esUrgente ? 'text-red-600' : 'text-indigo-600'}`}>
+                                  <InlineCountdown endTime={timerActivo.fechaFin} seconds={timerActivo.tiempoRestanteSegundos} paused={!timerActivo.activo} format={formatearTiempo} />
+                                </span>
+                              </div>
+                              {!timerActivo.activo && (
+                                <span className="text-xs text-gray-500">Pausado</span>
+                              )}
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => (timerActivo.activo ? pausarTimer(timerActivo.id) : reanudarTimer(timerActivo.id))}
+                                  className={`p-1.5 rounded text-xs transition-colors ${timerActivo.activo ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700' : 'bg-green-100 hover:bg-green-200 text-green-700'}`}
+                                  title={timerActivo.activo ? 'Pausar' : 'Reanudar'}
+                                >
+                                  {timerActivo.activo ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                                </button>
+                                <button
+                                  onClick={() => abrirTemporizadorParaItem(item, 'Lista para Despacho')}
+                                  className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
+                                  title="Editar cronómetro"
+                                >
+                                  <Edit className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => eliminarTimer(timerActivo.id)}
+                                  className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs transition-colors"
+                                  title="Eliminar cronómetro"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
                           );
                         })()}
                       </td>
