@@ -14,7 +14,7 @@ interface AcondicionamientoViewSimpleProps {
 
 const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = ({ isOpen, onClose }) => {
   const { inventarioCompleto, cambiarEstadoItem, actualizarColumnasDesdeBackend } = useOperaciones();
-  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer } = useTimerContext();
+  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer, getRecentCompletion } = useTimerContext();
   
   const [mostrarModalTraerEnsamblaje, setMostrarModalTraerEnsamblaje] = useState(false);
   const [mostrarModalTraerDespacho, setMostrarModalTraerDespacho] = useState(false);
@@ -356,20 +356,33 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                             || completadosPorNombre.get(normalize(item.nombre_unidad))
                             || (item.rfid ? completadosPorNombre.get(normalize(item.rfid)) : undefined);
 
+                          // Fallback a reciente completado si el servidor lo limpió
+                          const reciente = !timerCompletado ? getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
+                            || (item.rfid ? getRecentCompletion(`Envío #${item.id} - ${item.rfid}`, 'envio') : null)
+                            || getRecentCompletion(item.nombre_unidad, 'envio')
+                            || (item.rfid ? getRecentCompletion(item.rfid, 'envio') : null)
+                            : null;
                           // Solo considerar 'Completo' si el timer pertenece a esta etapa (iniciado después de que el item llegó aquí)
                           const mostrarCompleto = (() => {
-                            if (!timerCompletado) return false;
-                            try {
-                              const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
-                              const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
-                              if (Number.isNaN(llegadaEtapa)) return true; // si no tenemos referencia, permitir
-                              // margen de 60s por desfases
-                              return inicioTimer >= (llegadaEtapa - 60_000);
-                            } catch { return false; }
+                            const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
+                            if (timerCompletado) {
+                              try {
+                                const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
+                                if (Number.isNaN(llegadaEtapa)) return true; // si no tenemos referencia, permitir
+                                // margen de 60s por desfases
+                                return inicioTimer >= (llegadaEtapa - 60_000);
+                              } catch { return false; }
+                            }
+                            if (reciente) {
+                              if (Number.isNaN(llegadaEtapa)) return true;
+                              return reciente.startMs >= (llegadaEtapa - 60_000);
+                            }
+                            return false;
                           })();
 
                           // Completado → mostrar estado 'Completo' con limpiar/editar
-                          if (mostrarCompleto) {
+          if (mostrarCompleto) {
+            const minutos = timerCompletado ? timerCompletado.tiempoInicialMinutos : (reciente?.minutes ?? 0);
                             return (
                               <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
                                 <span className="text-green-600 text-xs font-medium flex items-center gap-1">
@@ -377,7 +390,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                                   <span className="truncate">Completo</span>
                                 </span>
                                 <div className="text-xs text-gray-500 text-center truncate">
-                                  {timerCompletado.tiempoInicialMinutos}min
+              {minutos}min
                                 </div>
                                 <div className="flex gap-1">
                                   <button
@@ -386,7 +399,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                                       e.preventDefault();
                                       const confirmar = window.confirm(`¿Limpiar el cronómetro completado de ${item.rfid}?`);
                                       if (confirmar) {
-                                        try { eliminarTimer(timerCompletado.id); } catch {}
+                try { if (timerCompletado) eliminarTimer(timerCompletado.id); } catch {}
                                       }
                                     }}
                                     className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
@@ -560,17 +573,31 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                             || completadosPorNombre.get(normalize(item.nombre_unidad))
                             || (item.rfid ? completadosPorNombre.get(normalize(item.rfid)) : undefined);
 
+                          const reciente = !timerCompletado ? getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
+                            || getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
+                            || (item.rfid ? getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.rfid}`, 'envio') : null)
+                            || (item.rfid ? getRecentCompletion(`Envío #${item.id} - ${item.rfid}`, 'envio') : null)
+                            || getRecentCompletion(item.nombre_unidad, 'envio')
+                            || (item.rfid ? getRecentCompletion(item.rfid, 'envio') : null)
+                            : null;
                           const mostrarCompleto = (() => {
-                            if (!timerCompletado) return false;
-                            try {
-                              const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
-                              const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
+                            const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
+                            if (timerCompletado) {
+                              try {
+                                const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
+                                if (Number.isNaN(llegadaEtapa)) return true;
+                                return inicioTimer >= (llegadaEtapa - 60_000);
+                              } catch { return false; }
+                            }
+                            if (reciente) {
                               if (Number.isNaN(llegadaEtapa)) return true;
-                              return inicioTimer >= (llegadaEtapa - 60_000);
-                            } catch { return false; }
+                              return reciente.startMs >= (llegadaEtapa - 60_000);
+                            }
+                            return false;
                           })();
 
-                          if (mostrarCompleto) {
+          if (mostrarCompleto) {
+            const minutos = timerCompletado ? timerCompletado.tiempoInicialMinutos : (reciente?.minutes ?? 0);
                             return (
                               <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
                                 <span className="text-green-600 text-xs font-medium flex items-center gap-1">
@@ -578,7 +605,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                                   <span className="truncate">Completo</span>
                                 </span>
                                 <div className="text-xs text-gray-500 text-center truncate">
-                                  {timerCompletado.tiempoInicialMinutos}min
+              {minutos}min
                                 </div>
                                 <div className="flex gap-1">
                                   <button
@@ -587,7 +614,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                                       e.preventDefault();
                                       const confirmar = window.confirm(`¿Limpiar el cronómetro completado de ${item.rfid}?`);
                                       if (confirmar) {
-                                        try { eliminarTimer(timerCompletado.id); } catch {}
+                try { if (timerCompletado) eliminarTimer(timerCompletado.id); } catch {}
                                       }
                                     }}
                                     className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"

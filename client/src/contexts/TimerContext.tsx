@@ -16,7 +16,7 @@ interface TimerContextType {
   getRecentCompletion: (
     nombre: string,
     tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion'
-  ) => { minutes: number; at: number } | null;
+  ) => { minutes: number; at: number; startMs: number } | null;
 }
 
 const TimerContext = createContext<TimerContextType | undefined>(undefined);

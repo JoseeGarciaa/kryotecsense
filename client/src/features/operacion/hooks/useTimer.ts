@@ -93,7 +93,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   const serverTimeDiffRef = useRef<number>(0);
   // Cache de completados recientes para mostrar "Completo" aunque el servidor limpie el timer enseguida
   // key = `${tipo}|${norm(nombre)}`
-  const recentCompletionsRef = useRef<Map<string, { minutes: number; at: number }>>(new Map());
+  const recentCompletionsRef = useRef<Map<string, { minutes: number; at: number; startMs: number }>>(new Map());
   const RECENT_TTL_MS = 3 * 60 * 1000; // 3 minutos
   const norm = (s: string | null | undefined) => (s ?? '')
     .normalize('NFD')
@@ -103,13 +103,14 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   const markRecentlyCompleted = (t: Timer) => {
     try {
       const key = `${t.tipoOperacion}|${norm(t.nombre)}`;
-      recentCompletionsRef.current.set(key, { minutes: t.tiempoInicialMinutos, at: Date.now() });
+      const startMs = (t.fechaInicio instanceof Date ? t.fechaInicio.getTime() : new Date(t.fechaInicio).getTime());
+      recentCompletionsRef.current.set(key, { minutes: t.tiempoInicialMinutos, at: Date.now(), startMs });
     } catch {}
   };
   const getRecentCompletion = (
     nombre: string,
     tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion'
-  ): { minutes: number; at: number } | null => {
+  ): { minutes: number; at: number; startMs: number } | null => {
     const key = `${tipoOperacion}|${norm(nombre)}`;
     const val = recentCompletionsRef.current.get(key);
     if (!val) return null;
