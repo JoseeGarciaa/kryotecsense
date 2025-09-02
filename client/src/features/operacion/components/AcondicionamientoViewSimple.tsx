@@ -377,12 +377,22 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                               if (Number.isNaN(llegadaEtapa)) return true;
                               return reciente.startMs >= (llegadaEtapa - 60_000);
                             }
+                            // Considerar como completado si el activo llegó a 0s
+                            if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) {
+                              try {
+                                const inicioTimer = new Date(timerActivo.fechaInicio).getTime();
+                                if (Number.isNaN(llegadaEtapa)) return true;
+                                return inicioTimer >= (llegadaEtapa - 60_000);
+                              } catch { return true; }
+                            }
                             return false;
                           })();
 
                           // Completado → mostrar estado 'Completo' con limpiar/editar
-          if (mostrarCompleto) {
-            const minutos = timerCompletado ? timerCompletado.tiempoInicialMinutos : (reciente?.minutes ?? 0);
+                          if (mostrarCompleto) {
+                            const minutos = timerCompletado
+                              ? timerCompletado.tiempoInicialMinutos
+                              : (reciente?.minutes ?? (timerActivo ? timerActivo.tiempoInicialMinutos : 0));
                             return (
                               <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
                                 <span className="text-green-600 text-xs font-medium flex items-center gap-1">
@@ -593,11 +603,20 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                               if (Number.isNaN(llegadaEtapa)) return true;
                               return reciente.startMs >= (llegadaEtapa - 60_000);
                             }
+                            if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) {
+                              try {
+                                const inicioTimer = new Date(timerActivo.fechaInicio).getTime();
+                                if (Number.isNaN(llegadaEtapa)) return true;
+                                return inicioTimer >= (llegadaEtapa - 60_000);
+                              } catch { return true; }
+                            }
                             return false;
                           })();
 
-          if (mostrarCompleto) {
-            const minutos = timerCompletado ? timerCompletado.tiempoInicialMinutos : (reciente?.minutes ?? 0);
+                          if (mostrarCompleto) {
+                            const minutos = timerCompletado
+                              ? timerCompletado.tiempoInicialMinutos
+                              : (reciente?.minutes ?? (timerActivo ? timerActivo.tiempoInicialMinutos : 0));
                             return (
                               <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
                                 <span className="text-green-600 text-xs font-medium flex items-center gap-1">

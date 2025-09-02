@@ -288,7 +288,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
 
   const renderizarTemporizador = (itemId: number) => {
     const timer = obtenerTemporizadorParaItem(itemId);
-    if (!timer) {
+  if (!timer) {
       return (
         <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
           <span className="text-gray-400 text-xs text-center">Sin cronómetro</span>
@@ -303,8 +303,8 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       );
     }
 
-    // Cronómetro completado (diseño unificado)
-    if (timer.completado) {
+  // Cronómetro completado (diseño unificado)
+  if (timer.completado || (timer.tiempoRestanteSegundos ?? 0) <= 0) {
       return (
         <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
           <span className="text-green-600 text-xs font-medium flex items-center gap-1">
@@ -312,7 +312,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
             <span className="truncate">Completo</span>
           </span>
           <div className="text-xs text-gray-500 text-center truncate">
-            {timer.tiempoInicialMinutos}min
+      {timer.tiempoInicialMinutos}min
           </div>
           <div className="flex gap-1">
             <button
