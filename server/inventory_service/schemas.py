@@ -13,6 +13,8 @@ class InventarioCredcubeCreate(BaseModel):
     validacion_goteo: Optional[str] = None
     validacion_desinfeccion: Optional[str] = None
     categoria: Optional[str] = None
+    fecha_ingreso: Optional[datetime] = None
+    ultima_actualizacion: Optional[datetime] = None
 # --- Bulk Inventory Creation Schemas ---
 class BulkInventarioCreateRequest(BaseModel):
     items: List[InventarioCredcubeCreate]

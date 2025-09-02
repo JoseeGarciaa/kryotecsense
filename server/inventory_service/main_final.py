@@ -65,6 +65,9 @@ class InventarioCreate(BaseModel):
     validacion_goteo: Optional[str] = None
     validacion_desinfeccion: Optional[str] = None
     categoria: Optional[str] = None
+    # Permitir timestamps opcionales provenientes del cliente para sincronizar hora de escaneo
+    fecha_ingreso: Optional[datetime] = None
+    ultima_actualizacion: Optional[datetime] = None
 
 class DashboardMetrics(BaseModel):
     total_items: int
@@ -209,8 +212,8 @@ async def create_inventario(
                 status_code=400, 
                 detail=f"El RFID {inventario.rfid} ya existe en el inventario"
             )
-        
         # Crear nuevo item
+        # Usar los timestamps provistos si llegan, de lo contrario NOW()
         insert_query = text(f"""
             INSERT INTO {tenant_schema}.inventario 
             (modelo_id, nombre_unidad, rfid, lote, estado, sub_estado, 
@@ -218,15 +221,16 @@ async def create_inventario(
              fecha_ingreso, ultima_actualizacion, activo)
             VALUES (:modelo_id, :nombre_unidad, :rfid, :lote, :estado, :sub_estado,
                     :validacion_limpieza, :validacion_goteo, :validacion_desinfeccion, :categoria,
-                    NOW(), NOW(), true)
+                    COALESCE(:fecha_ingreso, NOW()), COALESCE(:ultima_actualizacion, NOW()), true)
             RETURNING id, modelo_id, nombre_unidad, rfid, lote, estado, sub_estado,
                       validacion_limpieza, validacion_goteo, validacion_desinfeccion, categoria,
                       fecha_ingreso, ultima_actualizacion, fecha_vencimiento, activo
         """)
-        
-        result = db.execute(insert_query, inventario.dict())
+
+        params = inventario.dict()
+        result = db.execute(insert_query, params)
         db.commit()
-        
+
         nuevo_item = result.fetchone()
         if nuevo_item:
             return InventarioResponse(**dict(nuevo_item._mapping))

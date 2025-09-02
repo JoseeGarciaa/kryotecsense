@@ -65,5 +65,6 @@ export const formatDateForDisplay = (dateString: string): string => {
  * Para usar cuando necesitas que la hora local se registre como UTC
  */
 export const createUtcTimestamp = (): string => {
-  return getDeviceTimeAsUtc();
+  // Registrar el instante real en UTC para que coincida con lo mostrado al usuario
+  return new Date().toISOString();
 };

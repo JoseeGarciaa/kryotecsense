@@ -7,7 +7,10 @@ import { useAntiDuplicate, useDebouncedCallback } from '../../../shared/hooks/us
 interface RfidLectura {
   rfid: string;
   nombre_unidad: string;
+  // Hora mostrada al usuario (local)
   timestamp: string;
+  // Timestamp ISO (UTC) exacto del momento del escaneo
+  isoTimestamp: string;
 }
 
 const Registro: React.FC = () => {
@@ -173,10 +176,12 @@ const Registro: React.FC = () => {
     const modelo = encontrarModelo(tipoSeleccionado, parseFloat(litrajeSeleccionado));
     const nombreUnidad = generarNombreUnidad(tipoSeleccionado, rfidLimpio, modelo);
     
+    const nowDate = new Date();
     const nuevaLectura: RfidLectura = {
       rfid: rfidLimpio,
       nombre_unidad: nombreUnidad,
-      timestamp: new Date().toLocaleTimeString()
+      timestamp: nowDate.toLocaleTimeString(),
+      isoTimestamp: nowDate.toISOString()
     };
     
     // Solo agregar a la lista, NO registrar automáticamente
@@ -330,7 +335,10 @@ const Registro: React.FC = () => {
           categoria: categoriaFinal,
           validacion_limpieza: null,
           validacion_goteo: null,
-          validacion_desinfeccion: null
+          validacion_desinfeccion: null,
+          // Timestamps tomados del momento del escaneo para que coincidan con lo mostrado
+          fecha_ingreso: lectura.isoTimestamp || new Date().toISOString(),
+          ultima_actualizacion: lectura.isoTimestamp || new Date().toISOString()
         };
         
         // Contar por tipo basado en la categoría del item
