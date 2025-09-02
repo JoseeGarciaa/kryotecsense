@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Package, Search, Loader, Scan } from 'lucide-react';
+import { Plus, Package, Search, Loader, Scan, Play } from 'lucide-react';
 import { useOperaciones } from '../hooks/useOperaciones';
 import { apiServiceClient } from '../../../api/apiClient';
 import RfidScanModal from './RfidScanModal';
 import { useTimerContext } from '../../../contexts/TimerContext';
 import InlineCountdown from '../../../shared/components/InlineCountdown';
+import TimerModal from './TimerModal';
 
 interface AcondicionamientoViewSimpleProps {
   isOpen: boolean;
@@ -22,6 +23,11 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   const [cargandoActualizacion, setCargandoActualizacion] = useState(false);
   const [cargandoEnsamblaje, setCargandoEnsamblaje] = useState(false);
   const [cargandoDespacho, setCargandoDespacho] = useState(false);
+  // Estado para configurar timer por item
+  const [mostrarTimerModal, setMostrarTimerModal] = useState(false);
+  const [itemParaTemporizador, setItemParaTemporizador] = useState<any | null>(null);
+  const [destinoTimer, setDestinoTimer] = useState<'Ensamblaje' | 'Lista para Despacho' | null>(null);
+  const [cargandoTimer, setCargandoTimer] = useState(false);
 
   // Obtener items por sub-estado
   const itemsEnsamblaje = inventarioCompleto?.filter(item => 
@@ -197,6 +203,42 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     }
   };
 
+  // Abrir modal de tiempo para un item específico
+  const abrirTemporizadorParaItem = (item: any, destino: 'Ensamblaje' | 'Lista para Despacho') => {
+    try { if (isConnected) forzarSincronizacion(); } catch {}
+    setItemParaTemporizador(item);
+    setDestinoTimer(destino);
+    setMostrarTimerModal(true);
+  };
+
+  // Confirmar tiempo y crear/actualizar el timer de envío
+  const confirmarTemporizador = async (minutos: number) => {
+    if (!itemParaTemporizador || !destinoTimer) return;
+    setCargandoTimer(true);
+    try {
+      // Eliminar timers de envío existentes del mismo item
+      try {
+        const relacionados = timers.filter(t => t.tipoOperacion === 'envio' && (t.nombre || '').includes(`#${itemParaTemporizador.id} -`));
+        relacionados.forEach(t => eliminarTimer(t.id));
+      } catch {}
+
+      const label = destinoTimer === 'Lista para Despacho'
+        ? `Envío (Despacho) #${itemParaTemporizador.id} - ${itemParaTemporizador.nombre_unidad}`
+        : `Envío #${itemParaTemporizador.id} - ${itemParaTemporizador.nombre_unidad}`;
+      try {
+        crearTimer(label, 'envio', minutos);
+      } catch (e) {
+        console.warn('No se pudo crear temporizador:', e);
+      }
+      try { forzarSincronizacion(); } catch {}
+    } finally {
+      setCargandoTimer(false);
+      setMostrarTimerModal(false);
+      setItemParaTemporizador(null);
+      setDestinoTimer(null);
+    }
+  };
+
   // Filtrar por búsqueda
   const itemsEnsamblajeFiltrados = itemsEnsamblaje.filter(item =>
     item.nombre_unidad?.toLowerCase().includes(busquedaEnsamblaje.toLowerCase()) ||
@@ -308,7 +350,21 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                           const info = infoPorId.get(item.id)
                             || infoPorNombre.get(normalize(item.nombre_unidad))
                             || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
-                          if (!info) return <span className="text-xs text-gray-400">—</span>;
+                          if (!info) {
+                            return (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500">Sin timer</span>
+                                <button
+                                  onClick={() => abrirTemporizadorParaItem(item, 'Ensamblaje')}
+                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
+                                  title="Configurar tiempo"
+                                >
+                                  <Play className="w-3.5 h-3.5" />
+                                  Colocar tiempo
+                                </button>
+                              </div>
+                            );
+                          }
                           return (
                             <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación">
                               ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
@@ -411,7 +467,21 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                           const info = infoPorId.get(item.id)
                             || infoPorNombre.get(normalize(item.nombre_unidad))
                             || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
-                          if (!info) return <span className="text-xs text-gray-400">—</span>;
+                          if (!info) {
+                            return (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500">Sin timer</span>
+                                <button
+                                  onClick={() => abrirTemporizadorParaItem(item, 'Lista para Despacho')}
+                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
+                                  title="Configurar tiempo"
+                                >
+                                  <Play className="w-3.5 h-3.5" />
+                                  Colocar tiempo
+                                </button>
+                              </div>
+                            );
+                          }
                           return (
                             <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación">
                               ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
@@ -590,6 +660,19 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               setCargandoActualizacion(false);
             }
           }}
+        />
+      )}
+
+      {/* Modal para configurar tiempo por item */}
+      {mostrarTimerModal && itemParaTemporizador && destinoTimer && (
+        <TimerModal
+          mostrarModal={mostrarTimerModal}
+          onCancelar={() => { setMostrarTimerModal(false); setItemParaTemporizador(null); setDestinoTimer(null); }}
+          onConfirmar={(min) => confirmarTemporizador(min)}
+          titulo={`Configurar tiempo • ${destinoTimer}`}
+          descripcion={`Define el tiempo de operación para "${itemParaTemporizador.nombre_unidad}"`}
+          tipoOperacion="envio"
+          cargando={cargandoTimer}
         />
       )}
     </div>
@@ -952,3 +1035,4 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
 };
 
 export default AcondicionamientoViewSimple;
+
