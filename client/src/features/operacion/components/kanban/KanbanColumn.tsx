@@ -96,8 +96,9 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
   onToggleSeleccion
 }) => {
     const headerColor = columnColors[column.name.toLowerCase().replace(/ /g, '-')] || columnColors['default'];
+    // Se elimina el resumen fijo por fase; solo se mostrarán las cards de categorías
     const resumenTargets = ['operacion', 'devolucion', 'inspeccion'];
-    const mostrarResumen = Boolean(isViewOnly && resumenTargets.includes(columnId));
+    const mostrarResumen = false;
     const resumenEstilos: { [key: string]: { headBg: string; headText: string; countText: string; bodyBg: string; border: string } } = {
         operacion: {
             headBg: 'bg-green-50',
@@ -366,24 +367,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
                 )}
             </div>
             <div className="p-2 sm:p-3 transition-colors duration-200 min-h-[300px] sm:min-h-[400px] lg:min-h-[500px]">
-                        {/* Resumen informativo para Operación / Devolución / Inspección en vista de todas las fases */}
-                        {mostrarResumen && (
-                            <div className={`bg-white rounded-lg shadow-md mb-3 overflow-hidden border ${resumenEstilos[columnId]?.border || 'border-gray-100'}`}>
-                                <div className={`${resumenEstilos[columnId]?.headBg || 'bg-gray-50'} p-3 border-b ${resumenEstilos[columnId]?.border || 'border-gray-100'} flex justify-between items-center`}>
-                                    <h3 className={`text-sm font-semibold ${resumenEstilos[columnId]?.headText || 'text-gray-800'}`}>
-                                        Resumen de {column?.name || 'Fase'}
-                                    </h3>
-                                    <span className={`text-xs ${resumenEstilos[columnId]?.countText || 'text-gray-600'}`}>{items.length} items</span>
-                                </div>
-                                <div className={`p-3 text-sm ${resumenEstilos[columnId]?.headText || 'text-gray-700'} ${resumenEstilos[columnId]?.bodyBg || 'bg-gray-50'}`}>
-                                    {items.length === 0 ? (
-                                        <div className="text-gray-600">No hay items en esta fase por ahora.</div>
-                                    ) : (
-                                        <div className="text-gray-600">Hay {items.length} items en esta fase.</div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
+                        {/* Resumen fijo removido según requerimiento */}
                         {items.map((item, index) => (
                                         <KanbanCard 
                                             key={item.id} 

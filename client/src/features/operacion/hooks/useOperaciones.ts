@@ -346,13 +346,7 @@ export const useOperaciones = () => {
       'operacion': {
         ...prevColumns['operacion'],
         items: (() => {
-          // Agrupar items de operación solo por categoría
-          // Crear cards agrupadas para operación
-          if (itemsOperacion.length === 0) {
-            return [];
-          }
-          
-          // Agrupar solo por categoría
+          // Agrupar items de operación por categoría y crear cards fijas por categoría (TIC/VIP)
           const itemsPorCategoria = itemsOperacion.reduce((grupos: any, item: any) => {
             const categoria = item.categoria || 'TIC';
             if (!grupos[categoria]) {
@@ -363,7 +357,13 @@ export const useOperaciones = () => {
           }, {});
           
           const cardsOperacion: any[] = [];
+          const categoriasFijas = ['TIC', 'VIP'];
           
+          // Asegurar que existan entradas para categorías fijas aunque no haya items
+          categoriasFijas.forEach(cat => {
+            if (!itemsPorCategoria[cat]) itemsPorCategoria[cat] = [];
+          });
+
           Object.entries(itemsPorCategoria).forEach(([categoria, itemsCategoria]: [string, any]) => {
             const itemsArray = itemsCategoria as any[];
             
@@ -374,7 +374,7 @@ export const useOperaciones = () => {
               title: `${categoria} en tránsito`,
               description: `${itemsArray.length} items en operación`,
               assignee: [{name: 'Sistema', avatar: 'sistema'}],
-              date: formatDateForDisplay(itemsArray[0]?.ultima_actualizacion),
+              date: formatDateForDisplay(itemsArray[0]?.ultima_actualizacion || new Date().toISOString()),
               estado: 'operación',
               sub_estado: 'En transito',
               es_grupo: true,
@@ -403,14 +403,7 @@ export const useOperaciones = () => {
       'devolucion': {
         ...prevColumns['devolucion'],
         items: (() => {
-          // Agrupar items de devolución por categoría (igual que operación)
-          // Crear cards agrupadas para devolución
-          
-          if (itemsDevolucion.length === 0) {
-            return [];
-          }
-          
-          // Agrupar solo por categoría
+          // Agrupar items de devolución por categoría y crear cards fijas por categoría (TIC/VIP)
           const itemsPorCategoria = itemsDevolucion.reduce((grupos: any, item: any) => {
             const categoria = item.categoria || 'TIC';
             if (!grupos[categoria]) {
@@ -421,6 +414,10 @@ export const useOperaciones = () => {
           }, {});
           
           const cardsDevolucion: any[] = [];
+          const categoriasFijas = ['TIC', 'VIP'];
+          categoriasFijas.forEach(cat => {
+            if (!itemsPorCategoria[cat]) itemsPorCategoria[cat] = [];
+          });
           
           Object.entries(itemsPorCategoria).forEach(([categoria, itemsCategoria]: [string, any]) => {
             const itemsArray = itemsCategoria as any[];
@@ -432,7 +429,7 @@ export const useOperaciones = () => {
               title: `${categoria} pendientes de devolución`,
               description: `${itemsArray.length} items listos para devolver`,
               assignee: [{name: 'Sistema', avatar: 'sistema'}],
-              date: formatDateForDisplay(itemsArray[0]?.ultima_actualizacion),
+              date: formatDateForDisplay(itemsArray[0]?.ultima_actualizacion || new Date().toISOString()),
               estado: 'Devolución',
               sub_estado: 'Pendiente',
               es_grupo: true,
@@ -461,14 +458,7 @@ export const useOperaciones = () => {
       'inspeccion': {
         ...prevColumns['inspeccion'],
         items: (() => {
-          // Agrupar items de inspección por categoría (igual que operación y devolución)
-          // Crear cards agrupadas para inspección
-          
-          if (itemsInspeccion.length === 0) {
-            return [];
-          }
-          
-          // Agrupar solo por categoría
+          // Agrupar items de inspección por categoría y crear cards fijas por categoría (TIC/VIP)
           const itemsPorCategoria = itemsInspeccion.reduce((grupos: any, item: any) => {
             const categoria = item.categoria || 'TIC';
             if (!grupos[categoria]) {
@@ -479,6 +469,10 @@ export const useOperaciones = () => {
           }, {});
           
           const cardsInspeccion: any[] = [];
+          const categoriasFijas = ['TIC', 'VIP'];
+          categoriasFijas.forEach(cat => {
+            if (!itemsPorCategoria[cat]) itemsPorCategoria[cat] = [];
+          });
           
           Object.entries(itemsPorCategoria).forEach(([categoria, itemsCategoria]: [string, any]) => {
             const itemsArray = itemsCategoria as any[];
@@ -490,7 +484,7 @@ export const useOperaciones = () => {
               title: `${categoria}s Inspeccionados`,
               description: `${itemsArray.length} items inspeccionados`,
               assignee: [{name: 'Sistema', avatar: 'sistema'}],
-              date: formatDateForDisplay(new Date().toISOString()),
+              date: formatDateForDisplay(itemsArray[0]?.ultima_actualizacion || new Date().toISOString()),
               es_grupo: true,
               nivel_grupo: 1,
               items_count: itemsArray.length,
