@@ -630,19 +630,14 @@ const Registro: React.FC = () => {
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <span className="text-yellow-800 dark:text-yellow-200 font-medium">
-                      {duplicadosDetectados.length} código(s) duplicado(s) detectado(s)
+                      {duplicadosDetectados.length} código(s) duplicado(s)
                     </span>
                     <button
                       onClick={() => setMostrarCodigosDuplicados(!mostrarCodigosDuplicados)}
-                      className="ml-2 text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200 transition-colors"
+                      className="ml-2 text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200 transition-colors text-sm"
                       title={mostrarCodigosDuplicados ? "Ocultar códigos" : "Mostrar códigos"}
                     >
-                      <div className="flex items-center text-sm">
-                        <span className="mr-1">{mostrarCodigosDuplicados ? "Ocultar" : "Ver +"}</span>
-                        <div className={`transform transition-transform ${mostrarCodigosDuplicados ? "rotate-45" : "rotate-0"}`}>
-                          <Plus className="w-4 h-4" />
-                        </div>
-                      </div>
+                      {mostrarCodigosDuplicados ? "Ocultar" : "Ver +"}
                     </button>
                   </div>
                   {mostrarCodigosDuplicados && (
@@ -663,7 +658,7 @@ const Registro: React.FC = () => {
                   )}
                   {!mostrarCodigosDuplicados && (
                     <div className="mt-1 text-xs text-yellow-700 dark:text-yellow-300">
-                      Haz clic en "Ver +" para ver los detalles.
+                      Haz clic en "Ver +" para ver los códigos.
                     </div>
                   )}
                 </div>
