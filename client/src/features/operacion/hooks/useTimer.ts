@@ -280,6 +280,18 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             const restantesOptimistas = prev.filter(t => t.optimistic && !porIdONombre.has(t.id) && !porIdONombre.has(t.nombre));
             // Preservar cronómetros completados locales (el servidor a veces no los incluye en el snapshot)
             const completadosLocales = prev.filter(t => t.completado && !porIdONombre.has(t.id) && !porIdONombre.has(t.nombre));
+            // Detectar timers locales activos que desaparecieron del snapshot justo al completar (~0s)
+            try {
+              const desaparecidosCasiCompletos = prev.filter(t =>
+                !porIdONombre.has(t.id) && !porIdONombre.has(t.nombre) &&
+                !t.completado && t.activo && (t.tiempoRestanteSegundos <= 1 || (new Date(t.fechaFin).getTime() - Date.now() <= 1500))
+              );
+              for (const t of desaparecidosCasiCompletos) {
+                // Marcar como recientemente completado (incluye clave por ID si aplica)
+                try { markRecentlyCompleted({ ...t, completado: true, activo: false }); } catch {}
+              }
+            } catch {}
+
             const combinados = [...normalizadosServidor, ...completadosLocales, ...restantesOptimistas];
             localStorage.setItem('kryotec_timers', JSON.stringify(combinados));
             return combinados;
@@ -357,6 +369,11 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         // Timer eliminado desde otro dispositivo
         if (lastMessage.data.timerId) {
           setTimers(prev => {
+            const borrado = prev.find(timer => timer.id === lastMessage.data.timerId);
+            // Si el timer estaba a punto de terminar, marcar como completado reciente
+            if (borrado && borrado.activo && !borrado.completado && (borrado.tiempoRestanteSegundos <= 1 || (new Date(borrado.fechaFin).getTime() - Date.now() <= 1500))) {
+              try { markRecentlyCompleted({ ...borrado, completado: true, activo: false }); } catch {}
+            }
             const nuevos = prev.filter(timer => timer.id !== lastMessage.data.timerId);
             localStorage.setItem('kryotec_timers', JSON.stringify(nuevos));
             return nuevos;

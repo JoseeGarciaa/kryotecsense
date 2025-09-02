@@ -354,7 +354,13 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                           const timerCompletado = completadosPorId.get(item.id);
 
                           // Fallback a reciente completado si el servidor lo limpió (usar etiquetas con ID únicamente)
-                          const reciente = !timerCompletado ? (getRecentCompletionById('envio', item.id)) : null;
+                          const reciente = !timerCompletado
+                            ? (
+                              getRecentCompletionById('envio', item.id)
+                              || getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
+                              || getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
+                            )
+                            : null;
                           // Mostrar completo en estos casos:
                           // 1) Hay un timer completado persistente y pasó la compuerta por llegada a la etapa.
                           // 2) Hay un "reciente completado" (mostrar siempre, sin compuerta) para evitar parpadeos a "Sin cronómetro".
@@ -565,7 +571,13 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                           const timerActivo = activosPorId.get(item.id);
                           const timerCompletado = completadosPorId.get(item.id);
 
-                          const reciente = !timerCompletado ? (getRecentCompletionById('envio', item.id)) : null;
+                          const reciente = !timerCompletado
+                            ? (
+                              getRecentCompletionById('envio', item.id)
+                              || getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
+                              || getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
+                            )
+                            : null;
                           const mostrarCompleto = (() => {
                             if (reciente) return true;
                             if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
