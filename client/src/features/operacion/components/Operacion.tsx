@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { DragDropContext } from '@hello-pangea/dnd';
 import { Scan, ChevronDown, Menu, Plus } from 'lucide-react';
 import KanbanColumn from './kanban/KanbanColumn';
@@ -641,8 +641,8 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
   // Filtrar columnas según la fase seleccionada
   // Preparar columnas derivadas para render sin mutar el estado original
   const isViewOnly = selectedPhase === null || selectedPhase === 'all';
-  const columnsForRender = useMemo(() => {
-    // Clonar superficialmente y filtrar items si estamos en vista general
+  // Derivar columnas sin mutar el estado original
+  const columnsForRender = (() => {
     if (!isViewOnly) return columns;
     const cloned: typeof columns = { ...columns } as any;
     Object.keys(cloned).forEach((cid) => {
@@ -652,17 +652,17 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
           cloned[cid] = {
             ...col,
             items: col.items.filter((item: any) => !(
-              item.tipo === 'CONGELACION' || 
-              item.tipo === 'ATEMPERAMIENTO' || 
-              item.tipo_base === 'CONGELACION' || 
+              item.tipo === 'CONGELACION' ||
+              item.tipo === 'ATEMPERAMIENTO' ||
+              item.tipo_base === 'CONGELACION' ||
               item.tipo_base === 'ATEMPERAMIENTO'
-            ))
+            )),
           };
         }
       }
     });
     return cloned;
-  }, [columns, isViewOnly]);
+  })();
 
   const filteredColumns = selectedPhase 
     ? Object.entries(columnsForRender).filter(([columnId]) => columnId === selectedPhase)
