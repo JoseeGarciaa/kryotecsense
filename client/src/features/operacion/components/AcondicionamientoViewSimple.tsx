@@ -362,28 +362,21 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                             || getRecentCompletion(item.nombre_unidad, 'envio')
                             || (item.rfid ? getRecentCompletion(item.rfid, 'envio') : null)
                             : null;
-                          // Solo considerar 'Completo' si el timer pertenece a esta etapa (iniciado después de que el item llegó aquí)
+                          // Mostrar completo en estos casos:
+                          // 1) Hay un timer completado persistente y pasó la compuerta por llegada a la etapa.
+                          // 2) Hay un "reciente completado" (mostrar siempre, sin compuerta) para evitar parpadeos a "Sin cronómetro".
+                          // 3) El activo llegó a 0s (mostrar siempre, sin compuerta).
                           const mostrarCompleto = (() => {
-                            const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
+                            if (reciente) return true;
+                            if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
                             if (timerCompletado) {
+                              const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
                               try {
                                 const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
                                 if (Number.isNaN(llegadaEtapa)) return true; // si no tenemos referencia, permitir
                                 // margen de 60s por desfases
                                 return inicioTimer >= (llegadaEtapa - 60_000);
                               } catch { return false; }
-                            }
-                            if (reciente) {
-                              if (Number.isNaN(llegadaEtapa)) return true;
-                              return reciente.startMs >= (llegadaEtapa - 60_000);
-                            }
-                            // Considerar como completado si el activo llegó a 0s
-                            if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) {
-                              try {
-                                const inicioTimer = new Date(timerActivo.fechaInicio).getTime();
-                                if (Number.isNaN(llegadaEtapa)) return true;
-                                return inicioTimer >= (llegadaEtapa - 60_000);
-                              } catch { return true; }
                             }
                             return false;
                           })();
@@ -591,24 +584,15 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                             || (item.rfid ? getRecentCompletion(item.rfid, 'envio') : null)
                             : null;
                           const mostrarCompleto = (() => {
-                            const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
+                            if (reciente) return true;
+                            if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
                             if (timerCompletado) {
+                              const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
                               try {
                                 const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
                                 if (Number.isNaN(llegadaEtapa)) return true;
                                 return inicioTimer >= (llegadaEtapa - 60_000);
                               } catch { return false; }
-                            }
-                            if (reciente) {
-                              if (Number.isNaN(llegadaEtapa)) return true;
-                              return reciente.startMs >= (llegadaEtapa - 60_000);
-                            }
-                            if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) {
-                              try {
-                                const inicioTimer = new Date(timerActivo.fechaInicio).getTime();
-                                if (Number.isNaN(llegadaEtapa)) return true;
-                                return inicioTimer >= (llegadaEtapa - 60_000);
-                              } catch { return true; }
                             }
                             return false;
                           })();
