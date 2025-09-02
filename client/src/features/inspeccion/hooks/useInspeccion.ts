@@ -111,13 +111,12 @@ export const useInspeccion = () => {
       setItemsParaInspeccion(pendientesSinInspeccionados.map((item: any) => ({
         ...item,
         validaciones: {
-        // Pendientes cuando ya fueron movidos a Inspección desde Devolución
-        // Tolerante a legacy: sub_estado puede ser 'Pendiente' o 'En proceso'
+          limpieza: false,
+          goteo: false,
           desinfeccion: false
         }
       })));
-          const esPendienteInspeccion = estado === 'inspeccion' && (sub === 'pendiente' || sub === 'en proceso');
-  setItemsInspeccionados(itemsYaInspeccionados);
+      setItemsInspeccionados(itemsYaInspeccionados);
       
     } catch (err) {
       console.warn('Backend no disponible, usando datos de prueba:', err);
