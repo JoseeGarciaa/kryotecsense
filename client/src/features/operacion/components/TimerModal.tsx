@@ -22,47 +22,48 @@ const TimerModal: React.FC<TimerModalProps> = ({
   cargando = false,
   initialMinutes
 }) => {
-  // Defaults: 30 minutos por defecto para cualquier operación
-  const [horas, setHoras] = useState<number>(0);
-  const [minutos, setMinutos] = useState<number>(30);
+  // Inputs sin valores por defecto; el usuario ingresa manualmente
+  const [horas, setHoras] = useState<string>('');
+  const [minutos, setMinutos] = useState<string>('');
 
-  // Al abrir el modal, si se provee initialMinutes, usarlo como default
+  // Al abrir el modal, si se provee initialMinutes, usarlo como default opcional
   useEffect(() => {
     if (mostrarModal && typeof initialMinutes === 'number' && initialMinutes > 0) {
       const h = Math.floor(initialMinutes / 60);
       const m = initialMinutes % 60;
-      setHoras(h);
-      setMinutos(m);
+      setHoras(h.toString());
+      setMinutos(m.toString());
+    } else if (mostrarModal) {
+      setHoras('');
+      setMinutos('');
     }
   }, [mostrarModal, initialMinutes]);
 
   const handleConfirmar = () => {
-    const tiempoTotalMinutos = (horas * 60) + minutos;
+    const h = Number.parseInt(horas || '0', 10) || 0;
+    const m = Number.parseInt(minutos || '0', 10) || 0;
+    const tiempoTotalMinutos = (h * 60) + m;
     if (tiempoTotalMinutos > 0) {
       onConfirmar(tiempoTotalMinutos);
       // Resetear valores
-      setHoras(0);
-      setMinutos(30);
+      setHoras('');
+      setMinutos('');
     }
   };
 
   const handleCancelar = () => {
-    // Resetear valores
-    setHoras(0);
-    setMinutos(30);
+    setHoras('');
+    setMinutos('');
     onCancelar();
   };
 
-  // Early return después de todos los hooks
   if (!mostrarModal) return null;
 
-  // Tiempos sugeridos según el tipo de operación
-  const tiemposSugeridos = [
-    { label: '15 min', horas: 0, minutos: 15 },
-    { label: '30 min', horas: 0, minutos: 30 },
-    { label: '45 min', horas: 0, minutos: 45 },
-    { label: '1 hora', horas: 1, minutos: 0 }
-  ];
+  // Valores derivados para UI y validación
+  const hNum = Number.parseInt(horas || '0', 10) || 0;
+  const mNum = Number.parseInt(minutos || '0', 10) || 0;
+  const totalMin = (hNum * 60) + mNum;
+  const disabledStart = totalMin === 0 || cargando;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -118,12 +119,21 @@ const TimerModal: React.FC<TimerModalProps> = ({
                 <label className="block text-xs text-gray-500 mb-1">Horas</label>
                 <input
                   type="number"
-                  min="0"
-                  max="240"
+                  min={0}
+                  max={240}
                   value={horas}
-                  onChange={(e) => setHoras(Math.max(0, parseInt(e.target.value) || 0))}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '') {
+                      setHoras('');
+                      return;
+                    }
+                    const n = Math.max(0, Math.min(240, Number.parseInt(v, 10) || 0));
+                    setHoras(n.toString());
+                  }}
+                  placeholder="Horas"
                   disabled={cargando}
-                  className={`w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  className={`w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 ${
                     cargando ? 'cursor-not-allowed opacity-50 bg-gray-100' : ''
                   }`}
                 />
@@ -132,12 +142,21 @@ const TimerModal: React.FC<TimerModalProps> = ({
                 <label className="block text-xs text-gray-500 mb-1">Minutos</label>
                 <input
                   type="number"
-                  min="0"
-                  max="59"
+                  min={0}
+                  max={59}
                   value={minutos}
-                  onChange={(e) => setMinutos(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '') {
+                      setMinutos('');
+                      return;
+                    }
+                    const n = Math.max(0, Math.min(59, Number.parseInt(v, 10) || 0));
+                    setMinutos(n.toString());
+                  }}
+                  placeholder="Minutos"
                   disabled={cargando}
-                  className={`w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  className={`w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 ${
                     cargando ? 'cursor-not-allowed opacity-50 bg-gray-100' : ''
                   }`}
                 />
@@ -154,7 +173,7 @@ const TimerModal: React.FC<TimerModalProps> = ({
               <span className={`text-lg font-bold ${
                 tipoOperacion === 'congelamiento' ? 'text-blue-600' : 'text-orange-600'
               }`}>
-                {horas > 0 && `${horas}h `}{minutos}min
+                {hNum > 0 && `${hNum}h `}{mNum}min
               </span>
             </div>
           </div>
@@ -170,9 +189,9 @@ const TimerModal: React.FC<TimerModalProps> = ({
           </button>
           <button
             onClick={handleConfirmar}
-            disabled={(horas * 60) + minutos === 0 || cargando}
+            disabled={disabledStart}
             className={`px-4 py-2 text-white rounded-md flex items-center gap-2 transition-all ${
-              (horas * 60) + minutos === 0 || cargando
+              disabledStart
                 ? 'opacity-50 cursor-not-allowed bg-gray-400'
                 : tipoOperacion === 'congelamiento'
                   ? 'bg-blue-600 hover:bg-blue-700'
