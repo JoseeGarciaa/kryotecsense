@@ -96,6 +96,31 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
   onToggleSeleccion
 }) => {
     const headerColor = columnColors[column.name.toLowerCase().replace(/ /g, '-')] || columnColors['default'];
+    const resumenTargets = ['operacion', 'devolucion', 'inspeccion'];
+    const mostrarResumen = Boolean(isViewOnly && resumenTargets.includes(columnId));
+    const resumenEstilos: { [key: string]: { headBg: string; headText: string; countText: string; bodyBg: string; border: string } } = {
+        operacion: {
+            headBg: 'bg-green-50',
+            headText: 'text-green-800',
+            countText: 'text-green-600',
+            bodyBg: 'bg-green-50',
+            border: 'border-green-100'
+        },
+        devolucion: {
+            headBg: 'bg-red-50',
+            headText: 'text-red-800',
+            countText: 'text-red-600',
+            bodyBg: 'bg-red-50',
+            border: 'border-red-100'
+        },
+        inspeccion: {
+            headBg: 'bg-purple-50',
+            headText: 'text-purple-800',
+            countText: 'text-purple-600',
+            bodyBg: 'bg-purple-50',
+            border: 'border-purple-100'
+        }
+    };
     
     // Estados para los modales
     // Eliminado el modal de agregar a bodega (no se usa)
@@ -340,6 +365,24 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
                 )}
             </div>
             <div className="p-2 sm:p-3 transition-colors duration-200 min-h-[300px] sm:min-h-[400px] lg:min-h-[500px]">
+                        {/* Resumen informativo para Operación / Devolución / Inspección en vista de todas las fases */}
+                        {mostrarResumen && (
+                            <div className={`bg-white rounded-lg shadow-md mb-3 overflow-hidden border ${resumenEstilos[columnId]?.border || 'border-gray-100'}`}>
+                                <div className={`${resumenEstilos[columnId]?.headBg || 'bg-gray-50'} p-3 border-b ${resumenEstilos[columnId]?.border || 'border-gray-100'} flex justify-between items-center`}>
+                                    <h3 className={`text-sm font-semibold ${resumenEstilos[columnId]?.headText || 'text-gray-800'}`}>
+                                        Resumen de {column?.name || 'Fase'}
+                                    </h3>
+                                    <span className={`text-xs ${resumenEstilos[columnId]?.countText || 'text-gray-600'}`}>{items.length} items</span>
+                                </div>
+                                <div className={`p-3 text-sm ${resumenEstilos[columnId]?.headText || 'text-gray-700'} ${resumenEstilos[columnId]?.bodyBg || 'bg-gray-50'}`}>
+                                    {items.length === 0 ? (
+                                        <div className="text-gray-600">No hay items en esta fase por ahora.</div>
+                                    ) : (
+                                        <div className="text-gray-600">Hay {items.length} items en esta fase.</div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                         {items.map((item, index) => (
                                         <KanbanCard 
                                             key={item.id} 
