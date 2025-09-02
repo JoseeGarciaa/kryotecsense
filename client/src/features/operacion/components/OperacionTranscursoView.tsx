@@ -41,6 +41,9 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   const [itemsSeleccionadosModal, setItemsSeleccionadosModal] = useState<number[]>([]);
   // Filtros para el modal (diseño sin lotes)
   const [modalBusqueda, setModalBusqueda] = useState('');
+  // Tiempo manual en el modal (opcional)
+  const [horasEnvio, setHorasEnvio] = useState<string>('');
+  const [minutosEnvio, setMinutosEnvio] = useState<string>('');
   
   // Lista filtrada para el modal (memoizada)
   const itemsFiltradosModal = useMemo(() => {
@@ -649,13 +652,20 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       const itemsParaEnvio = itemsListosDespacho.filter(item =>
         Array.isArray(itemsSeleccionadosModal) && itemsSeleccionadosModal.includes(item.id)
       );
-      
-  await envio.iniciarEnvio(itemsParaEnvio);
+  // Calcular tiempo manual si fue provisto
+  const h = parseInt(horasEnvio || '0', 10);
+  const m = parseInt(minutosEnvio || '0', 10);
+  const totalMin = (Number.isNaN(h) ? 0 : h) * 60 + (Number.isNaN(m) ? 0 : m);
+  const tiempoManual = totalMin > 0 ? totalMin : undefined;
+
+  await envio.iniciarEnvio(itemsParaEnvio, tiempoManual);
       
       // Cerrar modal y limpiar selección
       setMostrarModalSeleccion(false);
       setItemsSeleccionadosModal([]);
   setModalBusqueda('');
+  setHorasEnvio('');
+  setMinutosEnvio('');
     } catch (error) {
       console.error('Error iniciando envío:', error);
     }
@@ -949,6 +959,34 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     Seleccionar todo
                   </label>
                 </div>
+                {/* Tiempo manual para envío (opcional) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs text-gray-600 mb-1">Tiempo de envío (opcional)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder="Horas"
+                        value={horasEnvio}
+                        onChange={(e) => setHorasEnvio(e.target.value.replace(/[^0-9]/g, ''))}
+                        className="w-24 px-3 py-2 border rounded-md text-sm"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        max={59}
+                        placeholder="Minutos"
+                        value={minutosEnvio}
+                        onChange={(e) => setMinutosEnvio(e.target.value.replace(/[^0-9]/g, ''))}
+                        className="w-28 px-3 py-2 border rounded-md text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Si lo dejas vacío, se usará el tiempo predeterminado.
+                  </div>
+                </div>
               </div>
 
               {/* Lista de items */}
@@ -994,6 +1032,8 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     setMostrarModalSeleccion(false);
                     setItemsSeleccionadosModal([]);
                     setModalBusqueda('');
+                    setHorasEnvio('');
+                    setMinutosEnvio('');
                   }}
                   className="px-3 py-2 sm:px-4 sm:py-2 text-gray-600 bg-white rounded-lg hover:bg-white transition-colors text-sm"
                 >

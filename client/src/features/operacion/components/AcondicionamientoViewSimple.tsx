@@ -83,11 +83,22 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
         .trim() ?? '';
     const extractFromNombre = (nombre: string): { id?: number; base: string } => {
       const n = normalize(nombre);
-      const re = /^envio\s+(?:#(\d+)\s*-\s*)?(.*)$/i;
+      // Permitir variantes como:
+      //  - "envio #123 - nombre"
+      //  - "envio (despacho) #123 - nombre"
+      //  - "envio nombre" (sin id)
+      const re = /^envio(?:\s*\([^)]*\))?\s+(?:#(\d+)\s*-\s*)?(.*)$/i;
       const m = n.match(re);
       if (m) {
         const id = m[1] ? Number(m[1]) : undefined;
         const base = (m[2] || '').trim();
+        return { id, base };
+      }
+      // Fallback: intentar encontrar '#id - resto' en cualquier parte
+      const m2 = n.match(/#(\d+)\s*-\s*(.*)$/);
+      if (m2) {
+        const id = Number(m2[1]);
+        const base = (m2[2] || '').trim();
         return { id, base };
       }
       return { base: n };
