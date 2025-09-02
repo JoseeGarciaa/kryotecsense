@@ -777,7 +777,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
       {(subEstadoDestino === 'Ensamblaje' || subEstadoDestino === 'Lista para Despacho') && (
             <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
               <div className="sm:col-span-2">
-        <label className="block text-xs text-gray-600 mb-1">Tiempo de operación para {subEstadoDestino} (opcional)</label>
+        <label className="block text-xs text-gray-600 mb-1">Tiempo de operación para {subEstadoDestino} (obligatorio)</label>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -799,7 +799,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                 </div>
               </div>
               <div className="text-xs text-gray-500">
-                Si lo dejas vacío no se creará cronómetro automático.
+        Debes ingresar horas y/o minutos para permitir el movimiento.
               </div>
             </div>
           )}
@@ -894,9 +894,14 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                 const h = parseInt(horas || '0', 10);
                 const m = parseInt(minutos || '0', 10);
                 const totalMin = (Number.isNaN(h) ? 0 : h) * 60 + (Number.isNaN(m) ? 0 : m);
+                const requiereTiempo = subEstadoDestino === 'Ensamblaje' || subEstadoDestino === 'Lista para Despacho';
+                if (requiereTiempo && totalMin <= 0) {
+                  alert('Debes ingresar un tiempo (horas y/o minutos) para continuar.');
+                  return;
+                }
                 onConfirm(itemsSeleccionados, subEstadoDestino, totalMin > 0 ? totalMin : undefined);
               }}
-              disabled={itemsSeleccionados.length === 0 || cargando}
+              disabled={itemsSeleccionados.length === 0 || cargando || ((subEstadoDestino === 'Ensamblaje' || subEstadoDestino === 'Lista para Despacho') && ((parseInt(horas || '0', 10) * 60 + parseInt(minutos || '0', 10)) <= 0))}
               className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
             >
               {cargando && (

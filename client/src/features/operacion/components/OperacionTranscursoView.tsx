@@ -648,14 +648,17 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     if (itemsSeleccionadosModal.length === 0) return;
     
     try {
+      const h = parseInt(horasEnvio || '0', 10);
+      const m = parseInt(minutosEnvio || '0', 10);
+      const totalMin = (Number.isNaN(h) ? 0 : h) * 60 + (Number.isNaN(m) ? 0 : m);
+      if (totalMin <= 0) {
+        alert('Debes ingresar un tiempo (horas y/o minutos) para iniciar el envío.');
+        return;
+      }
       // Enfoque sin lotes: tomar los items seleccionados desde el inventario filtrado general
       const itemsParaEnvio = itemsListosDespacho.filter(item =>
         Array.isArray(itemsSeleccionadosModal) && itemsSeleccionadosModal.includes(item.id)
       );
-  // Calcular tiempo manual si fue provisto
-  const h = parseInt(horasEnvio || '0', 10);
-  const m = parseInt(minutosEnvio || '0', 10);
-  const totalMin = (Number.isNaN(h) ? 0 : h) * 60 + (Number.isNaN(m) ? 0 : m);
   const tiempoManual = totalMin > 0 ? totalMin : undefined;
 
   await envio.iniciarEnvio(itemsParaEnvio, tiempoManual);
@@ -959,10 +962,10 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     Seleccionar todo
                   </label>
                 </div>
-                {/* Tiempo manual para envío (opcional) */}
+        {/* Tiempo manual para envío (obligatorio) */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
                   <div className="sm:col-span-2">
-                    <label className="block text-xs text-gray-600 mb-1">Tiempo de envío (opcional)</label>
+          <label className="block text-xs text-gray-600 mb-1">Tiempo de envío (obligatorio)</label>
                     <div className="flex gap-2">
                       <input
                         type="number"
@@ -983,9 +986,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                       />
                     </div>
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Si lo dejas vacío, se usará el tiempo predeterminado.
-                  </div>
+                  <div className="text-xs text-gray-500">Debes ingresar horas y/o minutos para iniciar el envío.</div>
                 </div>
               </div>
 
@@ -1041,9 +1042,9 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                 </button>
                 <button
                   onClick={confirmarSeleccion}
-                  disabled={itemsSeleccionadosModal.length === 0}
+                  disabled={itemsSeleccionadosModal.length === 0 || ((parseInt(horasEnvio || '0', 10) * 60 + parseInt(minutosEnvio || '0', 10)) <= 0)}
                   className={`px-3 py-2 sm:px-4 sm:py-2 rounded-lg transition-colors text-sm ${
-                    itemsSeleccionadosModal.length > 0
+                    itemsSeleccionadosModal.length > 0 && ((parseInt(horasEnvio || '0', 10) * 60 + parseInt(minutosEnvio || '0', 10)) > 0)
                       ? 'bg-blue-600 hover:bg-blue-700 text-white'
                       : 'bg-white text-gray-500 cursor-not-allowed'
                   }`}
