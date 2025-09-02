@@ -127,14 +127,17 @@ export const useBodega = () => {
     // Vista principal - mostrar grupos principales
     const gruposPrincipales = crearGruposPrincipales(items);
     const cards: any[] = [];
-    
-    Object.entries(gruposPrincipales).forEach(([tipoGrupo, itemsGrupo]) => {
+
+    // Asegurar grupos fijos aunque estén vacíos (orden TICS, CAJAS, VIPS)
+    const tiposFijos = ['TICS', 'CAJAS', 'VIPS'];
+    tiposFijos.forEach((tipoGrupo) => {
+      const itemsGrupo = gruposPrincipales[tipoGrupo] || [];
       cards.push({
         id: `${tipoGrupo.toLowerCase()}-grupo-principal`,
         category: tipoGrupo,
         title: tipoGrupo,
         description: `${(itemsGrupo as any[]).length} items disponibles`,
-        assignee: [{name: 'Sistema', avatar: 'sistema'}],
+        assignee: [{ name: 'Sistema', avatar: 'sistema' }],
         date: new Date().toLocaleDateString(),
         nombre_unidad: tipoGrupo,
         rfid: `${tipoGrupo}-PRINCIPAL`,
@@ -147,7 +150,7 @@ export const useBodega = () => {
         nivel_grupo: 1
       });
     });
-    
+
     return cards;
   };
 
