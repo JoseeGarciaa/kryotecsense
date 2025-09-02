@@ -148,7 +148,27 @@ export class OptimizedBulkOperations {
         id: item.id || item.inventario_id,
         inventory_data: {
       estado: newState,
-      sub_estado: newSubState || 'En proceso',
+      // Evitar el genérico "En proceso": usar subEstado provisto o un valor explícito por estado
+  sub_estado: ((): string | undefined => {
+        if (newSubState) return newSubState;
+        switch (newState) {
+          case 'Pre-acondicionamiento':
+            return 'Congelación';
+          case 'Acondicionamiento':
+            return 'Ensamblaje';
+          case 'Operación':
+          case 'operación':
+            return 'En transito';
+          case 'Devolución':
+            return 'Pendiente';
+          case 'Inspección':
+            return 'Pendiente';
+          case 'En bodega':
+            return 'Disponible';
+          default:
+    return undefined;
+        }
+      })(),
       // Cuando regresan a bodega, limpiar el lote anterior
       ...(newState === 'En bodega' ? { lote: null } : {})
         },
@@ -157,7 +177,26 @@ export class OptimizedBulkOperations {
           usuario_id: 1,
       descripcion: `${item.nombre_unidad || item.title} movido a ${newState}${newState === 'En bodega' ? ' (lote limpiado)' : ''}`,
           estado_nuevo: newState,
-          sub_estado_nuevo: newSubState || 'En proceso'
+      sub_estado_nuevo: ((): string | undefined => {
+            if (newSubState) return newSubState;
+            switch (newState) {
+              case 'Pre-acondicionamiento':
+                return 'Congelación';
+              case 'Acondicionamiento':
+                return 'Ensamblaje';
+              case 'Operación':
+              case 'operación':
+                return 'En transito';
+              case 'Devolución':
+                return 'Pendiente';
+              case 'Inspección':
+                return 'Pendiente';
+              case 'En bodega':
+                return 'Disponible';
+              default:
+        return undefined;
+            }
+          })()
         }
       }));
       
@@ -214,7 +253,7 @@ export class OptimizedBulkOperations {
    */
   async optimizedMoveToAcondicionamiento(
     items: any[],
-    subEstado: string = 'En proceso'
+    subEstado: string = 'Ensamblaje'
   ): Promise<{ success: number; errors: string[] }> {
     console.log(`🌡️ Optimizando movimiento a acondicionamiento (${subEstado}) para ${items.length} items`);
     

@@ -269,7 +269,7 @@ export const useDevolucion = () => {
         // Mover a inspección
         await apiServiceClient.patch(`/inventory/inventario/${id}/estado`, {
           estado: 'Inspección',
-          sub_estado: 'En proceso'
+          sub_estado: 'Pendiente'
         });
   // Crear temporizador de inspección 36h
   crearTimer(`Inspección #${id} - ${nombre ?? 'Item'}`, 'inspeccion', 36 * 60);
@@ -279,7 +279,7 @@ export const useDevolucion = () => {
           usuario_id: 1,
           descripcion: `${nombre ?? 'Item'} pasó a Inspección (cronómetro cancelado)`,
           estado_nuevo: 'Inspección',
-          sub_estado_nuevo: 'En proceso'
+          sub_estado_nuevo: 'Pendiente'
         });
         await cargarItemsDevolucion();
         alert('🔎 Pasó a Inspección (cronómetro cancelado)');

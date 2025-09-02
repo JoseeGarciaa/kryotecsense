@@ -554,7 +554,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       } else if (timerCompletado.tipoOperacion === 'atemperamiento') {
   // Atemperamiento completado → va a Acondicionamiento (ensamblaje)
   siguienteEstado = 'Acondicionamiento';
-  siguienteSubEstado = 'En proceso';
+  siguienteSubEstado = 'Ensamblaje';
   tiempoNuevo = 0; // Sin timer aquí
       }
 

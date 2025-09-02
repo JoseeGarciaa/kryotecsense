@@ -221,7 +221,7 @@ export const createDragDropHandlers = (
         // === VERSIÓN OPTIMIZADA: Mover todos los items en lote ===
         const result = await bulkOperations.optimizedMoveToAcondicionamiento(
           grupoPreAcondicionamiento.items_grupo,
-          'En proceso'
+          'Ensamblaje'
         );
         
         console.log(`✅ [OPTIMIZADO] ${result.success} items movidos a acondicionamiento`);
@@ -246,9 +246,9 @@ export const createDragDropHandlers = (
         const nuevaActividad = {
           inventario_id: grupoPreAcondicionamiento.inventario_id,
           usuario_id: 1,
-          descripcion: `TIC movido a acondicionamiento - ${grupoPreAcondicionamiento.nombre_unidad}`,
+    descripcion: `TIC movido a acondicionamiento - ${grupoPreAcondicionamiento.nombre_unidad}`,
           estado_nuevo: 'Acondicionamiento',
-          sub_estado_nuevo: 'En proceso'
+    sub_estado_nuevo: 'Ensamblaje'
         };
         
         await apiServiceClient.post('/activities/actividades/', nuevaActividad);
@@ -275,7 +275,7 @@ export const createDragDropHandlers = (
         usuario_id: 1, // Usuario actual
         descripcion: `TIC movido de vuelta a pre-acondicionamiento - ${item.nombre_unidad}`,
         estado_nuevo: 'Pre-acondicionamiento',
-        sub_estado_nuevo: 'Congelación'
+  sub_estado_nuevo: 'Congelación'
       };
       
       await apiServiceClient.post('/activities/actividades/', nuevaActividad);
@@ -300,9 +300,9 @@ export const createDragDropHandlers = (
       const nuevaActividad = {
         inventario_id: item.inventario_id || item.id,
         usuario_id: 1, // Usuario actual
-        descripcion: `TIC movido a acondicionamiento desde pre-acondicionamiento - ${item.nombre_unidad}`,
+  descripcion: `TIC movido a acondicionamiento desde pre-acondicionamiento - ${item.nombre_unidad}`,
         estado_nuevo: 'Acondicionamiento',
-        sub_estado_nuevo: 'En proceso'
+  sub_estado_nuevo: 'Ensamblaje'
       };
       
       await apiServiceClient.post('/activities/actividades/', nuevaActividad);
@@ -325,11 +325,11 @@ export const createDragDropHandlers = (
       // Mapear columnas a estados
       const estadosPorColumna: { [key: string]: { estado: string; subEstado: string } } = {
         'en-bodega': { estado: 'En bodega', subEstado: 'Disponible' },
-        'pre-acondicionamiento': { estado: 'Pre-acondicionamiento', subEstado: 'En proceso' },
-        'acondicionamiento': { estado: 'Acondicionamiento', subEstado: 'En proceso' },
-        'operacion': { estado: 'Operación', subEstado: 'En proceso' },
-        'devolucion': { estado: 'Devolución', subEstado: 'En proceso' },
-        'inspeccion': { estado: 'Inspección', subEstado: 'En proceso' }
+        'pre-acondicionamiento': { estado: 'Pre-acondicionamiento', subEstado: 'Congelación' },
+        'acondicionamiento': { estado: 'Acondicionamiento', subEstado: 'Ensamblaje' },
+        'operacion': { estado: 'Operación', subEstado: 'En transito' },
+        'devolucion': { estado: 'Devolución', subEstado: 'Pendiente' },
+        'inspeccion': { estado: 'Inspección', subEstado: 'Pendiente' }
       };
       
       const estadoDestino = estadosPorColumna[destino];
