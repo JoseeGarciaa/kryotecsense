@@ -135,51 +135,52 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
     // Función para obtener datos de inventario de bodega
     const obtenerDatosBodega = () => {
         if (!inventarioCompleto) {
-            console.log('🚨 KanbanColumn: inventarioCompleto es null/undefined');
+            if (process.env.NODE_ENV !== 'production') {
+                console.log('KanbanColumn: inventarioCompleto es null/undefined');
+            }
             return { tics: [], vips: [], cajas: [] };
         }
 
-        console.log('🔍 KanbanColumn obtenerDatosBodega: Total items:', inventarioCompleto.length);
-        console.log('🔍 KanbanColumn obtenerDatosBodega: Todos los items:', inventarioCompleto);
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('KanbanColumn obtenerDatosBodega: Total items:', inventarioCompleto.length);
+        }
 
         // Solo items que están específicamente en estado "En bodega" (case-insensitive)
         const itemsBodega = inventarioCompleto.filter(item => {
             const estado = item.estado?.toLowerCase();
             const esBodega = estado === 'en bodega';
-            console.log(`🔍 Item ${item.id}: estado="${item.estado}" -> normalizado="${estado}" -> esBodega=${esBodega}`);
             return esBodega;
         });
 
-        console.log('🏪 KanbanColumn: Items filtrados en bodega:', itemsBodega.length);
-        console.log('🏪 KanbanColumn: Items bodega detalle:', itemsBodega);
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('KanbanColumn: Items filtrados en bodega:', itemsBodega.length);
+        }
 
         const resultado = {
             tics: itemsBodega.filter(item => {
                 const categoria = item.categoria?.toLowerCase();
                 const esTic = categoria === 'tic';
-                console.log(`🔍 Item ${item.id}: categoria="${item.categoria}" -> normalizado="${categoria}" -> esTic=${esTic}`);
                 return esTic;
             }),
             vips: itemsBodega.filter(item => {
                 const categoria = item.categoria?.toLowerCase();
                 const esVip = categoria === 'vip';
-                console.log(`🔍 Item ${item.id}: categoria="${item.categoria}" -> normalizado="${categoria}" -> esVip=${esVip}`);
                 return esVip;
             }),
             cajas: itemsBodega.filter(item => {
                 const categoria = item.categoria?.toLowerCase();
                 const esCube = categoria === 'cube';
-                console.log(`🔍 Item ${item.id}: categoria="${item.categoria}" -> normalizado="${categoria}" -> esCube=${esCube}`);
                 return esCube;
             })
         };
 
-        console.log('📊 KanbanColumn resultado obtenerDatosBodega:', {
-            tics: resultado.tics.length,
-            vips: resultado.vips.length, 
-            cajas: resultado.cajas.length,
-            resultado
-        });
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('KanbanColumn resultado obtenerDatosBodega:', {
+                tics: resultado.tics.length,
+                vips: resultado.vips.length, 
+                cajas: resultado.cajas.length,
+            });
+        }
 
         return resultado;
     };

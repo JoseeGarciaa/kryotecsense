@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { DragDropContext } from '@hello-pangea/dnd';
 import { Scan, ChevronDown, Menu, Plus } from 'lucide-react';
 import KanbanColumn from './kanban/KanbanColumn';
@@ -144,12 +144,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
   
   // Hook para acceder a los temporizadores
   const { timers, formatearTiempo, crearTimer } = useTimerContext();
-  // Tick local solo para re-render cada segundo (no recalcula tiempo, usa valores sincronizados)
-  const [, forceTick] = useState<number>(0);
-  useEffect(() => {
-    const i = setInterval(() => forceTick(v => v + 1), 1000);
-    return () => clearInterval(i);
-  }, []);
+  // Eliminado: re-render global por segundo. Los contadores se actualizan localmente en InlineCountdown.
 
   // InlineCountdown compartido: usaremos fechaFin cuando esté disponible
   
@@ -354,7 +349,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
   };
 
   // Funciones para manejar temporizadores en el Kanban (OPTIMIZADO)
-  const obtenerTemporizadorParaTIC = (itemId: string | number) => {
+  const obtenerTemporizadorParaTIC = useCallback((itemId: string | number) => {
     // Convertir itemId a string si es necesario
     const itemIdStr = String(itemId);
     
@@ -375,9 +370,9 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
     // Log completamente eliminado para mejor performance
     
     return timer;
-  };
+  }, [timers]);
 
-  const obtenerTiempoRestanteKanban = (itemId: string): any => {
+  const obtenerTiempoRestanteKanban = useCallback((itemId: string): any => {
     const timer = obtenerTemporizadorParaTIC(itemId);
     if (!timer) return '';
     return (
@@ -388,9 +383,9 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
         format={formatearTiempo}
       />
     );
-  };
+  }, [obtenerTemporizadorParaTIC, formatearTiempo]);
 
-  const contarTimersActivosEnColumna = (columnId: string): { activos: number, completados: number } => {
+  const contarTimersActivosEnColumna = useCallback((columnId: string): { activos: number, completados: number } => {
     if (columnId !== 'pre-acondicionamiento') return { activos: 0, completados: 0 };
     
     const column = columns[columnId];
@@ -410,7 +405,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
       // Saltar items que son grupos o no son TICs
       if (item.id.includes('-grupo') || !item.id.startsWith('TIC')) return;
       
-      const timer = obtenerTemporizadorParaTIC(item.id);
+    const timer = obtenerTemporizadorParaTIC(item.id);
       if (timer) {
         if (timer.completado) {
           completados++;
@@ -421,11 +416,11 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
     });
     
     return { activos, completados };
-  };
+  }, [columns, obtenerTemporizadorParaTIC]);
 
 // ... (rest of the code remains the same)
   // Función para calcular tiempo promedio por lotes en cada fase
-  const calcularTiempoPromedioPorFase = () => {
+  const calcularTiempoPromedioPorFase = useCallback(() => {
     const tiemposPorFase: { [key: string]: { totalSegundos: number, cantidad: number, tiempoPromedio: string } } = {};
     
     // Analizar todas las columnas
@@ -456,10 +451,10 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
     });
     
     return tiemposPorFase;
-  };
+  }, [columns, obtenerTemporizadorParaTIC, formatearTiempo]);
 
   // Función para obtener información de temporizadores por lote en cada fase
-  const obtenerTemporizadoresPorLote = (columnId: string) => {
+  const obtenerTemporizadoresPorLote = useCallback((columnId: string) => {
     const column = columns[columnId];
     if (!column || !column.items) return null;
 
@@ -486,7 +481,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
       let timerMasProximo: any = null;
       let tiempoRestanteMenor = Infinity;
       timersActivos.forEach(timer => {
-        const restante = timer.tiempoRestanteSegundos;
+  const restante = timer.tiempoRestanteSegundos;
         if (restante < tiempoRestanteMenor) {
           tiempoRestanteMenor = restante;
           timerMasProximo = timer;
@@ -513,7 +508,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
       });
 
     return lotesConTimers.length > 0 ? lotesConTimers[0] : null; // Retornar el lote con menos tiempo restante
-  };
+  }, [columns, formatearTiempo, obtenerTemporizadorParaTIC]);
 
   // Función para obtener el temporizador global más próximo a completarse
   const obtenerTemporizadorGlobalMasProximo = () => {
@@ -644,30 +639,36 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
   }
 
   // Filtrar columnas según la fase seleccionada
-  const filteredColumns = selectedPhase 
-    ? Object.entries(columns).filter(([columnId]) => columnId === selectedPhase)
-    : Object.entries(columns);
-    
-  // Determinar si el modo es solo visualización
+  // Preparar columnas derivadas para render sin mutar el estado original
   const isViewOnly = selectedPhase === null || selectedPhase === 'all';
-  
-  // Si estamos en modo visualización, filtrar las tarjetas de CONGELACIÓN y ATEMPERAMIENTO de otras columnas
-  // PERO NO de la columna de pre-acondicionamiento
-  if (isViewOnly) {
-    Object.keys(columns).forEach(columnId => {
-      // Solo filtrar en columnas que NO sean pre-acondicionamiento
-      if (columnId !== 'pre-acondicionamiento') {
-        columns[columnId].items = columns[columnId].items.filter(item => {
-          return !(
-            item.tipo === 'CONGELACION' || 
-            item.tipo === 'ATEMPERAMIENTO' || 
-            item.tipo_base === 'CONGELACION' || 
-            item.tipo_base === 'ATEMPERAMIENTO'
-          );
-        });
+  const columnsForRender = useMemo(() => {
+    // Clonar superficialmente y filtrar items si estamos en vista general
+    if (!isViewOnly) return columns;
+    const cloned: typeof columns = { ...columns } as any;
+    Object.keys(cloned).forEach((cid) => {
+      if (cid !== 'pre-acondicionamiento') {
+        const col = cloned[cid];
+        if (col && Array.isArray(col.items)) {
+          cloned[cid] = {
+            ...col,
+            items: col.items.filter((item: any) => !(
+              item.tipo === 'CONGELACION' || 
+              item.tipo === 'ATEMPERAMIENTO' || 
+              item.tipo_base === 'CONGELACION' || 
+              item.tipo_base === 'ATEMPERAMIENTO'
+            ))
+          };
+        }
       }
     });
-  }
+    return cloned;
+  }, [columns, isViewOnly]);
+
+  const filteredColumns = selectedPhase 
+    ? Object.entries(columnsForRender).filter(([columnId]) => columnId === selectedPhase)
+    : Object.entries(columnsForRender);
+    
+  // Eliminado: mutación de columnas en render. Ahora usamos columnsForRender arriba.
 
   if (fase === 'pre-acondicionamiento') {
     return <PreAcondicionamientoView />;

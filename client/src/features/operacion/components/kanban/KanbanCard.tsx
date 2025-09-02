@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { MoreHorizontal, Clock, ArrowLeft, Play, Pause } from 'lucide-react';
 import TimeConfigModal from '../TimeConfigModal';
 
@@ -21,7 +21,7 @@ interface KanbanCardProps {
     onToggleSeleccion?: (item: any) => void;
 }
 
-const KanbanCard: React.FC<KanbanCardProps> = ({
+const KanbanCardComponent: React.FC<KanbanCardProps> = ({
   item,
   index,
   onCardClick,
@@ -245,5 +245,17 @@ const KanbanCard: React.FC<KanbanCardProps> = ({
     </div>
   );
 };
+// Memoize to prevent unnecessary re-renders when props are shallowly equal
+const KanbanCard = memo(KanbanCardComponent, (prev, next) => {
+  // Fast checks on identity to avoid renders
+  return (
+    prev.item === next.item &&
+    prev.index === next.index &&
+    prev.columnId === next.columnId &&
+    prev.isViewOnly === next.isViewOnly &&
+    prev.modoSeleccionMultiple === next.modoSeleccionMultiple &&
+    prev.estaSeleccionado === next.estaSeleccionado
+  );
+});
 
 export default KanbanCard;
