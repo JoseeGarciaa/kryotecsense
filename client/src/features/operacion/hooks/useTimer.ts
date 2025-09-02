@@ -91,6 +91,35 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [serverTimeDiff, setServerTimeDiff] = useState<number>(0);
   const serverTimeDiffRef = useRef<number>(0);
+  // Cache de completados recientes para mostrar "Completo" aunque el servidor limpie el timer enseguida
+  // key = `${tipo}|${norm(nombre)}`
+  const recentCompletionsRef = useRef<Map<string, { minutes: number; at: number }>>(new Map());
+  const RECENT_TTL_MS = 3 * 60 * 1000; // 3 minutos
+  const norm = (s: string | null | undefined) => (s ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+  const markRecentlyCompleted = (t: Timer) => {
+    try {
+      const key = `${t.tipoOperacion}|${norm(t.nombre)}`;
+      recentCompletionsRef.current.set(key, { minutes: t.tiempoInicialMinutos, at: Date.now() });
+    } catch {}
+  };
+  const getRecentCompletion = (
+    nombre: string,
+    tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion'
+  ): { minutes: number; at: number } | null => {
+    const key = `${tipoOperacion}|${norm(nombre)}`;
+    const val = recentCompletionsRef.current.get(key);
+    if (!val) return null;
+    if (Date.now() - val.at > RECENT_TTL_MS) {
+      // Expirado
+      recentCompletionsRef.current.delete(key);
+      return null;
+    }
+    return val;
+  };
 
   // Mantener un ref siempre actualizado para evitar reiniciar el interval al cambiar serverTimeDiff
   useEffect(() => {
@@ -327,6 +356,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
                     });
                   }
                 }, 0);
+                // Marcar como recientemente completado para vistas que necesiten mostrar "Completo" aunque el timer sea limpiado
+                try { markRecentlyCompleted({ ...timer, completado: true }); } catch {}
               }
 
               // Evitar sobreescribir el conteo local de 1s con el mismo valor del servidor.
@@ -479,6 +510,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
               if (onTimerComplete) {
                 onTimerComplete({ ...timer, tiempoRestanteSegundos: 0, completado: true, activo: false });
               }
+              // Marcar como recientemente completado
+              try { markRecentlyCompleted({ ...timer, completado: true }); } catch {}
             })();
           }
 
@@ -731,7 +764,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     obtenerTimersActivos,
     obtenerTimersCompletados,
     forzarSincronizacion,
-    isConnected
+  isConnected,
+  getRecentCompletion
   };
 };
 

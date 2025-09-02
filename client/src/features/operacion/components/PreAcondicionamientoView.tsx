@@ -147,7 +147,8 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     eliminarTimer,
   formatearTiempo,
   forzarSincronizacion,
-  isConnected
+  isConnected,
+  getRecentCompletion
   } = useTimerContext();
 
   // Re-render 1s to keep lists fresh (timers tick via InlineCountdown itself)
@@ -758,7 +759,12 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       ? obtenerTimerCompletadoPorTipo(rfid, 'atemperamiento')
       : obtenerTimerCompletadoPorTipo(rfid, 'congelamiento');
 
-    if (timerCompletado) {
+    // Fallback: si el servidor limpió el cronómetro recién completado, usar cache temporal para mostrar "Completo"
+    const tipoSeccion = esAtemperamiento ? 'atemperamiento' : 'congelamiento';
+    const reciente = !timerCompletado ? getRecentCompletion(rfid, tipoSeccion) : null;
+
+    if (timerCompletado || reciente) {
+      const minutos = timerCompletado ? timerCompletado.tiempoInicialMinutos : (reciente?.minutes ?? 0);
       // Timer completado - mostrar estado completado
       return (
         <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
@@ -767,10 +773,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             <span className="truncate">Completo</span>
           </span>
           <div className="text-xs text-gray-500 text-center truncate">
-            {timerCompletado.tiempoInicialMinutos}min
+            {minutos}min
           </div>
           <div className="flex gap-1">
-            {!esAtemperamiento && (
+            {!esAtemperamiento && timerCompletado && (
               <button
                 onClick={() => completarTIC(rfid, timerCompletado)}
                 className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
@@ -785,16 +791,18 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 e.preventDefault();
                 const confirmar = window.confirm(`¿Limpiar el cronómetro completado de ${rfid}?`);
                 if (confirmar) {
-                  limpiarTimerConDebounce(timerCompletado.id, rfid);
+                  if (timerCompletado) {
+                    limpiarTimerConDebounce(timerCompletado.id, rfid);
+                  }
                 }
               }}
-              disabled={botonesLimpiandoSet.has(timerCompletado.id)}
+              disabled={timerCompletado ? botonesLimpiandoSet.has(timerCompletado.id) : false}
               className={`p-1.5 rounded text-xs transition-colors ${
-                botonesLimpiandoSet.has(timerCompletado.id) 
+                timerCompletado && botonesLimpiandoSet.has(timerCompletado.id) 
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                   : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
               }`}
-              title={botonesLimpiandoSet.has(timerCompletado.id) ? "Limpiando..." : "Limpiar"}
+              title={timerCompletado && botonesLimpiandoSet.has(timerCompletado.id) ? "Limpiando..." : "Limpiar"}
             >
               <X className="w-3 h-3" />
             </button>

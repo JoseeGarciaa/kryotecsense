@@ -13,6 +13,10 @@ interface TimerContextType {
   obtenerTimersCompletados: () => Timer[];
   forzarSincronizacion: () => void;
   isConnected: boolean;
+  getRecentCompletion: (
+    nombre: string,
+    tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion'
+  ) => { minutes: number; at: number } | null;
 }
 
 const TimerContext = createContext<TimerContextType | undefined>(undefined);
@@ -70,7 +74,7 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
   });
 
   return (
-    <TimerContext.Provider value={timerHook}>
+  <TimerContext.Provider value={timerHook}>
       {children}
     </TimerContext.Provider>
   );
