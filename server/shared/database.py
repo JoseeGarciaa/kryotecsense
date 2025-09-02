@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
@@ -61,6 +61,18 @@ def get_engine():
         sep = "&" if "?" in db_url else "?"
         db_url = f"{db_url}{sep}sslmode={sm}"
     engine = create_engine(db_url)
+
+    # Asegurar que la zona horaria de la sesión de PostgreSQL sea UTC en cada conexión.
+    # Esto evita desfases cuando se convierten timestamptz -> timestamp y al usar NOW()/CURRENT_TIMESTAMP.
+    @event.listens_for(engine, "connect")
+    def set_session_timezone(dbapi_connection, connection_record):
+        try:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("SET TIME ZONE 'UTC'")
+            cursor.close()
+        except Exception:
+            # No bloquear la creación del engine por fallos al ajustar la TZ de sesión
+            pass
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     return engine
 

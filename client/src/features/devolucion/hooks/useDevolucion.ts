@@ -327,8 +327,8 @@ export const useDevolucion = () => {
     }
   }, [cargarItemsDevolucion]);
 
-  // Batch: pasar a Inspección (cancela timer de envío y crea timer de inspección 36h)
-  const pasarItemsAInspeccion = useCallback(async (itemIds: number[], nombres?: Record<number, string>) => {
+  // Batch: pasar a Inspección (cancela timer de envío y crea timer de inspección con duración elegida)
+  const pasarItemsAInspeccion = useCallback(async (itemIds: number[], nombres?: Record<number, string>, duracionMinutos?: number) => {
     if (!itemIds || itemIds.length === 0) return;
     try {
       setError(null);
@@ -343,13 +343,14 @@ export const useDevolucion = () => {
           estado: 'Inspección',
           sub_estado: 'Pendiente'
         });
-        // Crear timer 36h
-        crearTimer(`Inspección #${id} - ${nombre ?? 'Item'}`, 'inspeccion', 36 * 60);
+        // Crear timer con duración elegida (por defecto 36h si no se provee)
+        const minutos = typeof duracionMinutos === 'number' && duracionMinutos > 0 ? duracionMinutos : 36 * 60;
+        crearTimer(`Inspección #${id} - ${nombre ?? 'Item'}`, 'inspeccion', minutos);
         // Registrar actividad
         await apiServiceClient.post('/activities/actividades/', {
           inventario_id: id,
           usuario_id: 1,
-          descripcion: `${nombre ?? 'Item'} pasó a Inspección (cronómetro cancelado)`,
+          descripcion: `${nombre ?? 'Item'} pasó a Inspección (cronómetro ${minutos} min)`,
           estado_nuevo: 'Inspección',
           sub_estado_nuevo: 'Pendiente'
         });

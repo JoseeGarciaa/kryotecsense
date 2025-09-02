@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from pydantic import BaseModel
 import sys
 import os
@@ -13,11 +14,55 @@ from shared.database import get_db
 from shared.utils import get_current_user_from_token
 
 # Utils: ensure datetimes are timezone-aware (UTC)
+# If a datetime is naive (older rows), assume it's in APP_LOCAL_TZ (default UTC), then convert to UTC.
+APP_LOCAL_TZ = os.getenv("APP_LOCAL_TZ", "UTC")
+APP_NAIVE_LEGACY_CUTOFF_ISO = os.getenv("APP_NAIVE_LEGACY_CUTOFF_ISO")
+try:
+    _LOCAL_TZ = ZoneInfo(APP_LOCAL_TZ)
+except Exception:
+    _LOCAL_TZ = timezone.utc
+
+# Optional cutoff to distinguish legacy naive timestamps (interpreted as local) vs new (interpreted as UTC)
+_NAIVE_CUTOFF: Optional[datetime] = None
+if APP_NAIVE_LEGACY_CUTOFF_ISO:
+    try:
+        # Accept both with and without timezone designator
+        _NAIVE_CUTOFF = datetime.fromisoformat(APP_NAIVE_LEGACY_CUTOFF_ISO.replace('Z', '+00:00'))
+        # If parsed cutoff is naive, assume local tz and convert to UTC for consistent comparisons
+        if _NAIVE_CUTOFF.tzinfo is None or _NAIVE_CUTOFF.tzinfo.utcoffset(_NAIVE_CUTOFF) is None:
+            _NAIVE_CUTOFF = _NAIVE_CUTOFF.replace(tzinfo=_LOCAL_TZ).astimezone(timezone.utc)
+        else:
+            _NAIVE_CUTOFF = _NAIVE_CUTOFF.astimezone(timezone.utc)
+    except Exception:
+        _NAIVE_CUTOFF = None
+
 def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
-    if isinstance(dt, datetime):
-        if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
-            return dt.replace(tzinfo=timezone.utc)
-    return dt
+    if not isinstance(dt, datetime):
+        return dt
+    if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
+        # Decide how to interpret naive timestamps
+        if _NAIVE_CUTOFF is not None:
+            # Compare using UTC: treat incoming dt as local to compare reliably
+            try:
+                dt_local = dt.replace(tzinfo=_LOCAL_TZ)
+                dt_utc_for_compare = dt_local.astimezone(timezone.utc)
+            except Exception:
+                dt_utc_for_compare = dt.replace(tzinfo=timezone.utc)
+            # If it's newer than cutoff, assume it was stored as UTC naive
+            if dt_utc_for_compare >= _NAIVE_CUTOFF:
+                return dt.replace(tzinfo=timezone.utc)
+            # Legacy: interpret as local, then convert to UTC
+            try:
+                return dt.replace(tzinfo=_LOCAL_TZ).astimezone(timezone.utc)
+            except Exception:
+                return dt.replace(tzinfo=timezone.utc)
+        # No cutoff: default to interpreting naive as UTC to avoid artificial shifts
+        return dt.replace(tzinfo=timezone.utc)
+    # Ensure conversion to UTC when tz-aware but not UTC
+    try:
+        return dt.astimezone(timezone.utc)
+    except Exception:
+        return dt
 
 # Función para generar lotes automáticos
 def generar_lote_automatico(db: Session, tenant_schema: str) -> str:

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Package, Scan, CheckCircle, AlertCircle } from 'lucide-react';
+import TimerModal from '../../operacion/components/TimerModal';
 import { useDevolucion } from '../hooks/useDevolucion';
 import { DevolucionScanModal } from './DevolucionScanModal';
 import { useTimerContext } from '../../../contexts/TimerContext';
@@ -23,6 +24,9 @@ export const Devolucion: React.FC = () => {
   const itemsPorPagina = 5;
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<'Cube' | 'VIP' | 'TIC' | null>(null);
   const [seleccionados, setSeleccionados] = useState<Record<number, boolean>>({});
+  const [mostrarModalTiempoInspeccion, setMostrarModalTiempoInspeccion] = useState(false);
+  const [idsParaInspeccion, setIdsParaInspeccion] = useState<number[]>([]);
+  const [nombresParaInspeccion, setNombresParaInspeccion] = useState<Record<number, string>>({});
 
   // Timers para mostrar la cuenta regresiva de Operación (96h)
   const { timers, formatearTiempo } = useTimerContext();
@@ -473,15 +477,15 @@ export const Devolucion: React.FC = () => {
                       >Regresar a Operación</button>
                       <button
                         className="px-3 py-2 text-xs sm:text-sm rounded-md border border-purple-300 text-purple-700 hover:bg-purple-50"
-                        onClick={async () => {
+                        onClick={() => {
                           const ids = Object.entries(seleccionados).filter(([,v]) => v).map(([k]) => Number(k));
                           if (ids.length === 0) return;
-                          const ok = window.confirm(`¿Pasar ${ids.length} item(s) a Inspección?`);
-                          if (!ok) return;
+                          // Preparar datos y abrir modal estándar de tiempo (obligatorio)
                           const nombres: Record<number,string> = {};
                           itemsDevueltosDeCategoria.forEach(i => { if (ids.includes(i.id)) nombres[i.id] = i.nombre_unidad; });
-                          await pasarItemsAInspeccion(ids, nombres);
-                          setSeleccionados({});
+                          setIdsParaInspeccion(ids);
+                          setNombresParaInspeccion(nombres);
+                          setMostrarModalTiempoInspeccion(true);
                         }}
                       >Pasar a Inspección</button>
                     </div>
@@ -491,6 +495,26 @@ export const Devolucion: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Modal de tiempo para Inspección (estándar y obligatorio) */}
+        <TimerModal
+          mostrarModal={mostrarModalTiempoInspeccion}
+          titulo="Tiempo de Inspección"
+          descripcion="Define el tiempo de inspección para los items seleccionados. Este tiempo es obligatorio."
+          tipoOperacion="inspeccion"
+          initialMinutes={36 * 60}
+          onCancelar={() => {
+            setMostrarModalTiempoInspeccion(false);
+          }}
+          onConfirmar={async (tiempoMinutos) => {
+            if (!idsParaInspeccion.length || tiempoMinutos <= 0) return;
+            await pasarItemsAInspeccion(idsParaInspeccion, nombresParaInspeccion, tiempoMinutos);
+            setSeleccionados({});
+            setIdsParaInspeccion([]);
+            setNombresParaInspeccion({});
+            setMostrarModalTiempoInspeccion(false);
+          }}
+        />
       </div>
 
       {/* Modal de escaneo */}
