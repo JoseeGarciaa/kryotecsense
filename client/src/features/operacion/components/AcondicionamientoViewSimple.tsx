@@ -14,7 +14,6 @@ interface AcondicionamientoViewSimpleProps {
 const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = ({ isOpen, onClose }) => {
   const { inventarioCompleto, cambiarEstadoItem, actualizarColumnasDesdeBackend } = useOperaciones();
   const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected } = useTimerContext();
-  const TIEMPO_OPERACION_MIN = 96 * 60;
   
   const [mostrarModalTraerEnsamblaje, setMostrarModalTraerEnsamblaje] = useState(false);
   const [mostrarModalTraerDespacho, setMostrarModalTraerDespacho] = useState(false);
@@ -291,7 +290,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                             || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
                           if (!info) return <span className="text-xs text-gray-400">—</span>;
                           return (
-                            <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
+                            <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación">
                               ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
                             </span>
                           );
@@ -391,7 +390,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                             || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
                           if (!info) return <span className="text-xs text-gray-400">—</span>;
                           return (
-                            <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
+                            <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación">
                               ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
                             </span>
                           );
@@ -424,7 +423,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
           itemsDisponibles={itemsDisponibles} // Bodega o Pre-acond → Atemperamiento (sin Congelación)
           subEstadoDestino="Ensamblaje"
           cargando={cargandoEnsamblaje}
-          onConfirm={async (items, subEstado) => {
+          onConfirm={async (items, subEstado, tiempoOperacionMinutos) => {
             try {
               setCargandoEnsamblaje(true);
               setCargandoActualizacion(true);
@@ -450,19 +449,20 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                 
                 // Usar PUT en lugar de PATCH, igual que el modal de bodega
                 await apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionItem);
-
-                // Iniciar cronómetro de Operación (96h) al ingresar a Ensamblaje, si no existe ya
-                const existe = timers.some(t =>
-                  t.tipoOperacion === 'envio' &&
-                  /envio\s+#\d+\s+-/i.test((t.nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')) &&
-                  (t.nombre || '').includes(`#${item.id} -`) &&
-                  !t.completado
-                );
-                if (!existe) {
-                  try {
-                    crearTimer(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio', TIEMPO_OPERACION_MIN);
-                  } catch (err) {
-                    console.warn('No se pudo crear timer de operación para item', item.id, err);
+                // Crear cronómetro opcional de Operación sólo si el usuario especificó tiempo
+                if (typeof tiempoOperacionMinutos === 'number' && tiempoOperacionMinutos > 0) {
+                  const existe = timers.some(t =>
+                    t.tipoOperacion === 'envio' &&
+                    /envio\s+#\d+\s+-/i.test((t.nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')) &&
+                    (t.nombre || '').includes(`#${item.id} -`) &&
+                    !t.completado
+                  );
+                  if (!existe) {
+                    try {
+                      crearTimer(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio', tiempoOperacionMinutos);
+                    } catch (err) {
+                      console.warn('No se pudo crear timer de operación para item', item.id, err);
+                    }
                   }
                 }
               });
@@ -560,7 +560,7 @@ interface AgregarItemsModalProps {
   isOpen: boolean;
   onClose: () => void;
   itemsDisponibles: any[];
-  onConfirm: (items: any[], subEstado: string) => void;
+  onConfirm: (items: any[], subEstado: string, tiempoOperacionMinutos?: number) => void;
   subEstadoDestino: string; // Nuevo prop para especificar el sub-estado destino
   cargando?: boolean; // Estado de carga para mostrar en el botón
 }
@@ -579,6 +579,8 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
   const [mostrarEscanerRfid, setMostrarEscanerRfid] = useState(false);
   const [rfidInput, setRfidInput] = useState('');
   const [rfidsEscaneados, setRfidsEscaneados] = useState<string[]>([]);
+  const [horas, setHoras] = useState<string>('');
+  const [minutos, setMinutos] = useState<string>('');
 
   // Función para manejar auto-procesamiento de RFIDs de 24 caracteres
   const procesarRfid = (rfid: string) => {
@@ -747,6 +749,35 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
               </button>
             </div>
           </div>
+          {subEstadoDestino === 'Ensamblaje' && (
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+              <div className="sm:col-span-2">
+                <label className="block text-xs text-gray-600 mb-1">Tiempo de operación (opcional)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="Horas"
+                    value={horas}
+                    onChange={(e) => setHoras(e.target.value.replace(/[^0-9]/g, ''))}
+                    className="w-24 px-3 py-2 border rounded-md text-sm"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={59}
+                    placeholder="Minutos"
+                    value={minutos}
+                    onChange={(e) => setMinutos(e.target.value.replace(/[^0-9]/g, ''))}
+                    className="w-28 px-3 py-2 border rounded-md text-sm"
+                  />
+                </div>
+              </div>
+              <div className="text-xs text-gray-500">
+                Si lo dejas vacío no se creará cronómetro automático.
+              </div>
+            </div>
+          )}
           
           <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
             <button
@@ -834,7 +865,12 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
               Cancelar
             </button>
             <button
-              onClick={() => onConfirm(itemsSeleccionados, subEstadoDestino)}
+              onClick={() => {
+                const h = parseInt(horas || '0', 10);
+                const m = parseInt(minutos || '0', 10);
+                const totalMin = (Number.isNaN(h) ? 0 : h) * 60 + (Number.isNaN(m) ? 0 : m);
+                onConfirm(itemsSeleccionados, subEstadoDestino, totalMin > 0 ? totalMin : undefined);
+              }}
               disabled={itemsSeleccionados.length === 0 || cargando}
               className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
             >
