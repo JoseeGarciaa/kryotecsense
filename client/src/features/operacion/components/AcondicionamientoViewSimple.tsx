@@ -356,8 +356,20 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                             || completadosPorNombre.get(normalize(item.nombre_unidad))
                             || (item.rfid ? completadosPorNombre.get(normalize(item.rfid)) : undefined);
 
+                          // Solo considerar 'Completo' si el timer pertenece a esta etapa (iniciado después de que el item llegó aquí)
+                          const mostrarCompleto = (() => {
+                            if (!timerCompletado) return false;
+                            try {
+                              const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
+                              const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
+                              if (Number.isNaN(llegadaEtapa)) return true; // si no tenemos referencia, permitir
+                              // margen de 60s por desfases
+                              return inicioTimer >= (llegadaEtapa - 60_000);
+                            } catch { return false; }
+                          })();
+
                           // Completado → mostrar estado 'Completo' con limpiar/editar
-                          if (timerCompletado) {
+                          if (mostrarCompleto) {
                             return (
                               <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
                                 <span className="text-green-600 text-xs font-medium flex items-center gap-1">
@@ -548,7 +560,17 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                             || completadosPorNombre.get(normalize(item.nombre_unidad))
                             || (item.rfid ? completadosPorNombre.get(normalize(item.rfid)) : undefined);
 
-                          if (timerCompletado) {
+                          const mostrarCompleto = (() => {
+                            if (!timerCompletado) return false;
+                            try {
+                              const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
+                              const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
+                              if (Number.isNaN(llegadaEtapa)) return true;
+                              return inicioTimer >= (llegadaEtapa - 60_000);
+                            } catch { return false; }
+                          })();
+
+                          if (mostrarCompleto) {
                             return (
                               <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
                                 <span className="text-green-600 text-xs font-medium flex items-center gap-1">
