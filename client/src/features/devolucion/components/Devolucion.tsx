@@ -13,12 +13,16 @@ export const Devolucion: React.FC = () => {
     error,
     cargarItemsDevolucion,
     marcarComoDevuelto,
-    marcarItemsComoDevueltos
+    marcarItemsComoDevueltos,
+    regresarItemsAOperacion,
+    pasarItemsAInspeccion
   } = useDevolucion();
 
   const [mostrarModal, setMostrarModal] = useState(false);
   const [paginaActual, setPaginaActual] = useState(1);
   const itemsPorPagina = 5;
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<'Cube' | 'VIP' | 'TIC' | null>(null);
+  const [seleccionados, setSeleccionados] = useState<Record<number, boolean>>({});
 
   // Timers para mostrar la cuenta regresiva de Operación (96h)
   const { timers, formatearTiempo } = useTimerContext();
@@ -129,7 +133,7 @@ export const Devolucion: React.FC = () => {
     );
   }
 
-  // Agrupar items por categoría
+  // Agrupar items por categoría (pendientes para devolver o ya devueltos, según tablero)
   const cubesPendientes = itemsDevolucion.filter(item => item.categoria === 'Cube');
   const vipsPendientes = itemsDevolucion.filter(item => item.categoria === 'VIP');
   const ticsPendientes = itemsDevolucion.filter(item => item.categoria === 'TIC');
@@ -137,6 +141,30 @@ export const Devolucion: React.FC = () => {
   const cubesDevueltos = itemsDevueltos.filter(item => item.categoria === 'Cube');
   const vipsDevueltos = itemsDevueltos.filter(item => item.categoria === 'VIP');
   const ticsDevueltos = itemsDevueltos.filter(item => item.categoria === 'TIC');
+
+  // Datos del panel de Items Devueltos (siempre visibles con conteo 0)
+  const resumenDevueltos = [
+    { key: 'Cube' as const, titulo: 'Cubes', color: 'text-blue-800', bg: 'bg-blue-50', count: cubesDevueltos.length },
+    { key: 'VIP' as const, titulo: 'VIPs', color: 'text-green-800', bg: 'bg-green-50', count: vipsDevueltos.length },
+    { key: 'TIC' as const, titulo: 'TICs', color: 'text-yellow-800', bg: 'bg-yellow-50', count: ticsDevueltos.length },
+  ];
+
+  const itemsDevueltosDeCategoria = useMemo(() => {
+    if (categoriaSeleccionada === 'Cube') return cubesDevueltos;
+    if (categoriaSeleccionada === 'VIP') return vipsDevueltos;
+    if (categoriaSeleccionada === 'TIC') return ticsDevueltos;
+    return [];
+  }, [categoriaSeleccionada, cubesDevueltos, vipsDevueltos, ticsDevueltos]);
+
+  const toggleSeleccion = (id: number) => {
+    setSeleccionados(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const seleccionarTodos = (valor: boolean) => {
+    const map: Record<number, boolean> = {};
+    itemsDevueltosDeCategoria.forEach(i => { map[i.id] = valor; });
+    setSeleccionados(map);
+  };
 
   return (
   <div className="flex-1 overflow-hidden bg-white">
@@ -350,7 +378,7 @@ export const Devolucion: React.FC = () => {
           )}
         </div>
 
-        {/* Items Devueltos */}
+        {/* Items Devueltos - Siempre visibles con conteo y navegables por categoría */}
         <div className="bg-white rounded-lg shadow border border-gray-200">
           <div className="bg-green-50 border-b border-green-200 px-4 sm:px-6 py-3 sm:py-4">
             <h3 className="text-base sm:text-lg font-semibold text-green-800 flex items-center">
@@ -361,174 +389,105 @@ export const Devolucion: React.FC = () => {
               </span>
             </h3>
           </div>
-          <div className="p-3 sm:p-6">
-            {itemsDevueltos.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No hay items devueltos</p>
-              </div>
-            ) : (
-              <>
-                {/* Resumen agrupado por categoría */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
-                  <div className="bg-blue-50 rounded-lg p-3 sm:p-4 text-center">
-                    <Package className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-                    <h4 className="font-semibold text-blue-900">Cubes</h4>
-                    <p className="text-2xl font-bold text-blue-800">
-                      {itemsDevueltos.filter(item => item.categoria === 'Cube').length}
-                    </p>
-                  </div>
-                  <div className="bg-green-50 rounded-lg p-3 sm:p-4 text-center">
-                    <Package className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                    <h4 className="font-semibold text-green-900">VIPs</h4>
-                    <p className="text-2xl font-bold text-green-800">
-                      {itemsDevueltos.filter(item => item.categoria === 'VIP').length}
-                    </p>
-                  </div>
-                  <div className="bg-yellow-50 rounded-lg p-3 sm:p-4 text-center">
-                    <Package className="h-8 w-8 text-yellow-600 mx-auto mb-2" />
-                    <h4 className="font-semibold text-yellow-900">TICs</h4>
-                    <p className="text-2xl font-bold text-yellow-800">
-                      {itemsDevueltos.filter(item => item.categoria === 'TIC').length}
-                    </p>
-                  </div>
-                </div>
-                
-                {/* Lista paginada de items devueltos */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between mb-2 sm:mb-3">
-                    <h4 className="font-medium text-gray-900">Items devueltos:</h4>
-                    <span className="text-xs sm:text-sm text-gray-500">
-                      {itemsDevueltos.length} total{itemsDevueltos.length !== 1 ? 'es' : ''}
-                    </span>
-                  </div>
-                  
-                  {(() => {
-                    const totalPaginas = Math.ceil(itemsDevueltos.length / itemsPorPagina);
-                    const indiceInicio = (paginaActual - 1) * itemsPorPagina;
-                    const indiceFin = indiceInicio + itemsPorPagina;
-                    const itemsPaginaActual = itemsDevueltos.slice(indiceInicio, indiceFin);
-                    
-                    return (
-                      <>
-                        {itemsPaginaActual.map((item) => {
-                          // Timer visible también en devueltos
-                          const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-                          const info = infoPorId.get(item.id) 
-                            || infoPorNombre.get(normalize(item.nombre_unidad))
-                            || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
-                          const secs = info?.seconds ?? 0;
-                          const puedeRegresarAOpe = secs >= 48*3600; // 48h
-
-                          return (
-                            <div key={item.id} className="bg-green-50 rounded-lg p-3 flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                                <div>
-                                  <h4 className="text-sm font-medium text-gray-900">{item.nombre_unidad}</h4>
-                                  <p className="text-xs text-gray-600">{item.categoria} • Lote: {item.lote}</p>
-                                  <div className="mt-1 flex items-center gap-2">
-                                    <span className="text-[10px] sm:text-xs text-green-700 font-medium bg-green-100 px-2 py-0.5 rounded">Devuelto</span>
-                                    {info && (
-                                      <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo de operación restante">
-                                        ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
+          <div className="p-3 sm:p-6 space-y-4">
+            {/* Resumen por categoría (clickeable) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+              {resumenDevueltos.map(card => (
                 <button
-                                  disabled={!puedeRegresarAOpe}
-                                  title={puedeRegresarAOpe ? 'Regresar a Operación (continúa el tiempo)' : 'Disponible cuando queden ≥ 48h'}
-                                  className={`px-3 py-1 text-xs rounded-md border ${puedeRegresarAOpe ? 'border-blue-300 text-blue-700 hover:bg-blue-50' : 'border-gray-200 text-gray-400 cursor-not-allowed'}`}
-                                  onClick={() => {
-                  if (!puedeRegresarAOpe) return;
-                  const ok = window.confirm(`¿Regresar "${item.nombre_unidad}" a Operación?\n\nEl cronómetro continuará desde el tiempo actual.`);
-                  if (!ok) return;
-                  // Emitir evento para mover a operación; dejamos el timer activo
-                  window.dispatchEvent(new CustomEvent('devolucion:regresar-operacion', { detail: { id: item.id, nombre: item.nombre_unidad } }));
-                                  }}
-                                >
-                                  Regresar a Operación
-                                </button>
-                                <button
-                                  className="px-3 py-1 text-xs rounded-md border border-purple-300 text-purple-700 hover:bg-purple-50"
-                                  title="Pasar a Inspección (cancela el tiempo)"
-                                  onClick={() => {
-                  const ok = window.confirm(`¿Pasar "${item.nombre_unidad}" a Inspección?\n\nEsto cancelará el cronómetro de operación.`);
-                  if (!ok) return;
-                  window.dispatchEvent(new CustomEvent('devolucion:pasar-inspeccion', { detail: { id: item.id, nombre: item.nombre_unidad } }));
-                                  }}
-                                >
-                                  Pasar a Inspección
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                        
-                        {/* Paginación */}
-                        {totalPaginas > 1 && (
-                          <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-200">
-                            <div className="text-sm text-gray-500">
-                              Mostrando {indiceInicio + 1} a {Math.min(indiceFin, itemsDevueltos.length)} de {itemsDevueltos.length} items
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => setPaginaActual(prev => Math.max(prev - 1, 1))}
-                                disabled={paginaActual === 1}
-                                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                ‹ Anterior
-                              </button>
-                              
-                              <div className="flex items-center space-x-1">
-                                {Array.from({ length: totalPaginas }, (_, i) => i + 1).map(numeroPagina => {
-                                  // Mostrar solo algunas páginas alrededor de la actual
-                                  if (
-                                    numeroPagina === 1 ||
-                                    numeroPagina === totalPaginas ||
-                                    (numeroPagina >= paginaActual - 1 && numeroPagina <= paginaActual + 1)
-                                  ) {
-                                    return (
-                                      <button
-                                        key={numeroPagina}
-                                        onClick={() => setPaginaActual(numeroPagina)}
-                                        className={`px-3 py-1 text-sm border rounded-md ${
-                                          paginaActual === numeroPagina
-                                            ? 'bg-blue-600 text-white border-blue-600'
-                                            : 'border-gray-300 hover:bg-white'
-                                        }`}
-                                      >
-                                        {numeroPagina}
-                                      </button>
-                                    );
-                                  } else if (
-                                    numeroPagina === paginaActual - 2 ||
-                                    numeroPagina === paginaActual + 2
-                                  ) {
-                                    return <span key={numeroPagina} className="px-2 text-gray-400">…</span>;
-                                  }
-                                  return null;
-                                })}
-                              </div>
-                              
-                              <button
-                                onClick={() => setPaginaActual(prev => Math.min(prev + 1, totalPaginas))}
-                                disabled={paginaActual === totalPaginas}
-                                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                Siguiente ›
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
+                  key={card.key}
+                  onClick={() => {
+                    setCategoriaSeleccionada(prev => (prev === card.key ? null : card.key));
+                    setSeleccionados({});
+                  }}
+                  className={`rounded-lg p-3 sm:p-4 text-center border transition-colors ${card.bg} ${categoriaSeleccionada === card.key ? 'ring-2 ring-offset-1 ring-green-400' : 'border-transparent hover:border-gray-200'}`}
+                  title={`Ver ${card.titulo} devueltos`}
+                >
+                  <Package className={`h-8 w-8 mx-auto mb-2 ${card.color.replace('text-', 'text-')}`} />
+                  <h4 className={`font-semibold ${card.color.replace('text-', 'text-')}`}>{card.titulo}</h4>
+                  <p className={`text-2xl font-bold ${card.color}`}>{card.count}</p>
+                </button>
+              ))}
+            </div>
+
+            {/* Panel de la categoría seleccionada */}
+            {categoriaSeleccionada && (
+              <div className="mt-2 border rounded-lg">
+                <div className="flex items-center justify-between p-3 bg-gray-50 border-b rounded-t-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{categoriaSeleccionada} devueltos</span>
+                    <span className="text-xs text-gray-500">{itemsDevueltosDeCategoria.length} items</span>
+                  </div>
+                  {itemsDevueltosDeCategoria.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-white"
+                        onClick={() => seleccionarTodos(true)}
+                      >Seleccionar todos</button>
+                      <button
+                        className="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-white"
+                        onClick={() => seleccionarTodos(false)}
+                      >Limpiar</button>
+                    </div>
+                  )}
                 </div>
-              </>
+                <div className="p-3 space-y-2 max-h-96 overflow-y-auto">
+                  {itemsDevueltosDeCategoria.length === 0 ? (
+                    <div className="text-center text-gray-500 py-8">No hay items devueltos en esta categoría</div>
+                  ) : (
+                    itemsDevueltosDeCategoria.map(item => (
+                      <label key={item.id} className="flex items-center justify-between bg-green-50 border border-green-200 rounded p-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={!!seleccionados[item.id]}
+                            onChange={() => toggleSeleccion(item.id)}
+                          />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{item.nombre_unidad}</div>
+                            <div className="text-xs text-gray-600">Lote: {item.lote} • RFID: {item.rfid || 'N/A'}</div>
+                          </div>
+                        </div>
+                        <span className="text-[10px] sm:text-xs text-green-700 font-medium bg-green-100 px-2 py-0.5 rounded">Devuelto</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+                {itemsDevueltosDeCategoria.length > 0 && (
+                  <div className="p-3 border-t flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+                    <div className="text-xs text-gray-600">
+                      {Object.values(seleccionados).filter(Boolean).length} seleccionados
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        className="px-3 py-2 text-xs sm:text-sm rounded-md border border-blue-300 text-blue-700 hover:bg-blue-50"
+                        onClick={async () => {
+                          const ids = Object.entries(seleccionados).filter(([,v]) => v).map(([k]) => Number(k));
+                          if (ids.length === 0) return;
+                          const ok = window.confirm(`¿Regresar ${ids.length} item(s) a Operación?`);
+                          if (!ok) return;
+                          const nombres: Record<number,string> = {};
+                          itemsDevueltosDeCategoria.forEach(i => { if (ids.includes(i.id)) nombres[i.id] = i.nombre_unidad; });
+                          await regresarItemsAOperacion(ids, nombres);
+                          setSeleccionados({});
+                        }}
+                      >Regresar a Operación</button>
+                      <button
+                        className="px-3 py-2 text-xs sm:text-sm rounded-md border border-purple-300 text-purple-700 hover:bg-purple-50"
+                        onClick={async () => {
+                          const ids = Object.entries(seleccionados).filter(([,v]) => v).map(([k]) => Number(k));
+                          if (ids.length === 0) return;
+                          const ok = window.confirm(`¿Pasar ${ids.length} item(s) a Inspección?`);
+                          if (!ok) return;
+                          const nombres: Record<number,string> = {};
+                          itemsDevueltosDeCategoria.forEach(i => { if (ids.includes(i.id)) nombres[i.id] = i.nombre_unidad; });
+                          await pasarItemsAInspeccion(ids, nombres);
+                          setSeleccionados({});
+                        }}
+                      >Pasar a Inspección</button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>

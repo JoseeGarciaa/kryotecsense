@@ -297,6 +297,72 @@ export const useDevolucion = () => {
     };
   }, [cargarItemsDevolucion, timers, eliminarTimer]);
 
+  // Batch: regresar a Operación
+  const regresarItemsAOperacion = useCallback(async (itemIds: number[], nombres?: Record<number, string>) => {
+    if (!itemIds || itemIds.length === 0) return;
+    try {
+      setError(null);
+      // Ejecutar en paralelo
+      await Promise.all(itemIds.map(async (id) => {
+        const nombre = nombres?.[id];
+        await apiServiceClient.patch(`/inventory/inventario/${id}/estado`, {
+          estado: 'operación',
+          sub_estado: 'En transito'
+        });
+        // Registrar actividad
+        await apiServiceClient.post('/activities/actividades/', {
+          inventario_id: id,
+          usuario_id: 1,
+          descripcion: `${nombre ?? 'Item'} regresado a Operación (cronómetro continúa)`,
+          estado_nuevo: 'operación',
+          sub_estado_nuevo: 'En transito'
+        });
+      }));
+
+      await cargarItemsDevolucion();
+    } catch (err) {
+      console.error('Error regresando items a operación:', err);
+      setError('Error regresando items a operación');
+      throw err;
+    }
+  }, [cargarItemsDevolucion]);
+
+  // Batch: pasar a Inspección (cancela timer de envío y crea timer de inspección 36h)
+  const pasarItemsAInspeccion = useCallback(async (itemIds: number[], nombres?: Record<number, string>) => {
+    if (!itemIds || itemIds.length === 0) return;
+    try {
+      setError(null);
+      await Promise.all(itemIds.map(async (id) => {
+        const nombre = nombres?.[id];
+        // Cancelar timer de envío si existe
+        const timer = timers.find(t => t.tipoOperacion === 'envio' && new RegExp(`^Envío\s+#${id}\s+-`).test(t.nombre));
+        if (timer) eliminarTimer(timer.id);
+
+        // Mover a inspección
+        await apiServiceClient.patch(`/inventory/inventario/${id}/estado`, {
+          estado: 'Inspección',
+          sub_estado: 'Pendiente'
+        });
+        // Crear timer 36h
+        crearTimer(`Inspección #${id} - ${nombre ?? 'Item'}`, 'inspeccion', 36 * 60);
+        // Registrar actividad
+        await apiServiceClient.post('/activities/actividades/', {
+          inventario_id: id,
+          usuario_id: 1,
+          descripcion: `${nombre ?? 'Item'} pasó a Inspección (cronómetro cancelado)`,
+          estado_nuevo: 'Inspección',
+          sub_estado_nuevo: 'Pendiente'
+        });
+      }));
+
+      await cargarItemsDevolucion();
+    } catch (err) {
+      console.error('Error pasando items a inspección:', err);
+      setError('Error pasando items a inspección');
+      throw err;
+    }
+  }, [timers, eliminarTimer, crearTimer, cargarItemsDevolucion]);
+
   return {
     itemsDevolucion,
     itemsDevueltos,
@@ -304,6 +370,8 @@ export const useDevolucion = () => {
     error,
     cargarItemsDevolucion,
     marcarComoDevuelto,
-  marcarItemsComoDevueltos
+  marcarItemsComoDevueltos,
+  regresarItemsAOperacion,
+  pasarItemsAInspeccion
   };
 };
