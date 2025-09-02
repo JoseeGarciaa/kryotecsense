@@ -401,7 +401,7 @@ export const createDragDropHandlers = (
       
       console.log(`✅ [OPTIMIZADO] Actividad y estado actualizados para ${item.nombre_unidad || item.title}`);
 
-      // Si el destino es Inspección, crear un temporizador de 36h para la inspección
+  // Si el destino es Inspección, crear un cronómetro de 36h para la inspección
       try {
         if (destino === 'inspeccion' && typeof createInspectionTimer === 'function') {
           const id = item.id || item.inventario_id;
@@ -411,7 +411,7 @@ export const createDragDropHandlers = (
           }
         }
       } catch (timerErr) {
-        console.warn('⚠️ No se pudo crear el temporizador de inspección:', timerErr);
+        console.warn('⚠️ No se pudo crear el cronómetro de inspección:', timerErr);
       }
       
     } catch (error: any) {

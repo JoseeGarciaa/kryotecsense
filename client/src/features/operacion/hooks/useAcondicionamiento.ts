@@ -9,7 +9,7 @@ import { createUtcTimestamp } from '../../../shared/utils/dateUtils';
  * - Una caja completa = 1 caja + 1 VIP + 6 TICs atemperadas
  * - Condiciones para armar:
  *   * Cajas y VIPs: Disponibles en bodega
- *   * TICs: Deben estar atemperadas Y haber completado su temporizador
+ *   * TICs: Deben estar atemperadas Y haber completado su cronómetro
  * 
  * SUB-ESTADOS:
  * - Ensamblaje: Componentes escaneados y listos para armar cajas completas
@@ -201,7 +201,7 @@ export const useAcondicionamiento = () => {
       es_grupo_principal: true,
       nivel_grupo: 1,
       color_clase: 'bg-blue-50 border-blue-200',
-      descripcion_armado: 'Cajas y VIPs (de bodega) + TICs atemperadas (temporizador completado)'
+  descripcion_armado: 'Cajas y VIPs (de bodega) + TICs atemperadas (cronómetro completado)'
     });
     
     // Card para Listo para despacho (cajas armadas: 1 caja + 1 vip + 6 tics)
@@ -277,7 +277,7 @@ export const useAcondicionamiento = () => {
 
   /**
    * Valida si una TIC está lista para acondicionamiento
-   * Debe estar atemperada Y haber completado su temporizador
+  * Debe estar atemperada Y haber completado su cronómetro
    */
   const validarTicParaAcondicionamiento = (tic: any, timersGlobales?: any[]) => {
     // Debe estar en estado atemperado
@@ -285,7 +285,7 @@ export const useAcondicionamiento = () => {
       return { valida: false, razon: 'TIC no está atemperada' };
     }
 
-    // Verificar que no tenga timers activos
+  // Verificar que no tenga cronómetros activos
     if (timersGlobales) {
       const tieneTimerActivo = timersGlobales.some(timer => 
         timer.nombre === tic.nombre_unidad || 
@@ -294,7 +294,7 @@ export const useAcondicionamiento = () => {
       );
       
       if (tieneTimerActivo) {
-        return { valida: false, razon: 'TIC tiene temporizador activo' };
+        return { valida: false, razon: 'TIC tiene cronómetro activo' };
       }
     }
 

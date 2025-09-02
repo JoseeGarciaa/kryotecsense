@@ -54,7 +54,7 @@ const CompactTimerDisplay: React.FC<CompactTimerDisplayProps> = ({
             <button
               onClick={() => onEliminar(timer.id)}
               className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-white/50"
-              title="Eliminar temporizador"
+              title="Eliminar cronómetro"
             >
               <X size={14} />
             </button>

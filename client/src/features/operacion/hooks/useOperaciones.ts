@@ -1218,8 +1218,8 @@ export const useOperaciones = () => {
         ).join('\n');
         
         const mensaje = itemsConTimers.length === 1 
-          ? `⚠️ La siguiente TIC está en proceso:\n\n${nombresTics}\n\n¿Estás seguro que deseas moverla a bodega?\n\nEsto cancelará el temporizador activo.`
-          : `⚠️ Las siguientes TICs están en proceso:\n\n${nombresTics}\n\n¿Estás seguro que deseas moverlas a bodega?\n\nEsto cancelará los temporizadores activos.`;
+          ? `⚠️ La siguiente TIC está en proceso:\n\n${nombresTics}\n\n¿Estás seguro que deseas moverla a bodega?\n\nEsto cancelará el cronómetro activo.`
+          : `⚠️ Las siguientes TICs están en proceso:\n\n${nombresTics}\n\n¿Estás seguro que deseas moverlas a bodega?\n\nEsto cancelará los cronómetros activos.`;
         
         const confirmar = window.confirm(mensaje);
         
@@ -1427,7 +1427,7 @@ export const useOperaciones = () => {
         const tiempoRestante = timerGlobalActivo ? 
           formatearTiempo(timerGlobalActivo.tiempoRestanteSegundos) : 'activo';
         
-        const mensaje = `⚠️ La TIC "${nombreItem}" está en proceso de ${tipoTimer} (${tiempoRestante}).\n\n¿Estás seguro que deseas moverla a bodega?\n\nEsto cancelará el temporizador activo.`;
+  const mensaje = `⚠️ La TIC "${nombreItem}" está en proceso de ${tipoTimer} (${tiempoRestante}).\n\n¿Estás seguro que deseas moverla a bodega?\n\nEsto cancelará el cronómetro activo.`;
         
         if (!confirm(mensaje)) {
           console.log('❌ Usuario canceló el movimiento de TIC con timer activo');

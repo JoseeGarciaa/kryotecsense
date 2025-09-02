@@ -101,7 +101,7 @@ const TimerModal: React.FC<TimerModalProps> = ({
                   tipoOperacion === 'congelamiento' ? 'text-blue-600' : 'text-orange-600'
                 }`} />
                 <span className="text-sm font-medium text-gray-700">
-                  Configurando temporizador...
+                  Configurando cronómetro...
                 </span>
               </div>
             </div>
@@ -206,7 +206,7 @@ const TimerModal: React.FC<TimerModalProps> = ({
             ) : (
               <>
                 <Play size={16} />
-                Iniciar Temporizador
+                Iniciar Cronómetro
               </>
             )}
           </button>

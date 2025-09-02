@@ -31,7 +31,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-gray-600" />
             <h3 className="text-sm font-semibold text-gray-800">
-              Temporizadores Activos ({timersActivos.length})
+              Cronómetros Activos ({timersActivos.length})
             </h3>
           </div>
         </div>
@@ -60,7 +60,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
                 <button
                   onClick={() => onEliminar(timer.id)}
                   className="text-gray-400 hover:text-red-500 transition-colors"
-                  title="Eliminar temporizador"
+                  title="Eliminar cronómetro"
                 >
                   <X size={14} />
                 </button>

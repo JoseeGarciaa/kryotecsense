@@ -158,12 +158,12 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
     }
     
     const nombreItem = item.nombre_unidad || item.title || 'TIC';
-    const confirmacion = window.confirm(
+      const confirmacion = window.confirm(
       `¿Estás seguro de que quieres devolver "${nombreItem}" a bodega?\n\n` +
       `Esto hará lo siguiente:\n` +
       `• Cambiará el estado a "En bodega - Disponible"\n` +
       `• Creará un registro de la actividad\n` +
-      `• Detendrá cualquier temporizador activo\n\n` +
+        `• Detendrá cualquier cronómetro activo\n\n` +
       `¿Continuar?`
     );
     
@@ -207,7 +207,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
       `Esto hará lo siguiente:\n` +
       `• Cambiará el estado de todos los items a "En bodega - Disponible"\n` +
       `• Creará registros de actividad para cada item\n` +
-      `• Detendrá cualquier temporizador activo\n\n` +
+      `• Detendrá cualquier cronómetro activo\n\n` +
       `¿Continuar?`
     );
     
@@ -302,7 +302,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
       // 36h = 2160 minutos
       crearTimer(label, 'inspeccion', 36 * 60);
     } catch (e) {
-      console.warn('No se pudo crear temporizador de inspección:', e);
+      console.warn('No se pudo crear cronómetro de inspección:', e);
     }
   };
 

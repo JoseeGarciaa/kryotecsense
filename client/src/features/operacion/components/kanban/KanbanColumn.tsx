@@ -336,7 +336,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
                                                 </span>
                                             )}
                                             {activos === 0 && completados === 0 && (
-                                                <span className="text-gray-500">Sin temporizadores</span>
+                                                <span className="text-gray-500">Sin cronómetros</span>
                                             )}
                                         </div>
                                     );

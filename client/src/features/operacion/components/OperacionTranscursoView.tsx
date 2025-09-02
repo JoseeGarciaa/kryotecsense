@@ -55,7 +55,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   }, [itemsListosDespacho, modalBusqueda]);
   
 
-  // Estados para modal de temporizador
+  // Estados para modal de cronómetro
   const [mostrarModalTimer, setMostrarModalTimer] = useState(false);
   const [itemIdParaTimer, setItemIdParaTimer] = useState<number | null>(null);
   const [timerEnEdicion, setTimerEnEdicion] = useState<any>(null);
@@ -147,9 +147,9 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     }
   };
 
-  // Función para obtener el temporizador asociado a un item (con logging detallado)
+  // Función para obtener el cronómetro asociado a un item (con logging detallado)
   const obtenerTemporizadorParaItem = useCallback((itemId: number) => {
-    // console.log('🔍 ===== BÚSQUEDA DE TEMPORIZADOR =====');
+  // console.log('🔍 ===== BÚSQUEDA DE CRONÓMETRO =====');
     // console.log('📦 Item ID:', itemId);
     
     // Incluir tanto timers activos como completados
@@ -201,7 +201,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       sub_estado: item.sub_estado
     });
 
-    // Estrategia 3: Buscar timer por nombre del item (incluir completados) - MEJORADA
+  // Estrategia 3: Buscar cronómetro por nombre del item (incluir completados) - MEJORADA
     const posiblesNombres = [
       `Envío #${item.id} - ${item.nombre_unidad}`,
       `Envío #${item.id} - ${item.rfid}`,
@@ -254,7 +254,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       }
     }
 
-    // Estrategia 4: Buscar timer que contenga parte del nombre del item (incluir completados)
+  // Estrategia 4: Buscar cronómetro que contenga parte del nombre del item (incluir completados)
     const timerConNombre = todosLosTimers.find(timer => {
       const nombreTimer = timer.nombre.toLowerCase();
       const nombreItem = (item.nombre_unidad || item.rfid || '').toLowerCase();
@@ -297,7 +297,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       return timerConNombre;
     }
 
-    // Estrategia 5: Para items sin timer, si están en estado "En transito", buscar timers huérfanos de envío
+  // Estrategia 5: Para items sin cronómetro, si están en estado "En transito", buscar cronómetros huérfanos de envío
     if (item.estado === 'operación' && item.sub_estado === 'En transito') {
       const timersEnvioSinAsociar = todosLosTimers.filter(timer => {
         // Es un timer de envío
@@ -346,13 +346,13 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     }
 
     // Log de debugging adicional cuando no se encuentra nada
-    console.log('❌ ===== NO SE ENCONTRÓ TIMER =====');
+  console.log('❌ ===== NO SE ENCONTRÓ CRONÓMETRO =====');
     console.log('❌ Estrategias probadas:');
     console.log('   1. Por registro de envío:', registroEnvio ? `timerId: ${registroEnvio.timerId}` : 'No disponible');
     console.log('   2. Por nombres exactos:', posiblesNombres);
     console.log('   3. Por coincidencia parcial con:', item.nombre_unidad);
-    console.log('   4. Por timers huérfanos de envío para items en tránsito');
-    console.log('❌ Timers en contexto:', todosLosTimers.map(t => `"${t.nombre}" (tipo: ${t.tipoOperacion}, completado: ${t.completado}, activo: ${t.activo})`));
+  console.log('   4. Por cronómetros huérfanos de envío para items en tránsito');
+  console.log('❌ Cronómetros en contexto:', todosLosTimers.map(t => `"${t.nombre}" (tipo: ${t.tipoOperacion}, completado: ${t.completado}, activo: ${t.activo})`));
     console.log('❌ Items en envío:', envio.itemsEnEnvio.map(e => ({ id: e.id, timerId: e.timerId, nombre: e.nombre_unidad })));
     
     return undefined;
@@ -363,11 +363,11 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     if (!timer) {
       return (
         <div className="flex flex-col items-center space-y-2">
-          <span className="text-gray-400 text-xs">Sin temporizador</span>
+          <span className="text-gray-400 text-xs">Sin cronómetro</span>
           <button
             onClick={() => iniciarTemporizadorParaItem(itemId)}
             className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors text-xs"
-            title="Iniciar temporizador de envío"
+            title="Iniciar cronómetro de envío"
           >
             <Clock className="w-3 h-3" />
             Iniciar
@@ -376,7 +376,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       );
     }
 
-    // Si el timer está completado, mostrar estado completado
+  // Si el cronómetro está completado, mostrar estado completado
     if (timer.completado) {
       return (
         <div className="flex flex-col items-center space-y-2">
@@ -393,7 +393,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
             <button
               onClick={() => editarTemporizadorItem(itemId, timer)}
               className="p-1 rounded-md hover:bg-gray-100 transition-colors"
-              title="Crear nuevo temporizador"
+              title="Crear nuevo cronómetro"
             >
               <Clock className="w-3 h-3 text-blue-600" />
             </button>
@@ -460,7 +460,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
           <button
             onClick={() => editarTemporizadorItem(itemId, timer)}
             className="p-1 rounded-md hover:bg-gray-100 transition-colors"
-            title="Editar temporizador"
+            title="Editar cronómetro"
           >
             <Clock className="w-3 h-3 text-blue-600" />
           </button>
@@ -485,7 +485,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     }
   };
 
-  // Función para iniciar temporizador para un item específico
+  // Función para iniciar cronómetro para un item específico
   const iniciarTemporizadorParaItem = (itemId: number) => {
   // Abrir modal para configurar tiempo con default 96h
   setItemIdParaTimer(itemId);
@@ -493,14 +493,14 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   setMostrarModalTimer(true);
   };
 
-  // Función para editar temporizador existente
+  // Función para editar cronómetro existente
   const editarTemporizadorItem = (itemId: number, timer: any) => {
     setItemIdParaTimer(itemId);
     setTimerEnEdicion(timer);
     setMostrarModalTimer(true);
   };
 
-  // Función para confirmar temporizador (crear o editar)
+  // Función para confirmar cronómetro (crear o editar)
   const confirmarTemporizador = async (tiempoMinutos: number) => {
     if (!itemIdParaTimer) return;
 
@@ -557,7 +557,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       setTimerEnEdicion(null);
 
     } catch (error) {
-      console.error('Error configurando temporizador:', error);
+  console.error('Error configurando cronómetro:', error);
     } finally {
       setCargandoTimer(false);
     }
@@ -855,7 +855,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     CATEGORÍA
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    TEMPORIZADOR
+                    CRONÓMETRO
                   </th>
                 </tr>
               </thead>
@@ -1056,7 +1056,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
         </div>
       )}
 
-      {/* Modal de Temporizador */}
+  {/* Modal de Cronómetro */}
       {mostrarModalTimer && itemIdParaTimer && (
         <TimerModal
           mostrarModal={mostrarModalTimer}
@@ -1068,8 +1068,8 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
             }
           }}
           onConfirmar={confirmarTemporizador}
-          titulo={timerEnEdicion ? 'Editar Temporizador de Envío' : 'Configurar Temporizador de Envío'}
-          descripcion={`Configure el tiempo de envío para el item. ${timerEnEdicion ? 'Editando temporizador existente.' : 'Se creará un nuevo temporizador.'}`}
+      titulo={timerEnEdicion ? 'Editar Cronómetro de Envío' : 'Configurar Cronómetro de Envío'}
+      descripcion={`Configura el tiempo de envío para el item. ${timerEnEdicion ? 'Editando cronómetro existente.' : 'Se creará un nuevo cronómetro.'}`}
           tipoOperacion="envio"
           initialMinutes={TIEMPO_ENVIO_MIN}
           cargando={cargandoTimer}

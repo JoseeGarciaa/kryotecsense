@@ -353,14 +353,13 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                           if (!info) {
                             return (
                               <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-500">Sin timer</span>
+                                <span className="text-xs text-gray-500">Sin cronómetro</span>
                                 <button
                                   onClick={() => abrirTemporizadorParaItem(item, 'Ensamblaje')}
                                   className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
-                                  title="Configurar tiempo"
+                                  title="Configurar cronómetro"
                                 >
                                   <Play className="w-3.5 h-3.5" />
-                                  Colocar tiempo
                                 </button>
                               </div>
                             );
@@ -470,14 +469,13 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                           if (!info) {
                             return (
                               <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-500">Sin timer</span>
+                                <span className="text-xs text-gray-500">Sin cronómetro</span>
                                 <button
                                   onClick={() => abrirTemporizadorParaItem(item, 'Lista para Despacho')}
                                   className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
-                                  title="Configurar tiempo"
+                                  title="Configurar cronómetro"
                                 >
                                   <Play className="w-3.5 h-3.5" />
-                                  Colocar tiempo
                                 </button>
                               </div>
                             );
@@ -669,8 +667,8 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
           mostrarModal={mostrarTimerModal}
           onCancelar={() => { setMostrarTimerModal(false); setItemParaTemporizador(null); setDestinoTimer(null); }}
           onConfirmar={(min) => confirmarTemporizador(min)}
-          titulo={`Configurar tiempo • ${destinoTimer}`}
-          descripcion={`Define el tiempo de operación para "${itemParaTemporizador.nombre_unidad}"`}
+          titulo={`Configurar Cronómetro • ${destinoTimer}`}
+          descripcion={`Define el tiempo del cronómetro para "${itemParaTemporizador.nombre_unidad}"`}
           tipoOperacion="envio"
           cargando={cargandoTimer}
         />
