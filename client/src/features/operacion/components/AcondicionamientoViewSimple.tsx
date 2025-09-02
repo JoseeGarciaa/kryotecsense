@@ -172,15 +172,24 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   const cancelarCronometrosDeItems = (itemsMovidos: any[]) => {
     try {
       itemsMovidos.forEach(item => {
-        // Buscar timer por RFID del item
-        const timerAsociado = timers.find(timer => timer.nombre === item.rfid);
-        if (timerAsociado) {
-          console.log(`🔄 Cancelando cronómetro para ${item.rfid}`);
-          try {
-            eliminarTimer(timerAsociado.id);
-          } catch (timerError) {
-            console.warn(`⚠️ Error cancelando cronómetro para ${item.rfid}:`, timerError);
-          }
+        // Cancelar SOLO timers de envío asociados al item
+        const relacionados = timers.filter(t => {
+          if (t.tipoOperacion !== 'envio') return false;
+          const nombre = (t.nombre || '');
+          return (
+            nombre.includes(`#${item.id} -`) ||
+            nombre === String(item.id) ||
+            nombre === item.nombre_unidad ||
+            nombre === item.rfid
+          );
+        });
+        if (relacionados.length > 0) {
+          console.log(`🔄 Cancelando ${relacionados.length} cronómetro(s) de envío para item #${item.id}`);
+          relacionados.forEach(t => {
+            try { eliminarTimer(t.id); } catch (timerError) {
+              console.warn(`⚠️ Error cancelando cronómetro ${t.id} (${t.nombre}) para item #${item.id}:`, timerError);
+            }
+          });
         }
       });
     } catch (error) {
@@ -232,7 +241,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               <button
                 onClick={() => {
                   // Refuerzo: al abrir el modal, forzar una ligera sincronización de timers para evitar vacíos
-                  try { /* lazy import via context not needed here */ } catch {}
+                  try { if (isConnected) forzarSincronizacion(); } catch {}
                   setMostrarModalTraerEnsamblaje(true);
                 }}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
@@ -334,7 +343,10 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                 <p className="text-sm text-green-600">({itemsListaDespacho.length} de {itemsListaDespacho.length})</p>
               </div>
               <button
-                onClick={() => setMostrarModalTraerDespacho(true)}
+                onClick={() => {
+                  try { if (isConnected) forzarSincronizacion(); } catch {}
+                  setMostrarModalTraerDespacho(true);
+                }}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-md hover:bg-orange-700 transition-colors"
               >
                 <Plus className="w-4 h-4" />
@@ -485,6 +497,8 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               try {
                 await actualizarColumnasDesdeBackend();
                 console.log(`🔄 Datos actualizados automáticamente`);
+                // Refuerzo: sincronizar timers para evitar desfases visuales
+                try { forzarSincronizacion(); } catch {}
               } catch (updateError) {
                 console.warn('⚠️ Error actualizando datos (items ya fueron movidos):', updateError);
                 // No lanzar error aquí ya que los items se movieron exitosamente
@@ -559,6 +573,8 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               try {
                 await actualizarColumnasDesdeBackend();
                 console.log(`🔄 Datos actualizados automáticamente`);
+                // Refuerzo: sincronizar timers para evitar desfases visuales
+                try { forzarSincronizacion(); } catch {}
               } catch (updateError) {
                 console.warn('⚠️ Error actualizando datos (items ya fueron movidos):', updateError);
                 // No lanzar error aquí ya que los items se movieron exitosamente
