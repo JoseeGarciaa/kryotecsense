@@ -540,19 +540,24 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   };
 
   // Función para completar un TIC y moverlo al siguiente estado
-  const completarTIC = async (rfid: string, timerCompletado: any) => {
+  const completarTIC = async (
+    rfid: string,
+    timerCompletado: any | null,
+    tipoSeccion?: 'congelamiento' | 'atemperamiento'
+  ) => {
     try {
       // Determinar el siguiente estado basado en el tipo de operación
+      const tipoOp: 'congelamiento' | 'atemperamiento' = timerCompletado?.tipoOperacion || (tipoSeccion as any) || 'congelamiento';
       let siguienteEstado = '';
       let siguienteSubEstado = '';
       let tiempoNuevo = 0; // Tiempo en minutos para el nuevo estado
       
-      if (timerCompletado.tipoOperacion === 'congelamiento') {
+      if (tipoOp === 'congelamiento') {
         // Congelamiento completado → va a Atemperamiento (sin timer por defecto)
         siguienteEstado = 'Pre-acondicionamiento';
         siguienteSubEstado = 'Atemperamiento';
         tiempoNuevo = 0; // No crear timer automáticamente
-      } else if (timerCompletado.tipoOperacion === 'atemperamiento') {
+      } else if (tipoOp === 'atemperamiento') {
   // Atemperamiento completado → va a Acondicionamiento (ensamblaje)
   siguienteEstado = 'Acondicionamiento';
   siguienteSubEstado = 'Ensamblaje';
@@ -562,7 +567,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       console.log(`🔄 Completando TIC ${rfid} - Moviendo a ${siguienteEstado} / ${siguienteSubEstado} con tiempo: ${tiempoNuevo} min`);
 
       // Confirmar con el usuario
-      const mensajeConfirmacion = timerCompletado.tipoOperacion === 'congelamiento' 
+  const mensajeConfirmacion = tipoOp === 'congelamiento' 
         ? `¿Completar el proceso de congelamiento para el TIC ${rfid}?\n\nEsto moverá el TIC a: Atemperamiento (${tiempoNuevo} minutos)`
         : `¿Completar el proceso de atemperamiento para el TIC ${rfid}?\n\nEsto moverá el TIC a: Acondicionamiento`;
       
@@ -576,7 +581,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
 
       // Mover el TIC al siguiente estado
       let resultado: any = false;
-      if (timerCompletado.tipoOperacion === 'congelamiento') {
+  if (tipoOp === 'congelamiento') {
         // Pasar a Atemperamiento dentro de Pre-acondicionamiento
         console.log(`🚀 [DEBUG] Llamando confirmarPreAcondicionamiento con:`, [rfid], siguienteSubEstado);
         resultado = await operaciones.confirmarPreAcondicionamiento([rfid], siguienteSubEstado);
@@ -590,8 +595,12 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       if (resultado || resultado !== false) {
         console.log(`✅ [DEBUG] Actualización exitosa`);
         // Eliminar el timer completado tras actualizar estado
-        eliminarTimer(timerCompletado.id);
-        console.log(`❌ [DEBUG] Timer eliminado: ${timerCompletado.id}`);
+        if (timerCompletado?.id) {
+          eliminarTimer(timerCompletado.id);
+          console.log(`❌ [DEBUG] Timer eliminado: ${timerCompletado.id}`);
+        } else {
+          console.log('ℹ️ [DEBUG] No hay timer persistente que eliminar (completado reciente/fallback)');
+        }
         
   // No crear timer automáticamente al pasar a atemperamiento
   console.log(`ℹ️ [DEBUG] No se crea timer automáticamente para el nuevo estado`);
@@ -601,7 +610,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         await cargarDatos();
         console.log(`✅ [DEBUG] Datos recargados`);
         
-        const mensajeExito = timerCompletado.tipoOperacion === 'congelamiento'
+  const mensajeExito = tipoOp === 'congelamiento'
           ? `✅ TIC ${rfid} completado y movido a Atemperamiento sin timer`
           : `✅ TIC ${rfid} completado y movido a Acondicionamiento`;
         
@@ -750,7 +759,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   // Función para renderizar el temporizador de un TIC
   const renderizarTemporizador = (rfid: string, esAtemperamiento: boolean = false) => {
     // Usar el timer del tipo de la sección; evita arrastrar timers de otra fase
-    const timer = esAtemperamiento
+  const timer = esAtemperamiento
       ? obtenerTimerActivoPorTipo(rfid, 'atemperamiento')
       : obtenerTimerActivoPorTipo(rfid, 'congelamiento');
 
@@ -763,8 +772,13 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     const tipoSeccion = esAtemperamiento ? 'atemperamiento' : 'congelamiento';
     const reciente = !timerCompletado ? getRecentCompletion(rfid, tipoSeccion) : null;
 
-    if (timerCompletado || reciente) {
-      const minutos = timerCompletado ? timerCompletado.tiempoInicialMinutos : (reciente?.minutes ?? 0);
+    // Si el timer activo llegó a 0s, tratar como completado inmediato (unificado)
+    const ceroAlcanzado = timer && ((timer.tiempoRestanteSegundos ?? 0) <= 0);
+
+    if (timerCompletado || reciente || ceroAlcanzado) {
+      const minutos = timerCompletado
+        ? timerCompletado.tiempoInicialMinutos
+        : (reciente?.minutes ?? (timer ? timer.tiempoInicialMinutos : 0));
       // Timer completado - mostrar estado completado
       return (
         <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
@@ -776,9 +790,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             {minutos}min
           </div>
           <div className="flex gap-1">
-            {!esAtemperamiento && timerCompletado && (
+            {/* Permitir completar también con fallback reciente o 0s alcanzado en Congelación */}
+            {!esAtemperamiento && (timerCompletado || reciente || ceroAlcanzado) && (
               <button
-                onClick={() => completarTIC(rfid, timerCompletado)}
+                onClick={() => completarTIC(rfid, timerCompletado ?? null, tipoSeccion)}
                 className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
                 title="Completar"
               >

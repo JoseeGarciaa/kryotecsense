@@ -349,18 +349,16 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                       <td className="px-6 py-4 whitespace-nowrap">
                         {(() => {
                           const normalize = (s: string) => s?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-                          const timerActivo = activosPorId.get(item.id)
-                            || activosPorNombre.get(normalize(item.nombre_unidad))
-                            || (item.rfid ? activosPorNombre.get(normalize(item.rfid)) : undefined);
-                          const timerCompletado = completadosPorId.get(item.id)
-                            || completadosPorNombre.get(normalize(item.nombre_unidad))
-                            || (item.rfid ? completadosPorNombre.get(normalize(item.rfid)) : undefined);
+                          // Coincidir cronómetros solo por ID del item para evitar asignación masiva por nombres repetidos
+                          const timerActivo = activosPorId.get(item.id);
+                          const timerCompletado = completadosPorId.get(item.id);
 
-                          // Fallback a reciente completado si el servidor lo limpió
-                          const reciente = !timerCompletado ? getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
-                            || (item.rfid ? getRecentCompletion(`Envío #${item.id} - ${item.rfid}`, 'envio') : null)
-                            || getRecentCompletion(item.nombre_unidad, 'envio')
-                            || (item.rfid ? getRecentCompletion(item.rfid, 'envio') : null)
+                          // Fallback a reciente completado si el servidor lo limpió (usar etiquetas con ID únicamente)
+                          const reciente = !timerCompletado
+                            ? (getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
+                              || (item.rfid ? getRecentCompletion(`Envío #${item.id} - ${item.rfid}`, 'envio') : null)
+                              || getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
+                              || (item.rfid ? getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.rfid}`, 'envio') : null))
                             : null;
                           // Mostrar completo en estos casos:
                           // 1) Hay un timer completado persistente y pasó la compuerta por llegada a la etapa.
@@ -569,19 +567,14 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                       <td className="px-6 py-4 whitespace-nowrap">
                         {(() => {
                           const normalize = (s: string) => s?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-                          const timerActivo = activosPorId.get(item.id)
-                            || activosPorNombre.get(normalize(item.nombre_unidad))
-                            || (item.rfid ? activosPorNombre.get(normalize(item.rfid)) : undefined);
-                          const timerCompletado = completadosPorId.get(item.id)
-                            || completadosPorNombre.get(normalize(item.nombre_unidad))
-                            || (item.rfid ? completadosPorNombre.get(normalize(item.rfid)) : undefined);
+                          const timerActivo = activosPorId.get(item.id);
+                          const timerCompletado = completadosPorId.get(item.id);
 
-                          const reciente = !timerCompletado ? getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
-                            || getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
-                            || (item.rfid ? getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.rfid}`, 'envio') : null)
-                            || (item.rfid ? getRecentCompletion(`Envío #${item.id} - ${item.rfid}`, 'envio') : null)
-                            || getRecentCompletion(item.nombre_unidad, 'envio')
-                            || (item.rfid ? getRecentCompletion(item.rfid, 'envio') : null)
+                          const reciente = !timerCompletado
+                            ? (getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
+                              || getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
+                              || (item.rfid ? getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.rfid}`, 'envio') : null)
+                              || (item.rfid ? getRecentCompletion(`Envío #${item.id} - ${item.rfid}`, 'envio') : null))
                             : null;
                           const mostrarCompleto = (() => {
                             if (reciente) return true;

@@ -252,7 +252,9 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
 
             // Mantener optimistas locales no presentes aún en servidor (por nombre)
             const restantesOptimistas = prev.filter(t => t.optimistic && !porIdONombre.has(t.id) && !porIdONombre.has(t.nombre));
-            const combinados = [...normalizadosServidor, ...restantesOptimistas];
+            // Preservar cronómetros completados locales (el servidor a veces no los incluye en el snapshot)
+            const completadosLocales = prev.filter(t => t.completado && !porIdONombre.has(t.id) && !porIdONombre.has(t.nombre));
+            const combinados = [...normalizadosServidor, ...completadosLocales, ...restantesOptimistas];
             localStorage.setItem('kryotec_timers', JSON.stringify(combinados));
             return combinados;
           });
