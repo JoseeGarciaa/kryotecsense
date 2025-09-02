@@ -128,6 +128,7 @@ const TraerDeBodegaModal: React.FC<TraerDeBodegaModalProps> = ({
                   placeholder="Buscar por nombre, RFID o lote..."
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
+                  maxLength={24}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>

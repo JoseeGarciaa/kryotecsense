@@ -132,6 +132,7 @@ const AgregarItemBodegaModal: React.FC<AgregarItemBodegaModalProps> = ({
                     value={busqueda}
                     onChange={(e) => setBusqueda(e.target.value)}
                     placeholder="Buscar por nombre, RFID o lote..."
+                    maxLength={24}
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>

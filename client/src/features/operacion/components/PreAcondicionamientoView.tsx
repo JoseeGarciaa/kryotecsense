@@ -1065,6 +1065,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 setBusquedaCongelamiento(e.target.value);
                 setPaginaActualCongelamiento(1); // Resetear a la primera página al buscar
               }}
+              maxLength={24}
             />
           </div>
         </div>
@@ -1349,6 +1350,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 setBusquedaAtemperamiento(e.target.value);
                 setPaginaActualAtemperamiento(1); // Resetear a la primera página al buscar
               }}
+              maxLength={24}
             />
           </div>
         </div>
