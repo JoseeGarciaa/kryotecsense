@@ -499,7 +499,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
           itemsDisponibles={itemsDisponiblesParaDespacho} // Solo items de Ensamblaje para Lista para Despacho
           subEstadoDestino="Lista para Despacho"
           cargando={cargandoDespacho}
-          onConfirm={async (items, subEstado) => {
+          onConfirm={async (items, subEstado, tiempoOperacionMinutos) => {
             try {
               setCargandoDespacho(true);
               setCargandoActualizacion(true);
@@ -524,7 +524,21 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                 };
                 
                 // Usar PUT en lugar de PATCH, igual que el modal de bodega
-                return apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionItem);
+                await apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionItem);
+
+                // Crear un cronómetro nuevo e independiente para Lista para Despacho si se indicó tiempo
+                if (typeof tiempoOperacionMinutos === 'number' && tiempoOperacionMinutos > 0) {
+                  // eliminar/ignorar cualquier timer de envío anterior asociado a este item
+                  try {
+                    const existentes = timers.filter(t => t.tipoOperacion === 'envio' && (t.nombre || '').includes(`#${item.id} -`) && !t.completado);
+                    existentes.forEach(t => eliminarTimer(t.id));
+                  } catch {}
+                  try {
+                    crearTimer(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio', tiempoOperacionMinutos);
+                  } catch (err) {
+                    console.warn('No se pudo crear timer de despacho para item', item.id, err);
+                  }
+                }
               });
               
               await Promise.all(promesas);
@@ -749,10 +763,10 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
               </button>
             </div>
           </div>
-          {subEstadoDestino === 'Ensamblaje' && (
+      {(subEstadoDestino === 'Ensamblaje' || subEstadoDestino === 'Lista para Despacho') && (
             <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
               <div className="sm:col-span-2">
-                <label className="block text-xs text-gray-600 mb-1">Tiempo de operación (opcional)</label>
+        <label className="block text-xs text-gray-600 mb-1">Tiempo de operación para {subEstadoDestino} (opcional)</label>
                 <div className="flex gap-2">
                   <input
                     type="number"
