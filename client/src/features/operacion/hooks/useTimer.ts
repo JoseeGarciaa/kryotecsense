@@ -109,13 +109,17 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       recentCompletionsRef.current.set(key, { minutes: t.tiempoInicialMinutos, at: Date.now(), startMs });
       // Si es 'envio', guardar también por ID extraído del nombre
       if (t.tipoOperacion === 'envio') {
-        const m = (t.nombre || '').match(/#(\d+)\s*-\s*/);
+        // Buscar patrón #ID en nombres como "Envío #123 - ..." o "Envío (Despacho) #123 - ..."
+        const m = (t.nombre || '').match(/#(\d+)(?:\s*-|$)/);
         if (m && m[1]) {
           const id = Number(m[1]);
           if (!Number.isNaN(id)) {
             const keyId = `${t.tipoOperacion}|id|${id}`;
             recentCompletionsByIdRef.current.set(keyId, { minutes: t.tiempoInicialMinutos, at: Date.now(), startMs });
+            console.log(`✅ Marcado timer completado reciente por ID ${id}:`, t.nombre);
           }
+        } else {
+          console.log(`⚠️ No se pudo extraer ID del nombre de timer envio:`, t.nombre);
         }
       }
     } catch {}
@@ -140,11 +144,16 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   ): { minutes: number; at: number; startMs: number } | null => {
     const key = `${tipoOperacion}|id|${itemId}`;
     const val = recentCompletionsByIdRef.current.get(key);
-    if (!val) return null;
-    if (Date.now() - val.at > RECENT_TTL_MS) {
-      recentCompletionsByIdRef.current.delete(key);
+    if (!val) {
+      console.log(`🔍 No hay completado reciente por ID para ${tipoOperacion}|id|${itemId}`);
       return null;
     }
+    if (Date.now() - val.at > RECENT_TTL_MS) {
+      recentCompletionsByIdRef.current.delete(key);
+      console.log(`⏰ Completado reciente expirado para ${tipoOperacion}|id|${itemId}`);
+      return null;
+    }
+    console.log(`✅ Encontrado completado reciente por ID para ${tipoOperacion}|id|${itemId}:`, val);
     return val;
   };
 
@@ -551,6 +560,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
 
           // Si se completó por conteo local, notificar una sola vez (batch + dedup evita duplicados)
           if (seCompletoAhora) {
+            console.log(`🎯 Timer completado localmente: ${timer.nombre} (${timer.tipoOperacion})`);
             (async () => {
               await mostrarNotificacionCompletado(timer);
               if (onTimerComplete) {

@@ -578,17 +578,33 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                               || getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
                             )
                             : null;
+                          
+                          console.log(`🔍 Lista para Despacho - Item ${item.id}:`, {
+                            timerActivo: timerActivo ? { id: timerActivo.id, nombre: timerActivo.nombre, tiempoRestante: timerActivo.tiempoRestanteSegundos } : null,
+                            timerCompletado: timerCompletado ? { id: timerCompletado.id, nombre: timerCompletado.nombre } : null,
+                            reciente: reciente ? { minutes: reciente.minutes, at: reciente.at } : null
+                          });
+
                           const mostrarCompleto = (() => {
-                            if (reciente) return true;
-                            if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
+                            if (reciente) {
+                              console.log(`✅ Lista para Despacho - Item ${item.id}: Mostrar completo por reciente`);
+                              return true;
+                            }
+                            if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) {
+                              console.log(`✅ Lista para Despacho - Item ${item.id}: Mostrar completo por timer activo en 0`);
+                              return true;
+                            }
                             if (timerCompletado) {
                               const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
                               try {
                                 const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
                                 if (Number.isNaN(llegadaEtapa)) return true;
-                                return inicioTimer >= (llegadaEtapa - 60_000);
+                                const result = inicioTimer >= (llegadaEtapa - 60_000);
+                                console.log(`✅ Lista para Despacho - Item ${item.id}: Mostrar completo por timer completado: ${result}`);
+                                return result;
                               } catch { return false; }
                             }
+                            console.log(`❌ Lista para Despacho - Item ${item.id}: NO mostrar completo`);
                             return false;
                           })();
 
