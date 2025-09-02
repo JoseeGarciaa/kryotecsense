@@ -72,6 +72,39 @@ export const DevolucionScanModal: React.FC<DevolucionScanModalProps> = ({
     console.log(`✅ Item escaneado: ${itemEncontrado.nombre_unidad}`);
   };
 
+  // Manejar cambios en input con auto-procesamiento por bloques de 24 caracteres
+  const handleCodigoChange = (valor: string) => {
+    setCodigoEscaneado(valor);
+
+    // Solo auto-procesar cuando el modo escaneo está activo
+    if (!modoEscaneo) return;
+
+    // Limpiar espacios y saltos de línea que suelen enviar algunos lectores
+    const sanitizado = valor.replace(/\s+/g, '');
+
+    if (sanitizado.length >= 24 && sanitizado.length % 24 === 0) {
+      const codigos: string[] = [];
+      for (let i = 0; i < sanitizado.length; i += 24) {
+        const segmento = sanitizado.substring(i, i + 24);
+        if (segmento.length === 24) codigos.push(segmento);
+      }
+
+      // Procesar cada código de 24 caracteres
+      codigos.forEach(c => handleEscanearCodigo(c));
+
+      // Limpiar input para permitir el siguiente lote
+      setCodigoEscaneado('');
+
+      if (codigos.length > 0) {
+        console.log(`🔄 Auto-procesados ${codigos.length} códigos de 24 caracteres`);
+      }
+    } else if (sanitizado.length === 24) {
+      // Procesamiento inmediato cuando se llega a 24 caracteres exactos
+      handleEscanearCodigo(sanitizado);
+      setCodigoEscaneado('');
+    }
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -156,7 +189,7 @@ export const DevolucionScanModal: React.FC<DevolucionScanModalProps> = ({
                 ref={inputRef}
                 type="text"
                 value={codigoEscaneado}
-                onChange={(e) => setCodigoEscaneado(e.target.value)}
+                onChange={(e) => handleCodigoChange(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Escanee o escriba el código del item..."
                 className="w-full sm:flex-1 px-3 sm:px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
