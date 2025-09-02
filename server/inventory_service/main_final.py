@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel
 import sys
 import os
@@ -18,6 +18,13 @@ app = FastAPI(
     description="Microservicio para gestión del inventario de credcubes",
     version="1.0.0"
 )
+
+# Utils: ensure datetimes are timezone-aware (UTC)
+def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    if isinstance(dt, datetime):
+        if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
+            return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 # Schemas básicos
 class ModeloResponse(BaseModel):
@@ -183,6 +190,9 @@ async def get_inventario(
         inventario = []
         for row in result:
             item_dict = dict(row._mapping)
+            # Normalize datetime fields to UTC-aware to serialize with 'Z'
+            item_dict['fecha_ingreso'] = _ensure_utc(item_dict.get('fecha_ingreso'))
+            item_dict['ultima_actualizacion'] = _ensure_utc(item_dict.get('ultima_actualizacion'))
             print(f"  - Unidad: {item_dict.get('nombre_unidad', 'N/A')}, Categoria: {item_dict.get('categoria', 'N/A')}, Fecha: {item_dict.get('fecha_ingreso', 'N/A')}")
             inventario.append(InventarioResponse(**item_dict))
         
@@ -233,7 +243,10 @@ async def create_inventario(
 
         nuevo_item = result.fetchone()
         if nuevo_item:
-            return InventarioResponse(**dict(nuevo_item._mapping))
+            data = dict(nuevo_item._mapping)
+            data['fecha_ingreso'] = _ensure_utc(data.get('fecha_ingreso'))
+            data['ultima_actualizacion'] = _ensure_utc(data.get('ultima_actualizacion'))
+            return InventarioResponse(**data)
         else:
             raise HTTPException(status_code=500, detail="Error creando item en inventario")
             

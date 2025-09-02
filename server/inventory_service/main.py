@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel
 import sys
 import os
@@ -11,6 +11,13 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from shared.database import get_db
 from shared.utils import get_current_user_from_token
+
+# Utils: ensure datetimes are timezone-aware (UTC)
+def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    if isinstance(dt, datetime):
+        if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
+            return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 # Función para generar lotes automáticos
 def generar_lote_automatico(db: Session, tenant_schema: str) -> str:
@@ -111,6 +118,9 @@ class InventarioCreate(BaseModel):
     validacion_goteo: Optional[str] = None
     validacion_desinfeccion: Optional[str] = None
     categoria: Optional[str] = None
+    # Permitir timestamps opcionales provenientes del cliente para sincronizar hora de escaneo
+    fecha_ingreso: Optional[datetime] = None
+    ultima_actualizacion: Optional[datetime] = None
 
 class InventarioUpdate(BaseModel):
     modelo_id: Optional[int] = None
@@ -253,6 +263,9 @@ async def get_inventario(
         inventario = []
         for row in result:
             item_dict = dict(row._mapping)
+            # Normalize datetime fields to UTC-aware to serialize with 'Z'
+            item_dict['fecha_ingreso'] = _ensure_utc(item_dict.get('fecha_ingreso'))
+            item_dict['ultima_actualizacion'] = _ensure_utc(item_dict.get('ultima_actualizacion'))
             print(f"  - Unidad: {item_dict.get('nombre_unidad', 'N/A')}, Categoria: {item_dict.get('categoria', 'N/A')}, Fecha: {item_dict.get('fecha_ingreso', 'N/A')}")
             inventario.append(InventarioResponse(**item_dict))
         
@@ -282,8 +295,8 @@ async def create_inventario(
                 status_code=400, 
                 detail=f"El RFID {inventario.rfid} ya existe en el inventario"
             )
-        
-        # Crear nuevo item
+
+        # Crear nuevo item usando timestamps del cliente si vienen, de lo contrario NOW()
         insert_query = text(f"""
             INSERT INTO {tenant_schema}.inventario_credocubes 
             (modelo_id, nombre_unidad, rfid, lote, estado, sub_estado, 
@@ -291,18 +304,22 @@ async def create_inventario(
              fecha_ingreso, ultima_actualizacion, activo)
             VALUES (:modelo_id, :nombre_unidad, :rfid, :lote, :estado, :sub_estado,
                     :validacion_limpieza, :validacion_goteo, :validacion_desinfeccion, :categoria,
-                    NOW(), NOW(), true)
+                    COALESCE(:fecha_ingreso, NOW()), COALESCE(:ultima_actualizacion, NOW()), true)
             RETURNING id, modelo_id, nombre_unidad, rfid, lote, estado, sub_estado,
                       validacion_limpieza, validacion_goteo, validacion_desinfeccion, categoria,
                       fecha_ingreso, ultima_actualizacion, fecha_vencimiento, activo
         """)
-        
-        result = db.execute(insert_query, inventario.dict())
+
+        params = inventario.dict()
+        result = db.execute(insert_query, params)
         db.commit()
-        
+
         nuevo_item = result.fetchone()
         if nuevo_item:
-            return InventarioResponse(**dict(nuevo_item._mapping))
+            data = dict(nuevo_item._mapping)
+            data['fecha_ingreso'] = _ensure_utc(data.get('fecha_ingreso'))
+            data['ultima_actualizacion'] = _ensure_utc(data.get('ultima_actualizacion'))
+            return InventarioResponse(**data)
         else:
             raise HTTPException(status_code=500, detail="Error creando item en inventario")
             
@@ -382,7 +399,10 @@ async def update_inventario(
         
         row = result.fetchone()
         if row:
-            return InventarioResponse(**dict(row._mapping))
+            data = dict(row._mapping)
+            data['fecha_ingreso'] = _ensure_utc(data.get('fecha_ingreso'))
+            data['ultima_actualizacion'] = _ensure_utc(data.get('ultima_actualizacion'))
+            return InventarioResponse(**data)
         else:
             raise HTTPException(status_code=500, detail="Error actualizando inventario")
             
@@ -469,7 +489,10 @@ async def update_inventario_estado(
         row = result.fetchone()
         
         if row:
-            return InventarioResponse(**dict(row._mapping))
+            data = dict(row._mapping)
+            data['fecha_ingreso'] = _ensure_utc(data.get('fecha_ingreso'))
+            data['ultima_actualizacion'] = _ensure_utc(data.get('ultima_actualizacion'))
+            return InventarioResponse(**data)
         else:
             raise HTTPException(status_code=500, detail="Error actualizando estado")
             
