@@ -25,6 +25,12 @@ export const DevolucionScanModal: React.FC<DevolucionScanModalProps> = ({
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
+      // Asegurar que el input quede visible al abrir el teclado en móviles
+      setTimeout(() => {
+        try {
+          inputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        } catch {}
+      }, 50);
     }
   }, [isOpen]);
 
@@ -79,8 +85,8 @@ export const DevolucionScanModal: React.FC<DevolucionScanModalProps> = ({
     // Solo auto-procesar cuando el modo escaneo está activo
     if (!modoEscaneo) return;
 
-    // Limpiar espacios y saltos de línea que suelen enviar algunos lectores
-    const sanitizado = valor.replace(/\s+/g, '');
+  // Limpiar caracteres no alfanuméricos (lectores a veces envían símbolos/CR/LF)
+  const sanitizado = valor.replace(/[^a-zA-Z0-9]/g, '');
 
     if (sanitizado.length >= 24 && sanitizado.length % 24 === 0) {
       const codigos: string[] = [];
@@ -147,7 +153,7 @@ export const DevolucionScanModal: React.FC<DevolucionScanModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-lg shadow-xl w-[92vw] max-w-md sm:max-w-2xl md:max-w-3xl max-h-[88vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl w-[96vw] max-w-lg sm:max-w-2xl md:max-w-3xl max-h-[90dvh] md:max-h-[88vh] overflow-hidden flex flex-col pb-[env(safe-area-inset-bottom)]">
         {/* Header */}
         <div className="bg-blue-50 border-b border-blue-200 px-3 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-start sm:items-center gap-2 sm:gap-3">
@@ -167,7 +173,7 @@ export const DevolucionScanModal: React.FC<DevolucionScanModalProps> = ({
           </button>
         </div>
 
-        <div className="p-3 sm:p-6 overflow-y-auto flex-1">
+        <div className="p-3 sm:p-6 overflow-y-auto flex-1 min-h-0 overscroll-contain">
           {/* Input de escaneo */}
           <div className="mb-4 sm:mb-6">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
@@ -184,21 +190,36 @@ export const DevolucionScanModal: React.FC<DevolucionScanModalProps> = ({
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 min-w-0">
               <input
                 ref={inputRef}
                 type="text"
                 value={codigoEscaneado}
                 onChange={(e) => handleCodigoChange(e.target.value)}
                 onKeyPress={handleKeyPress}
+                onFocus={() => {
+                  // Al abrir teclado, asegurar el input visible
+                  setTimeout(() => {
+                    try {
+                      inputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    } catch {}
+                  }, 50);
+                }}
+                inputMode="text"
+                enterKeyHint="done"
+                autoCapitalize="off"
+                autoCorrect="off"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="Código RFID o nombre del item"
                 placeholder="Escanee o escriba el código del item..."
-                className="w-full sm:flex-1 px-3 sm:px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                className="w-full sm:flex-1 px-3 sm:px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base min-h-[44px] leading-tight"
                 disabled={procesando}
               />
               <button
                 onClick={() => handleEscanearCodigo(codigoEscaneado)}
                 disabled={!codigoEscaneado.trim() || procesando}
-                className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm min-h-[44px]"
               >
                 Agregar
               </button>
