@@ -31,8 +31,8 @@ export const Devolucion: React.FC = () => {
   // Timers para mostrar la cuenta regresiva de Operación (96h)
   const { timers, formatearTiempo } = useTimerContext();
 
-  // Mapa a info de tiempo (segundos + fecha fin) para InlineCountdown, tolerante a "Envio/Envío" y variaciones
-  const { infoPorId, infoPorNombre } = useMemo(() => {
+  // Mapa de tiempo ACTIVO (segundos + fecha fin) únicamente por ID de item
+  const { infoPorId } = useMemo(() => {
     const normalize = (s: string | null | undefined) => {
       if (!s) return '';
       try {
@@ -62,8 +62,7 @@ export const Devolucion: React.FC = () => {
       return { base: n };
     };
 
-    const infoPorId = new Map<number, { seconds: number; endTime: Date }>();
-    const infoPorNombre = new Map<string, { seconds: number; endTime: Date }>();
+  const infoPorId = new Map<number, { seconds: number; endTime: Date }>();
 
     for (const t of timers) {
       if (t.tipoOperacion === 'envio' && t.activo && !t.completado) {
@@ -72,14 +71,9 @@ export const Devolucion: React.FC = () => {
         if (typeof id === 'number' && !Number.isNaN(id)) {
           infoPorId.set(id, data);
         }
-        const normBase = normalize(base);
-        if (normBase) infoPorNombre.set(normBase, data);
-        // También indexar por el nombre completo normalizado como respaldo
-        const normFull = normalize(t.nombre);
-        if (normFull && !infoPorNombre.has(normFull)) infoPorNombre.set(normFull, data);
       }
     }
-    return { infoPorId, infoPorNombre };
+    return { infoPorId };
   }, [timers]);
 
   useEffect(() => {
@@ -265,13 +259,8 @@ export const Devolucion: React.FC = () => {
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-[10px] sm:text-xs text-blue-600 font-medium bg-blue-100 px-2 py-0.5 rounded">Pendiente</span>
                           {(() => {
-                            const normalize = (s: string | null | undefined) => {
-                              if (!s) return '';
-                              try { return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); } catch { return String(s).toLowerCase().trim(); }
-                            };
-                            const info = infoPorId.get(item.id) 
-                              || infoPorNombre.get(normalize(item.nombre_unidad))
-                              || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
+                            // Mostrar cuenta solo si hay cronómetro ACTIVO asociado por ID (evita confusiones por nombres repetidos)
+                            const info = infoPorId.get(item.id);
                             if (!info) return null;
                             return (
                               <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
@@ -313,13 +302,7 @@ export const Devolucion: React.FC = () => {
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-[10px] sm:text-xs text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">Pendiente</span>
                           {(() => {
-                            const normalize = (s: string | null | undefined) => {
-                              if (!s) return '';
-                              try { return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); } catch { return String(s).toLowerCase().trim(); }
-                            };
-                            const info = infoPorId.get(item.id) 
-                              || infoPorNombre.get(normalize(item.nombre_unidad))
-                              || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
+                            const info = infoPorId.get(item.id);
                             if (!info) return null;
                             return (
                               <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
@@ -361,13 +344,7 @@ export const Devolucion: React.FC = () => {
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-[10px] sm:text-xs text-yellow-600 font-medium bg-yellow-100 px-2 py-0.5 rounded">Pendiente</span>
                           {(() => {
-                            const normalize = (s: string | null | undefined) => {
-                              if (!s) return '';
-                              try { return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); } catch { return String(s).toLowerCase().trim(); }
-                            };
-                            const info = infoPorId.get(item.id) 
-                              || infoPorNombre.get(normalize(item.nombre_unidad))
-                              || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
+                            const info = infoPorId.get(item.id);
                             if (!info) return null;
                             return (
                               <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante de operación (96h)">
