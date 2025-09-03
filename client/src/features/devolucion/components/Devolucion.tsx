@@ -30,6 +30,33 @@ export const Devolucion: React.FC = () => {
   // Umbral de tiempo para decidir si puede regresar a Operación o debe ir a Inspección
   const [limiteHoras, setLimiteHoras] = useState<string>('');
   const [limiteMinutos, setLimiteMinutos] = useState<string>('');
+  const [mostrarEditorLimite, setMostrarEditorLimite] = useState(false);
+  const [editHoras, setEditHoras] = useState<string>('');
+  const [editMinutos, setEditMinutos] = useState<string>('');
+
+  // Persistencia simple del umbral
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('devolucionThreshold');
+      if (raw) {
+        const { h, m } = JSON.parse(raw) as { h?: string; m?: string };
+        if (typeof h === 'string') setLimiteHoras(h);
+        if (typeof m === 'string') setLimiteMinutos(m);
+      }
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem('devolucionThreshold', JSON.stringify({ h: limiteHoras, m: limiteMinutos }));
+    } catch {}
+  }, [limiteHoras, limiteMinutos]);
+
+  const thresholdSecs = useMemo(() => {
+    const h = parseInt(limiteHoras || '0', 10);
+    const m = parseInt(limiteMinutos || '0', 10);
+    const total = (Number.isNaN(h) ? 0 : h) * 3600 + (Number.isNaN(m) ? 0 : m) * 60;
+    return total > 0 ? total : 0;
+  }, [limiteHoras, limiteMinutos]);
 
   // Timers para mostrar la cuenta regresiva de Operación (96h)
   const { timers, formatearTiempo } = useTimerContext();
@@ -406,34 +433,66 @@ export const Devolucion: React.FC = () => {
                   </div>
                   {itemsDevueltosDeCategoria.length > 0 && (
                     <div className="flex items-center gap-2 flex-wrap">
-                      {/* Umbral de decisión */}
-                      <div className="flex items-end gap-1">
-                        <div className="flex flex-col">
-                          <span className="text-[11px] text-gray-600">Tiempo límite</span>
-                          <div className="flex gap-1">
-                            <input
-                              type="number"
-                              min={0}
-                              inputMode="numeric"
-                              placeholder="Horas"
-                              value={limiteHoras}
-                              onChange={(e) => setLimiteHoras(e.target.value.replace(/[^0-9]/g, ''))}
-                              className="w-16 px-2 py-1 border rounded text-xs"
-                            />
-                            <input
-                              type="number"
-                              min={0}
-                              max={59}
-                              inputMode="numeric"
-                              placeholder="Minutos"
-                              value={limiteMinutos}
-                              onChange={(e) => setLimiteMinutos(e.target.value.replace(/[^0-9]/g, ''))}
-                              className="w-20 px-2 py-1 border rounded text-xs"
-                            />
+                      {/* Umbral de decisión con botón */}
+                      <div className="flex items-center gap-2">
+                        {thresholdSecs > 0 && (
+                          <span className="text-[11px] bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                            Límite: {Math.floor(thresholdSecs/3600)}h {Math.floor((thresholdSecs%3600)/60)}m
+                          </span>
+                        )}
+                        <button
+                          className="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-white"
+                          onClick={() => {
+                            setEditHoras(limiteHoras);
+                            setEditMinutos(limiteMinutos);
+                            setMostrarEditorLimite(v => !v);
+                          }}
+                          title={thresholdSecs > 0 ? 'Editar tiempo límite' : 'Establecer tiempo límite'}
+                        >{thresholdSecs > 0 ? 'Editar tiempo' : 'Establecer tiempo'}</button>
+                      </div>
+                      {mostrarEditorLimite && (
+                        <div className="flex items-end gap-2 p-2 border rounded bg-white shadow-sm">
+                          <div className="flex flex-col">
+                            <span className="text-[11px] text-gray-600">Tiempo límite</span>
+                            <div className="flex gap-1">
+                              <input
+                                type="number"
+                                min={0}
+                                inputMode="numeric"
+                                placeholder="Horas"
+                                value={editHoras}
+                                onChange={(e) => setEditHoras(e.target.value.replace(/[^0-9]/g, ''))}
+                                className="w-16 px-2 py-1 border rounded text-xs"
+                              />
+                              <input
+                                type="number"
+                                min={0}
+                                max={59}
+                                inputMode="numeric"
+                                placeholder="Minutos"
+                                value={editMinutos}
+                                onChange={(e) => setEditMinutos(e.target.value.replace(/[^0-9]/g, ''))}
+                                className="w-20 px-2 py-1 border rounded text-xs"
+                              />
+                            </div>
+                          </div>
+                          <span className="text-[11px] text-gray-500 ml-1">Si falta menos, sólo Inspección</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              className="px-2 py-1 text-xs rounded border border-green-300 text-green-700 hover:bg-green-50"
+                              onClick={() => {
+                                setLimiteHoras(editHoras);
+                                setLimiteMinutos(editMinutos);
+                                setMostrarEditorLimite(false);
+                              }}
+                            >Guardar</button>
+                            <button
+                              className="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-gray-50"
+                              onClick={() => setMostrarEditorLimite(false)}
+                            >Cancelar</button>
                           </div>
                         </div>
-                        <span className="text-[11px] text-gray-500 ml-1">Si falta menos, sólo Inspección</span>
-                      </div>
+                      )}
                       {/* Selección rápida */}
                       <button
                         className="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-white"
@@ -497,12 +556,6 @@ export const Devolucion: React.FC = () => {
                     </div>
                     {(() => {
                       const selectedIds = Object.entries(seleccionados).filter(([,v]) => v).map(([k]) => Number(k));
-                      const thresholdSecs = (() => {
-                        const h = parseInt(limiteHoras || '0', 10);
-                        const m = parseInt(limiteMinutos || '0', 10);
-                        const total = (Number.isNaN(h) ? 0 : h) * 3600 + (Number.isNaN(m) ? 0 : m) * 60;
-                        return total > 0 ? total : 0;
-                      })();
                       const violates = thresholdSecs > 0 && selectedIds.some(id => {
                         const info = infoPorId.get(id);
                         if (!info) return false; // sin cronómetro activo, no se aplica restricción
