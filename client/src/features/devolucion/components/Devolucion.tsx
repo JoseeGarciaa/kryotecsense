@@ -27,6 +27,9 @@ export const Devolucion: React.FC = () => {
   const [mostrarModalTiempoInspeccion, setMostrarModalTiempoInspeccion] = useState(false);
   const [idsParaInspeccion, setIdsParaInspeccion] = useState<number[]>([]);
   const [nombresParaInspeccion, setNombresParaInspeccion] = useState<Record<number, string>>({});
+  // Umbral de tiempo para decidir si puede regresar a Operación o debe ir a Inspección
+  const [limiteHoras, setLimiteHoras] = useState<string>('');
+  const [limiteMinutos, setLimiteMinutos] = useState<string>('');
 
   // Timers para mostrar la cuenta regresiva de Operación (96h)
   const { timers, formatearTiempo } = useTimerContext();
@@ -396,13 +399,42 @@ export const Devolucion: React.FC = () => {
             {/* Panel de la categoría seleccionada */}
             {categoriaSeleccionada && (
               <div className="mt-2 border rounded-lg">
-                <div className="flex items-center justify-between p-3 bg-gray-50 border-b rounded-t-lg">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between p-3 bg-gray-50 border-b rounded-t-lg">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{categoriaSeleccionada} devueltos</span>
                     <span className="text-xs text-gray-500">{itemsDevueltosDeCategoria.length} items</span>
                   </div>
                   {itemsDevueltosDeCategoria.length > 0 && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Umbral de decisión */}
+                      <div className="flex items-end gap-1">
+                        <div className="flex flex-col">
+                          <span className="text-[11px] text-gray-600">Tiempo límite</span>
+                          <div className="flex gap-1">
+                            <input
+                              type="number"
+                              min={0}
+                              inputMode="numeric"
+                              placeholder="Horas"
+                              value={limiteHoras}
+                              onChange={(e) => setLimiteHoras(e.target.value.replace(/[^0-9]/g, ''))}
+                              className="w-16 px-2 py-1 border rounded text-xs"
+                            />
+                            <input
+                              type="number"
+                              min={0}
+                              max={59}
+                              inputMode="numeric"
+                              placeholder="Minutos"
+                              value={limiteMinutos}
+                              onChange={(e) => setLimiteMinutos(e.target.value.replace(/[^0-9]/g, ''))}
+                              className="w-20 px-2 py-1 border rounded text-xs"
+                            />
+                          </div>
+                        </div>
+                        <span className="text-[11px] text-gray-500 ml-1">Si falta menos, sólo Inspección</span>
+                      </div>
+                      {/* Selección rápida */}
                       <button
                         className="px-2 py-1 text-xs rounded border border-gray-300 hover:bg-white"
                         onClick={() => seleccionarTodos(true)}
@@ -463,35 +495,54 @@ export const Devolucion: React.FC = () => {
                     <div className="text-xs text-gray-600">
                       {Object.values(seleccionados).filter(Boolean).length} seleccionados
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        className="px-3 py-2 text-xs sm:text-sm rounded-md border border-blue-300 text-blue-700 hover:bg-blue-50"
-                        onClick={async () => {
-                          const ids = Object.entries(seleccionados).filter(([,v]) => v).map(([k]) => Number(k));
-                          if (ids.length === 0) return;
-                          const ok = window.confirm(`¿Regresar ${ids.length} item(s) a Operación?`);
-                          if (!ok) return;
-                          const nombres: Record<number,string> = {};
-                          itemsDevueltosDeCategoria.forEach(i => { if (ids.includes(i.id)) nombres[i.id] = i.nombre_unidad; });
-                          await regresarItemsAOperacion(ids, nombres);
-                          setSeleccionados({});
-                        }}
-                      >Regresar a Operación</button>
-                      <button
-                        className="px-3 py-2 text-xs sm:text-sm rounded-md border border-purple-300 text-purple-700 hover:bg-purple-50"
-                        onClick={() => {
-                          const ids = Object.entries(seleccionados).filter(([,v]) => v).map(([k]) => Number(k));
-                          if (ids.length === 0) return;
-                          // Preparar datos y abrir modal estándar de tiempo (obligatorio)
-                          const nombres: Record<number,string> = {};
-                          itemsDevueltosDeCategoria.forEach(i => { if (ids.includes(i.id)) nombres[i.id] = i.nombre_unidad; });
-                          setIdsParaInspeccion(ids);
-                          setNombresParaInspeccion(nombres);
-                          setMostrarModalTiempoInspeccion(true);
-                        }}
-                      >Pasar a Inspección</button>
+                    {(() => {
+                      const selectedIds = Object.entries(seleccionados).filter(([,v]) => v).map(([k]) => Number(k));
+                      const thresholdSecs = (() => {
+                        const h = parseInt(limiteHoras || '0', 10);
+                        const m = parseInt(limiteMinutos || '0', 10);
+                        const total = (Number.isNaN(h) ? 0 : h) * 3600 + (Number.isNaN(m) ? 0 : m) * 60;
+                        return total > 0 ? total : 0;
+                      })();
+                      const violates = thresholdSecs > 0 && selectedIds.some(id => {
+                        const info = infoPorId.get(id);
+                        if (!info) return false; // sin cronómetro activo, no se aplica restricción
+                        return (info.seconds ?? 0) < thresholdSecs;
+                      });
+                      return (
+                        <div className="flex gap-2">
+                          <button
+                            className={`px-3 py-2 text-xs sm:text-sm rounded-md border ${violates ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-blue-300 text-blue-700 hover:bg-blue-50'}`}
+                            title={violates ? 'Algún item supera la restricción: si falta menos que el tiempo límite, debe ir a Inspección' : 'Regresar a Operación'}
+                            disabled={selectedIds.length === 0 || violates}
+                            onClick={async () => {
+                              if (selectedIds.length === 0) return;
+                              if (violates) {
+                                alert('No se puede regresar a Operación: hay items con tiempo restante menor al límite. Envíalos a Inspección.');
+                                return;
+                              }
+                              const ok = window.confirm(`¿Regresar ${selectedIds.length} item(s) a Operación?`);
+                              if (!ok) return;
+                              const nombres: Record<number,string> = {};
+                              itemsDevueltosDeCategoria.forEach(i => { if (selectedIds.includes(i.id)) nombres[i.id] = i.nombre_unidad; });
+                              await regresarItemsAOperacion(selectedIds, nombres);
+                              setSeleccionados({});
+                            }}
+                          >Regresar a Operación</button>
+                          <button
+                            className="px-3 py-2 text-xs sm:text-sm rounded-md border border-purple-300 text-purple-700 hover:bg-purple-50"
+                            onClick={() => {
+                              if (selectedIds.length === 0) return;
+                              const nombres: Record<number,string> = {};
+                              itemsDevueltosDeCategoria.forEach(i => { if (selectedIds.includes(i.id)) nombres[i.id] = i.nombre_unidad; });
+                              setIdsParaInspeccion(selectedIds);
+                              setNombresParaInspeccion(nombres);
+                              setMostrarModalTiempoInspeccion(true);
+                            }}
+                          >Pasar a Inspección</button>
+                        </div>
+                      );
+                    })()}
                     </div>
-                  </div>
                 )}
               </div>
             )}
