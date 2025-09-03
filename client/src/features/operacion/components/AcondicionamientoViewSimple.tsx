@@ -397,17 +397,13 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                           // 2) Hay un "reciente completado" (mostrar siempre, sin compuerta) para evitar parpadeos a "Sin cronómetro".
                           // 3) El activo llegó a 0s (mostrar siempre, sin compuerta).
                           const mostrarCompleto = (() => {
+                            // Mostrar completo si:
+                            // - hay registro de completado reciente (el servidor pudo limpiar el timer)
+                            // - hay un timer activo que llegó a 0
+                            // - hay un timer completado persistente por ID
                             if (reciente) return true;
                             if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
-                            if (timerCompletado) {
-                              const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
-                              try {
-                                const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
-                                if (Number.isNaN(llegadaEtapa)) return true; // si no tenemos referencia, permitir
-                                // margen de 60s por desfases
-                                return inicioTimer >= (llegadaEtapa - 60_000);
-                              } catch { return false; }
-                            }
+                            if (timerCompletado) return true;
                             return false;
                           })();
 
@@ -613,17 +609,9 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                           // Debug silenciado de estado de cronómetro en Lista para Despacho
 
                           const mostrarCompleto = (() => {
-              if (reciente) { return true; }
-              if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) { return true; }
-                            if (timerCompletado) {
-                              const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
-                              try {
-                                const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
-                                if (Number.isNaN(llegadaEtapa)) return true;
-                const result = inicioTimer >= (llegadaEtapa - 60_000);
-                return result;
-                              } catch { return false; }
-                            }
+                            if (reciente) return true;
+                            if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
+                            if (timerCompletado) return true;
                             return false;
                           })();
 
