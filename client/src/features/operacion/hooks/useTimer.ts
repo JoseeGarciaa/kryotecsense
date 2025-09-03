@@ -237,7 +237,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         // Sincronización completa desde el servidor
   // console.log('✅ Sincronización recibida del servidor');
         
-        if (lastMessage.data.timers) {
+  if (Array.isArray(lastMessage.data.timers)) {
           // Mezclar con el estado actual para conservar el decremento local de 1s salvo drift significativo
           setTimers(prev => {
             const porIdONombre = new Map<string, Timer>();
@@ -316,11 +316,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
           
           // const count = Array.isArray(lastMessage.data.timers) ? lastMessage.data.timers.length : 0;
           // console.log(`🔄 ${count} timers sincronizados desde servidor`);
-        } else {
-          // console.log('📭 Sin timers en el servidor');
-          setTimers([]);
-          localStorage.setItem('kryotec_timers', JSON.stringify([]));
-        }
+  }
         break;
 
       case 'TIMER_CREATED':
