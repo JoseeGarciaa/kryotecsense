@@ -52,7 +52,7 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
    */
   const iniciarEnvio = useCallback(async (
     itemsSeleccionados: any[],
-    tiempoEnvioMinutos?: number // si no viene, reutilizamos el del timer ya creado (96h desde Ensamblaje)
+    tiempoEnvioMinutos?: number // minutos elegidos en el modal; si falta, usar mínimo 1
   ) => {
     setCargandoEnvio(true);
     
@@ -65,47 +65,27 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
       const actualizacionesEstado = [];
       const actividadesCreadas = [];
 
-  // Tiempo de operación: usar el proporcionado (UI) con default 96h
-  const tiempoOperacionMin = tiempoEnvioMinutos ? Math.max(1, Math.floor(tiempoEnvioMinutos)) : 5760;
+  // Tiempo de operación: usar exactamente el proporcionado por la UI; si no viene, forzar mínimo 1 minuto
+  const tiempoOperacionMin = Math.max(1, Math.floor(Number(tiempoEnvioMinutos ?? 1)));
 
       for (const item of itemsSeleccionados) {
-        // Reusar temporizador existente (creado desde Ensamblaje) si existe y está activo
-        const normalize = (s: string) =>
-          (s || '')
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toLowerCase()
-            .trim();
+        // Siempre crear un temporizador nuevo con el tiempo elegido.
+        // Primero eliminar cualquier timer de envío previo asociado a este item (activo o no).
+        try {
+          timers
+            .filter(t => t.tipoOperacion === 'envio' && ((t.nombre || '').includes(`#${item.id} -`) || t.nombre === String(item.id) || t.nombre === item.nombre_unidad || t.nombre === item.rfid))
+            .forEach(t => eliminarTimer(t.id));
+        } catch {}
 
         const expectedName = `Envío #${item.id} - ${item.nombre_unidad}`;
-        const expectedNameNorm = normalize(expectedName);
-        const existingTimer = timers.find(t => {
-          if (t.tipoOperacion !== 'envio' || t.completado !== false) return false;
-          const n = normalize(t.nombre);
-          return n === expectedNameNorm || /envio\s+#\d+\s+-/i.test(n) && n.includes(`#${item.id} -`.toLowerCase());
-        });
-
-        let timerId: string;
-        let fechaInicio: Date;
-        let fechaEstimada: Date;
-        let minutosUsados = tiempoOperacionMin;
-
-        if (existingTimer) {
-          // Reusar existente
-          timerId = existingTimer.id;
-          fechaInicio = new Date(existingTimer.fechaInicio);
-          fechaEstimada = new Date(existingTimer.fechaFin);
-          minutosUsados = existingTimer.tiempoInicialMinutos;
-  } else {
-          // Crear temporizador de envío (nombre incluye ID para coincidencia fiable en Devolución)
-          timerId = crearTimer(
-            expectedName,
-            'envio', // Tipo específico para envíos
-            tiempoOperacionMin
-          );
-          fechaInicio = new Date();
-          fechaEstimada = new Date(fechaInicio.getTime() + (tiempoOperacionMin * 60 * 1000));
-        }
+        const timerId = crearTimer(
+          expectedName,
+          'envio',
+          tiempoOperacionMin
+        );
+        const fechaInicio = new Date();
+        const fechaEstimada = new Date(fechaInicio.getTime() + (tiempoOperacionMin * 60 * 1000));
+        const minutosUsados = tiempoOperacionMin;
 
         // Preparar item para envío
         const itemEnvio: ItemEnvio = {
