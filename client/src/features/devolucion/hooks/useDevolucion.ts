@@ -32,12 +32,18 @@ export const useDevolucion = () => {
         
         if (inventarioResponse.data && Array.isArray(inventarioResponse.data)) {
           // Normalizador: sin tildes y minúsculas
-          const normalize = (s: string | null | undefined) =>
-            (s ?? '')
-              .normalize('NFD')
-              .replace(/\p{Diacritic}/gu, '')
-              .toLowerCase()
-              .trim();
+          const normalize = (s: string | null | undefined) => {
+            if (!s) return '';
+            try {
+              return s
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .trim();
+            } catch {
+              return String(s).toLowerCase().trim();
+            }
+          };
 
           // Filtrar items pendientes de devolución:
           // 1. Items en operación (en tránsito/en transcurso) -> mostrar tiempo restante de 96h

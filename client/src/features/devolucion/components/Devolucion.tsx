@@ -33,15 +33,22 @@ export const Devolucion: React.FC = () => {
 
   // Mapa a info de tiempo (segundos + fecha fin) para InlineCountdown, tolerante a "Envio/Envío" y variaciones
   const { infoPorId, infoPorNombre } = useMemo(() => {
-    const normalize = (s: string) =>
-      s
-        ?.normalize('NFD')
-        // Remover marcas diacríticas (combining marks) sin usar \p{...} por compatibilidad
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .trim() ?? '';
+    const normalize = (s: string | null | undefined) => {
+      if (!s) return '';
+      try {
+        return s
+          .normalize('NFD')
+          // Remover marcas diacríticas (combining marks) sin usar \p{...} por compatibilidad
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .trim();
+      } catch {
+        return String(s).toLowerCase().trim();
+      }
+    };
 
-    const extractFromNombre = (nombre: string): { id?: number; base: string } => {
+    const extractFromNombre = (nombre: string | null | undefined): { id?: number; base: string } => {
+      if (!nombre) return { base: '' };
       // Normalizar para comparar sin acentos y en minúsculas
       const n = normalize(nombre);
       // Acepta "envio" con o sin #ID y guión: "envio #123 - foo" | "envio foo"
@@ -61,14 +68,14 @@ export const Devolucion: React.FC = () => {
     for (const t of timers) {
       if (t.tipoOperacion === 'envio' && t.activo && !t.completado) {
         const data = { seconds: t.tiempoRestanteSegundos, endTime: t.fechaFin };
-  const { id, base } = extractFromNombre(t.nombre);
+        const { id, base } = extractFromNombre(t.nombre);
         if (typeof id === 'number' && !Number.isNaN(id)) {
           infoPorId.set(id, data);
         }
-  const normBase = normalize(base);
+        const normBase = normalize(base);
         if (normBase) infoPorNombre.set(normBase, data);
         // También indexar por el nombre completo normalizado como respaldo
-  const normFull = normalize(t.nombre);
+        const normFull = normalize(t.nombre);
         if (normFull && !infoPorNombre.has(normFull)) infoPorNombre.set(normFull, data);
       }
     }
@@ -100,42 +107,6 @@ export const Devolucion: React.FC = () => {
       console.error('Error al confirmar devolución:', error);
     }
   };
-
-  if (cargando) {
-    return (
-  <div className="flex-1 overflow-hidden bg-white">
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Devolución</h1>
-        </div>
-        <div className="flex-1 overflow-auto p-6">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Cargando items...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-  <div className="flex-1 overflow-hidden bg-white">
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Devolución</h1>
-        </div>
-        <div className="flex-1 overflow-auto p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-              <p className="text-red-800">Error: {error}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Agrupar items por categoría (pendientes para devolver o ya devueltos, según tablero)
   const cubesPendientes = itemsDevolucion.filter(item => item.categoria === 'Cube');
@@ -179,7 +150,30 @@ export const Devolucion: React.FC = () => {
       </div>
       
       <div className="flex-1 overflow-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
-        {/* Instrucciones */}
+        {/* Estados de carga y error sin cortar el flujo de hooks */}
+        {cargando && (
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <div className="flex items-center justify-center h-48">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Cargando items...</p>
+              </div>
+            </div>
+          </div>
+        )}
+        {error && !cargando && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
+              <p className="text-red-800">Error: {error}</p>
+            </div>
+          </div>
+        )}
+
+  {/* No mostrar el resto del contenido mientras carga o con error */}
+  {(cargando || error) ? null : (
+  <>
+  {/* Instrucciones */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
           <h2 className="text-base sm:text-lg font-semibold text-blue-900 mb-2">Proceso de Devolución</h2>
           <ol className="list-decimal list-inside space-y-1 text-blue-800 text-sm">
@@ -271,7 +265,10 @@ export const Devolucion: React.FC = () => {
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-[10px] sm:text-xs text-blue-600 font-medium bg-blue-100 px-2 py-0.5 rounded">Pendiente</span>
                           {(() => {
-                            const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                            const normalize = (s: string | null | undefined) => {
+                              if (!s) return '';
+                              try { return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); } catch { return String(s).toLowerCase().trim(); }
+                            };
                             const info = infoPorId.get(item.id) 
                               || infoPorNombre.get(normalize(item.nombre_unidad))
                               || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
@@ -316,7 +313,10 @@ export const Devolucion: React.FC = () => {
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-[10px] sm:text-xs text-green-600 font-medium bg-green-100 px-2 py-0.5 rounded">Pendiente</span>
                           {(() => {
-                            const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                            const normalize = (s: string | null | undefined) => {
+                              if (!s) return '';
+                              try { return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); } catch { return String(s).toLowerCase().trim(); }
+                            };
                             const info = infoPorId.get(item.id) 
                               || infoPorNombre.get(normalize(item.nombre_unidad))
                               || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
@@ -361,7 +361,10 @@ export const Devolucion: React.FC = () => {
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-[10px] sm:text-xs text-yellow-600 font-medium bg-yellow-100 px-2 py-0.5 rounded">Pendiente</span>
                           {(() => {
-                            const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '',).toLowerCase().trim();
+                            const normalize = (s: string | null | undefined) => {
+                              if (!s) return '';
+                              try { return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); } catch { return String(s).toLowerCase().trim(); }
+                            };
                             const info = infoPorId.get(item.id) 
                               || infoPorNombre.get(normalize(item.nombre_unidad))
                               || (item.rfid ? infoPorNombre.get(normalize(item.rfid)) : undefined);
@@ -380,9 +383,9 @@ export const Devolucion: React.FC = () => {
               )}
             </div>
           )}
-        </div>
+  </div>
 
-        {/* Items Devueltos - Siempre visibles con conteo y navegables por categoría */}
+  {/* Items Devueltos - Siempre visibles con conteo y navegables por categoría */}
         <div className="bg-white rounded-lg shadow border border-gray-200">
           <div className="bg-green-50 border-b border-green-200 px-4 sm:px-6 py-3 sm:py-4">
             <h3 className="text-base sm:text-lg font-semibold text-green-800 flex items-center">
@@ -494,10 +497,10 @@ export const Devolucion: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
+    </div>
 
-        {/* Modal de tiempo para Inspección (estándar y obligatorio) */}
-        <TimerModal
+  {/* Modal de tiempo para Inspección (estándar y obligatorio) */}
+  <TimerModal
           mostrarModal={mostrarModalTiempoInspeccion}
           titulo="Tiempo de Inspección"
           descripcion="Define el tiempo de inspección para los items seleccionados. Este tiempo es obligatorio."
@@ -515,6 +518,8 @@ export const Devolucion: React.FC = () => {
             setMostrarModalTiempoInspeccion(false);
           }}
         />
+  </>
+  )}
       </div>
 
       {/* Modal de escaneo */}
