@@ -380,17 +380,14 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                       <td className="px-6 py-4 whitespace-nowrap">
                         {(() => {
                           const normalize = (s: string) => s?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-                          // Coincidir cronómetros solo por ID del item para evitar asignación masiva por nombres repetidos
-                          const timerActivo = activosPorId.get(item.id);
-                          const timerCompletado = completadosPorId.get(item.id);
+                          // Ensamblaje: buscar timers de envío SIN la etiqueta (Despacho) para este ID
+                          const nombreBase = `#${item.id} -`;
+                          const timerActivo = timers.find(t => t.tipoOperacion === 'envio' && t.activo && !t.completado && (t.nombre || '').includes(nombreBase) && !/\(\s*despacho\s*\)/i.test(t.nombre || ''));
+                          const timerCompletado = timers.find(t => t.tipoOperacion === 'envio' && t.completado && (t.nombre || '').includes(nombreBase) && !/\(\s*despacho\s*\)/i.test(t.nombre || ''));
 
-                          // Fallback a reciente completado si el servidor lo limpió (usar etiquetas con ID únicamente)
+                          // Solo considerar "reciente completado" para la variante de Ensamblaje
                           const reciente = !timerCompletado
-                            ? (
-                              getRecentCompletionById('envio', item.id)
-                              || getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
-                              || getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
-                            )
+                            ? getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
                             : null;
                           // Mostrar completo en estos casos:
                           // 1) Hay un timer completado persistente y pasó la compuerta por llegada a la etapa.
@@ -595,15 +592,14 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                       <td className="px-6 py-4 whitespace-nowrap">
                         {(() => {
                           const normalize = (s: string) => s?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-                          const timerActivo = activosPorId.get(item.id);
-                          const timerCompletado = completadosPorId.get(item.id);
+                          // Lista para Despacho: buscar timers de envío CON etiqueta (Despacho) para este ID
+                          const nombreBase = `#${item.id} -`;
+                          const timerActivo = timers.find(t => t.tipoOperacion === 'envio' && t.activo && !t.completado && (t.nombre || '').includes(nombreBase) && /\(\s*despacho\s*\)/i.test(t.nombre || ''));
+                          const timerCompletado = timers.find(t => t.tipoOperacion === 'envio' && t.completado && (t.nombre || '').includes(nombreBase) && /\(\s*despacho\s*\)/i.test(t.nombre || ''));
 
+                          // Solo considerar "reciente completado" para la variante de Despacho
                           const reciente = !timerCompletado
-                            ? (
-                              getRecentCompletionById('envio', item.id)
-                              || getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
-                              || getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
-                            )
+                            ? getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
                             : null;
                           
                           // Debug silenciado de estado de cronómetro en Lista para Despacho
