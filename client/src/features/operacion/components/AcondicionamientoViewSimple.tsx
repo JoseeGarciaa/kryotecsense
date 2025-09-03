@@ -192,16 +192,16 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
           );
         });
         if (relacionados.length > 0) {
-          console.log(`🔄 Cancelando ${relacionados.length} cronómetro(s) de envío para item #${item.id}`);
+      // Silenciado: cancelación de cronómetros relacionados
           relacionados.forEach(t => {
             try { eliminarTimer(t.id); } catch (timerError) {
-              console.warn(`⚠️ Error cancelando cronómetro ${t.id} (${t.nombre}) para item #${item.id}:`, timerError);
+        // Silenciado: error al cancelar cronómetro
             }
           });
         }
       });
     } catch (error) {
-      console.warn('⚠️ Error general cancelando cronómetros:', error);
+    // Silenciado: error general cancelando cronómetros
     }
   };
 
@@ -579,32 +579,20 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                             )
                             : null;
                           
-                          console.log(`🔍 Lista para Despacho - Item ${item.id}:`, {
-                            timerActivo: timerActivo ? { id: timerActivo.id, nombre: timerActivo.nombre, tiempoRestante: timerActivo.tiempoRestanteSegundos } : null,
-                            timerCompletado: timerCompletado ? { id: timerCompletado.id, nombre: timerCompletado.nombre } : null,
-                            reciente: reciente ? { minutes: reciente.minutes, at: reciente.at } : null
-                          });
+                          // Debug silenciado de estado de cronómetro en Lista para Despacho
 
                           const mostrarCompleto = (() => {
-                            if (reciente) {
-                              console.log(`✅ Lista para Despacho - Item ${item.id}: Mostrar completo por reciente`);
-                              return true;
-                            }
-                            if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) {
-                              console.log(`✅ Lista para Despacho - Item ${item.id}: Mostrar completo por timer activo en 0`);
-                              return true;
-                            }
+              if (reciente) { return true; }
+              if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) { return true; }
                             if (timerCompletado) {
                               const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
                               try {
                                 const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
                                 if (Number.isNaN(llegadaEtapa)) return true;
-                                const result = inicioTimer >= (llegadaEtapa - 60_000);
-                                console.log(`✅ Lista para Despacho - Item ${item.id}: Mostrar completo por timer completado: ${result}`);
-                                return result;
+                const result = inicioTimer >= (llegadaEtapa - 60_000);
+                return result;
                               } catch { return false; }
                             }
-                            console.log(`❌ Lista para Despacho - Item ${item.id}: NO mostrar completo`);
                             return false;
                           })();
 
@@ -732,7 +720,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
             try {
               setCargandoEnsamblaje(true);
               setCargandoActualizacion(true);
-              console.log(`🔄 Moviendo ${items.length} items a ${subEstado}...`);
+              // Silenciado: log de movimiento a Ensamblaje
               
               // Cancelar cronómetros de los items que se van a mover
               cancelarCronometrosDeItems(items);
@@ -773,12 +761,12 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               });
               
               await Promise.all(promesas);
-              console.log(`✅ ${items.length} items movidos exitosamente a ${subEstado}`);
+              // Silenciado: movimiento exitoso a Ensamblaje
               
               // Actualizar datos - manejar errores de actualización por separado
               try {
                 await actualizarColumnasDesdeBackend();
-                console.log(`🔄 Datos actualizados automáticamente`);
+                // Silenciado: datos actualizados
                 // Refuerzo: sincronizar timers para evitar desfases visuales
                 try { forzarSincronizacion(); } catch {}
               } catch (updateError) {
@@ -810,7 +798,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
             try {
               setCargandoDespacho(true);
               setCargandoActualizacion(true);
-              console.log(`🔄 Moviendo ${items.length} items de Ensamblaje a ${subEstado}...`);
+              // Silenciado: log de movimiento a Lista para Despacho
               
               // Cancelar cronómetros de los items que se van a mover
               cancelarCronometrosDeItems(items);
@@ -849,12 +837,12 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               });
               
               await Promise.all(promesas);
-              console.log(`✅ ${items.length} items movidos exitosamente de Ensamblaje a ${subEstado}`);
+              // Silenciado: movimiento exitoso a Lista para Despacho
               
               // Actualizar datos - manejar errores de actualización por separado
               try {
                 await actualizarColumnasDesdeBackend();
-                console.log(`🔄 Datos actualizados automáticamente`);
+                // Silenciado: datos actualizados
                 // Refuerzo: sincronizar timers para evitar desfases visuales
                 try { forzarSincronizacion(); } catch {}
               } catch (updateError) {
