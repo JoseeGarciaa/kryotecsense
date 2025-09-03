@@ -75,9 +75,8 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   });
 
   // Filtrar items disponibles específicamente para Lista para Despacho (solo de Ensamblaje)
-  const itemsDisponiblesParaDespacho = inventarioCompleto?.filter(item => 
-    item.estado === 'Acondicionamiento' && item.sub_estado === 'Ensamblaje'
-  ) || [];
+  // Placeholder; se define después de construir índices de timers
+  let itemsDisponiblesParaDespacho: any[] = [];
 
   // Índices de timers de envío (activos y completados) para lookup rápido por id y nombre normalizado
   const { activosPorId, activosPorNombre, completadosPorId, completadosPorNombre } = useMemo(() => {
@@ -126,6 +125,38 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     }
     return { activosPorId, activosPorNombre, completadosPorId, completadosPorNombre };
   }, [timers]);
+
+  // Solo permitir mover a "Lista para Despacho" los items en Ensamblaje cuyo cronómetro de operación (envío) esté COMPLETADO
+  itemsDisponiblesParaDespacho = useMemo(() => {
+    const base = (inventarioCompleto || []).filter(item =>
+      item.estado === 'Acondicionamiento' && item.sub_estado === 'Ensamblaje'
+    );
+
+    return base.filter(item => {
+      // 1) Timer completado persistente por ID
+      const timerCompletado = completadosPorId.get(item.id);
+      if (timerCompletado) {
+        // Validación ligera: el timer debe ser razonablemente reciente respecto a la llegada a Ensamblaje
+        const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
+        try {
+          const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
+          if (Number.isNaN(llegadaEtapa) || inicioTimer >= (llegadaEtapa - 60_000)) return true;
+        } catch { /* continuar con otras heurísticas */ }
+      }
+
+      // 2) Completado reciente (si el servidor ya limpió el timer)
+      const reciente = getRecentCompletionById('envio', item.id)
+        || getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
+        || getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio');
+      if (reciente) return true;
+
+      // 3) Timer activo que ya llegó a 0s (latencia de sync)
+      const timerActivo = activosPorId.get(item.id);
+      if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
+
+      return false;
+    });
+  }, [inventarioCompleto, completadosPorId, activosPorId, getRecentCompletionById, getRecentCompletion]);
 
   // Refuerzo de sincronización al montar para minimizar “—” por desfase
   useEffect(() => {
