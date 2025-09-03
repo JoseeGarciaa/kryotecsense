@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Package, CheckCircle, AlertCircle, Clock, Settings, Shield, Scan } from 'lucide-react';
+import { Package, CheckCircle, AlertCircle, Clock, Settings, Shield, Scan, Search } from 'lucide-react';
 import { useInspeccion, ItemInspeccion } from '../hooks/useInspeccion';
 import { InspeccionScanModal } from './InspeccionScanModal';
 import { useTimerContext } from '../../../contexts/TimerContext';
+import { useDevolucion } from '../../devolucion/hooks/useDevolucion';
 
 export const Inspeccion: React.FC = () => {
   const {
@@ -25,6 +26,32 @@ export const Inspeccion: React.FC = () => {
   const [paginaActual, setPaginaActual] = useState(1);
   const [mostrarModalEscaneo, setMostrarModalEscaneo] = useState(false);
   const itemsPorPagina = 5;
+
+  // Datos de la fase anterior (Devolución) para "Agregar Items"
+  const {
+    itemsDevueltos,
+    cargarItemsDevolucion,
+    pasarItemsAInspeccion
+  } = useDevolucion();
+
+  const [mostrarModalSeleccion, setMostrarModalSeleccion] = useState(false);
+  const [modalBusqueda, setModalBusqueda] = useState('');
+  const [horasInspeccion, setHorasInspeccion] = useState<string>('');
+  const [minutosInspeccion, setMinutosInspeccion] = useState<string>('');
+  const [itemsSeleccionadosModal, setItemsSeleccionadosModal] = useState<number[]>([]);
+
+  // Items elegibles desde la fase previa: en Devolución y marcados como Devuelto
+  const itemsPreviosElegibles = useMemo(() => {
+    return (itemsDevueltos || []).map((i: any) => i);
+  }, [itemsDevueltos]);
+
+  const itemsFiltradosModal = useMemo(() => {
+    const term = modalBusqueda.toLowerCase();
+    return itemsPreviosElegibles.filter((item: any) =>
+      (typeof item.nombre_unidad === 'string' && item.nombre_unidad.toLowerCase().includes(term)) ||
+      (typeof item.rfid === 'string' && item.rfid.toLowerCase().includes(term))
+    );
+  }, [itemsPreviosElegibles, modalBusqueda]);
 
   // Timers de inspección (36h) para mostrar el tiempo restante por item
   const { timers, formatearTiempo } = useTimerContext();
@@ -60,6 +87,13 @@ export const Inspeccion: React.FC = () => {
   useEffect(() => {
     cargarItemsParaInspeccion();
   }, [cargarItemsParaInspeccion]);
+
+  // Cargar también la fase previa cuando abrimos el modal
+  useEffect(() => {
+    if (mostrarModalSeleccion) {
+      try { cargarItemsDevolucion(); } catch {}
+    }
+  }, [mostrarModalSeleccion, cargarItemsDevolucion]);
 
   // Resetear página cuando cambien los items inspeccionados
   useEffect(() => {
@@ -303,6 +337,15 @@ export const Inspeccion: React.FC = () => {
               </div>
               {/* Botones de acción para inspección */}
               <div className="flex items-center gap-2">
+                {/* Agregar Items desde la fase previa (Devolución) */}
+                <button
+                  onClick={() => setMostrarModalSeleccion(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                  title="Agregar items desde Devolución"
+                >
+                  <Package className="w-4 h-4" />
+                  Agregar Items
+                </button>
                 {/* Botón de escaneo RFID - Siempre visible */}
                 <button
                   onClick={() => setMostrarModalEscaneo(true)}
@@ -511,6 +554,170 @@ export const Inspeccion: React.FC = () => {
         itemsEscaneados={itemsEscaneados}
         procesandoEscaneos={procesandoEscaneos}
       />
+
+      {/* Modal de Selección de Items desde Devolución (mismo diseño que otros) */}
+      {mostrarModalSeleccion && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-lg shadow-xl w-[92vw] max-w-md sm:max-w-2xl md:max-w-4xl max-h-[88vh] overflow-hidden flex flex-col">
+            <div className="p-4 sm:p-6 border-b border-gray-200 flex items-start justify-between gap-2">
+              <div>
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Seleccionar items para Inspección</h2>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-2">Disponibles: {itemsPreviosElegibles.length}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setMostrarModalSeleccion(false);
+                  setItemsSeleccionadosModal([]);
+                  setModalBusqueda('');
+                }}
+                aria-label="Cerrar"
+                className="text-gray-500 hover:text-gray-700 p-1 -mt-1"
+                title="Cerrar"
+              >
+                <span className="text-xl leading-none">×</span>
+              </button>
+            </div>
+            <div className="p-4 sm:p-6 flex flex-col gap-4 sm:gap-6 flex-1 overflow-y-auto">
+              {/* Búsqueda y tiempo */}
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Buscar por RFID o nombre..."
+                    value={modalBusqueda}
+                    onChange={(e) => setModalBusqueda(e.target.value)}
+                    maxLength={24}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs text-gray-600 mb-1">Tiempo de inspección (obligatorio)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder="Horas"
+                        value={horasInspeccion}
+                        onChange={(e) => setHorasInspeccion(e.target.value.replace(/[^0-9]/g, ''))}
+                        className="w-24 px-3 py-2 border rounded-md text-sm"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        max={59}
+                        placeholder="Minutos"
+                        value={minutosInspeccion}
+                        onChange={(e) => setMinutosInspeccion(e.target.value.replace(/[^0-9]/g, ''))}
+                        className="w-28 px-3 py-2 border rounded-md text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-500">Debes ingresar horas y/o minutos para crear el cronómetro de inspección.</div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                  <button
+                    onClick={() => setItemsSeleccionadosModal(itemsFiltradosModal.map((i: any) => i.id))}
+                    className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded"
+                  >
+                    Seleccionar todos ({itemsFiltradosModal.length})
+                  </button>
+                  <button
+                    onClick={() => setItemsSeleccionadosModal([])}
+                    className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded"
+                  >
+                    Limpiar selección
+                  </button>
+                  <span className="text-gray-600">{itemsSeleccionadosModal.length} seleccionado(s)</span>
+                </div>
+              </div>
+
+              {/* Lista */}
+              <div className="space-y-2 max-h-[50vh] sm:max-h-[55vh] overflow-y-auto pr-1">
+                {itemsFiltradosModal.length === 0 ? (
+                  <div className="text-center text-gray-500 py-8">
+                    <Package className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-gray-400" />
+                    <p>No hay items que coincidan con la búsqueda</p>
+                  </div>
+                ) : (
+                  itemsFiltradosModal.map((item: any) => {
+                    const selected = itemsSeleccionadosModal.includes(item.id);
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => setItemsSeleccionadosModal(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}
+                        className={`p-3 border rounded cursor-pointer transition-all ${selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <input type="checkbox" checked={selected} onChange={() => {}} className="mt-0.5 rounded" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`px-2 py-0.5 text-[11px] rounded ${
+                                item.categoria === 'TIC' ? 'bg-yellow-100 text-yellow-800' :
+                                item.categoria === 'VIP' ? 'bg-purple-100 text-purple-800' :
+                                item.categoria === 'Cube' ? 'bg-blue-100 text-blue-800' :
+                                'bg-orange-100 text-orange-800'
+                              }`}>
+                                {item.categoria}
+                              </span>
+                              <span className="font-medium text-sm truncate" title={item.nombre_unidad}>{item.nombre_unidad}</span>
+                            </div>
+                            <div className="text-xs text-gray-600 mt-1 break-words">
+                              <span className="mr-2">RFID: {item.rfid || 'N/A'}</span>
+                              {item.lote && <span className="mr-2">Lote: {item.lote}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 sm:p-6 border-t border-gray-200 flex items-center justify-end gap-2 sm:gap-3">
+              <button
+                onClick={() => {
+                  setMostrarModalSeleccion(false);
+                  setItemsSeleccionadosModal([]);
+                  setModalBusqueda('');
+                  setHorasInspeccion('');
+                  setMinutosInspeccion('');
+                }}
+                className="px-4 py-2 text-sm text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  if (itemsSeleccionadosModal.length === 0) return;
+                  const h = parseInt(horasInspeccion || '0', 10);
+                  const m = parseInt(minutosInspeccion || '0', 10);
+                  const totalMin = (Number.isNaN(h) ? 0 : h) * 60 + (Number.isNaN(m) ? 0 : m);
+                  if (totalMin <= 0) { alert('Debes ingresar un tiempo de inspección.'); return; }
+                  const nombres: Record<number,string> = {};
+                  itemsPreviosElegibles.forEach((i: any) => { if (itemsSeleccionadosModal.includes(i.id)) nombres[i.id] = i.nombre_unidad; });
+                  await pasarItemsAInspeccion(itemsSeleccionadosModal, nombres, totalMin);
+                  await cargarItemsParaInspeccion();
+                  setMostrarModalSeleccion(false);
+                  setItemsSeleccionadosModal([]);
+                  setModalBusqueda('');
+                  setHorasInspeccion('');
+                  setMinutosInspeccion('');
+                }}
+                disabled={itemsSeleccionadosModal.length === 0 || ((parseInt(horasInspeccion || '0', 10) * 60 + parseInt(minutosInspeccion || '0', 10)) <= 0)}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                Pasar a Inspección ({itemsSeleccionadosModal.length})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
