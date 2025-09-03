@@ -31,7 +31,7 @@ export const Devolucion: React.FC = () => {
   // Timers para mostrar la cuenta regresiva de Operación (96h)
   const { timers, formatearTiempo } = useTimerContext();
 
-  // Mapa de tiempo ACTIVO (segundos + fecha fin) únicamente por ID de item
+  // Mapa de tiempo ACTIVO por ID de item, incluye: segundos restantes, fecha fin e inicio configurado (minutos)
   const { infoPorId } = useMemo(() => {
     const normalize = (s: string | null | undefined) => {
       if (!s) return '';
@@ -62,11 +62,11 @@ export const Devolucion: React.FC = () => {
       return { base: n };
     };
 
-  const infoPorId = new Map<number, { seconds: number; endTime: Date }>();
+  const infoPorId = new Map<number, { seconds: number; endTime: Date; initialMinutes: number }>();
 
     for (const t of timers) {
       if (t.tipoOperacion === 'envio' && t.activo && !t.completado) {
-        const data = { seconds: t.tiempoRestanteSegundos, endTime: t.fechaFin };
+        const data = { seconds: t.tiempoRestanteSegundos, endTime: t.fechaFin, initialMinutes: t.tiempoInicialMinutos };
         const { id, base } = extractFromNombre(t.nombre);
         if (typeof id === 'number' && !Number.isNaN(id)) {
           infoPorId.set(id, data);
@@ -431,7 +431,29 @@ export const Devolucion: React.FC = () => {
                             <div className="text-xs text-gray-600">Lote: {item.lote} • RFID: {item.rfid || 'N/A'}</div>
                           </div>
                         </div>
-                        <span className="text-[10px] sm:text-xs text-green-700 font-medium bg-green-100 px-2 py-0.5 rounded">Devuelto</span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-[10px] sm:text-xs text-green-700 font-medium bg-green-100 px-2 py-0.5 rounded">Devuelto</span>
+                          {(() => {
+                            const info = infoPorId.get(item.id);
+                            if (!info) return null;
+                            // Mostrar tiempo configurado en Operación (ej: 96h) y el conteo regresivo restante
+                            const horasIniciales = Math.floor(info.initialMinutes / 60);
+                            const minutosIniciales = info.initialMinutes % 60;
+                            const inicialLabel = horasIniciales > 0
+                              ? `${horasIniciales}h${minutosIniciales ? ` ${minutosIniciales}m` : ''}`
+                              : `${minutosIniciales}m`;
+                            return (
+                              <>
+                                <span className="text-[10px] sm:text-xs text-gray-600 bg-gray-100 px-2 py-0.5 rounded" title="Tiempo configurado en Operación">
+                                  Envío: {inicialLabel}
+                                </span>
+                                <span className="text-[10px] sm:text-xs text-gray-700 font-semibold bg-gray-100 px-2 py-0.5 rounded" title="Tiempo restante del envío">
+                                  ⏱ <InlineCountdown endTime={info.endTime} seconds={info.seconds} format={formatearTiempo} />
+                                </span>
+                              </>
+                            );
+                          })()}
+                        </div>
                       </label>
                     ))
                   )}
