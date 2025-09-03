@@ -77,34 +77,13 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     );
     setItemsListosParaDespacho(enTransito);
 
-    // 2) Items disponibles para iniciar envío en modal: en Ensamblaje y con tiempo de envío completado
-    const baseEnsamblaje = (inventarioCompleto || []).filter(
-      (item: any) => item.estado === 'Acondicionamiento' && item.sub_estado === 'Ensamblaje'
+    // 2) Items disponibles para iniciar envío en modal:
+    //    Tomar directamente los que están en Acondicionamiento > Lista para Despacho
+    const baseListaDespacho = (inventarioCompleto || []).filter(
+      (item: any) => item.estado === 'Acondicionamiento' && item.sub_estado === 'Lista para Despacho'
     );
-
-    const filtrados = baseEnsamblaje.filter((item: any) => {
-      // Persistente completado por ID
-      const tComp = completadosPorId.get(item.id);
-      if (tComp) {
-        const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
-        try {
-          const inicioTimer = new Date(tComp.fechaInicio).getTime();
-          if (Number.isNaN(llegadaEtapa) || inicioTimer >= llegadaEtapa - 60_000) return true;
-        } catch {}
-      }
-      // Reciente completado por ID o por nombre común
-      const reciente = getRecentCompletionById('envio', item.id)
-        || getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
-        || getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio');
-      if (reciente) return true;
-      // Activo ya en 0s
-      const tActivo = activosPorId.get(item.id);
-      if (tActivo && (tActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
-      return false;
-    });
-
-    setItemsListosDespacho(filtrados);
-  }, [inventarioCompleto, activosPorId, completadosPorId, getRecentCompletion, getRecentCompletionById]);
+    setItemsListosDespacho(baseListaDespacho);
+  }, [inventarioCompleto]);
   
   // Lista filtrada para el modal (memoizada)
   const itemsFiltradosModal = useMemo(() => {
