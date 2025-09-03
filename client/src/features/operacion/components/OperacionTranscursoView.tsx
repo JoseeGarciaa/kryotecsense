@@ -34,8 +34,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   const [itemsEnTransito, setItemsEnTransito] = useState<ItemEnTransito[]>([]);
   const [itemsListosParaDespacho, setItemsListosParaDespacho] = useState<any[]>([]);
   const [itemsSeleccionados, setItemsSeleccionados] = useState<number[]>([]);
-  // Tiempo de envío predeterminado para TimerModal individual (96h)
-  const TIEMPO_ENVIO_MIN = 96 * 60;
+  // Sin tiempo predeterminado para TimerModal individual (el usuario debe ingresar horas/minutos)
   const [mostrarModalSeleccion, setMostrarModalSeleccion] = useState(false);
   const [itemsListosDespacho, setItemsListosDespacho] = useState<any[]>([]);
   const [itemsSeleccionadosModal, setItemsSeleccionadosModal] = useState<number[]>([]);
@@ -430,7 +429,10 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       }
 
       // Crear nuevo timer de envío con el tiempo elegido
-      const minutosElegidos = tiempoMinutos > 0 ? tiempoMinutos : TIEMPO_ENVIO_MIN;
+      const minutosElegidos = tiempoMinutos; // obligatorio > 0 desde el modal
+      if (!minutosElegidos || minutosElegidos <= 0) {
+        return;
+      }
       const timerId = crearTimer(
         `Envío #${item.id} - ${item.nombre_unidad}`,
         'envio',
@@ -991,7 +993,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       titulo={timerEnEdicion ? 'Editar Cronómetro de Envío' : 'Configurar Cronómetro de Envío'}
       descripcion={`Configura el tiempo de envío para el item. ${timerEnEdicion ? 'Editando cronómetro existente.' : 'Se creará un nuevo cronómetro.'}`}
           tipoOperacion="envio"
-          initialMinutes={TIEMPO_ENVIO_MIN}
+          // Sin valores por defecto, el usuario debe ingresar Horas/Minutos
           cargando={cargandoTimer}
         />
       )}

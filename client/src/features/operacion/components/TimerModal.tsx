@@ -109,14 +109,10 @@ const TimerModal: React.FC<TimerModalProps> = ({
 
           <p className="text-gray-600 mb-6">{descripcion}</p>
 
-          {/* Selector de tiempo personalizado */}
+          {/* Selector de tiempo: solo inputs con placeholder, sin labels por encima */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Tiempo personalizado:
-            </label>
             <div className="flex items-center gap-4">
               <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-1">Horas</label>
                 <input
                   type="number"
                   min={0}
@@ -139,7 +135,6 @@ const TimerModal: React.FC<TimerModalProps> = ({
                 />
               </div>
               <div className="flex-1">
-                <label className="block text-xs text-gray-500 mb-1">Minutos</label>
                 <input
                   type="number"
                   min={0}

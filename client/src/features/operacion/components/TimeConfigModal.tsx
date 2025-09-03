@@ -14,26 +14,28 @@ const TimeConfigModal: React.FC<TimeConfigModalProps> = ({
   onConfirm,
   itemName = 'TIC'
 }) => {
-  const [horas, setHoras] = useState(0);
-  const [minutos, setMinutos] = useState(30);
+  const [horas, setHoras] = useState<string>('');
+  const [minutos, setMinutos] = useState<string>('');
 
   const handleConfirm = () => {
-    if (horas === 0 && minutos === 0) {
+  const h = parseInt(horas || '0', 10) || 0;
+  const m = parseInt(minutos || '0', 10) || 0;
+  if (h === 0 && m === 0) {
       alert('⚠️ Debe configurar al menos 1 minuto');
       return;
     }
-    onConfirm(horas, minutos);
+  onConfirm(h, m);
     onClose();
     // Resetear valores
-    setHoras(0);
-    setMinutos(30);
+  setHoras('');
+  setMinutos('');
   };
 
   const handleCancel = () => {
     onClose();
-    // Resetear valores
-    setHoras(0);
-    setMinutos(30);
+  // Resetear valores
+  setHoras('');
+  setMinutos('');
   };
 
   // Early return después de todos los hooks
@@ -66,50 +68,52 @@ const TimeConfigModal: React.FC<TimeConfigModalProps> = ({
             Configurar tiempo de pre-acondicionamiento para: <span className="font-semibold">{itemName}</span>
           </p>
 
-          {/* Time Inputs */}
+          {/* Time Inputs sin labels; placeholders grises */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Horas */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Horas
-              </label>
               <div className="relative">
                 <input
                   type="number"
                   min="0"
                   max="48"
                   value={horas}
-                  onChange={(e) => setHoras(Math.max(0, Math.min(48, parseInt(e.target.value) || 0)))}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '') { setHoras(''); return; }
+                    const n = Math.max(0, Math.min(48, parseInt(v) || 0));
+                    setHoras(n.toString());
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md 
                            bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                            focus:ring-2 focus:ring-orange-500 focus:border-orange-500
-                           text-center text-lg font-mono"
+                           text-center text-lg font-mono placeholder-gray-400"
                   title="Configurar horas"
-                  placeholder="0"
+                  placeholder="Horas"
                   aria-label="Horas para el cronómetro"
                 />
                 <span className="absolute right-3 top-2 text-sm text-gray-500 dark:text-gray-400">h</span>
               </div>
             </div>
 
-            {/* Minutos */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Minutos
-              </label>
               <div className="relative">
                 <input
                   type="number"
                   min="0"
                   max="59"
                   value={minutos}
-                  onChange={(e) => setMinutos(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '') { setMinutos(''); return; }
+                    const n = Math.max(0, Math.min(59, parseInt(v) || 0));
+                    setMinutos(n.toString());
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md 
                            bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                            focus:ring-2 focus:ring-orange-500 focus:border-orange-500
-                           text-center text-lg font-mono"
+                           text-center text-lg font-mono placeholder-gray-400"
                   title="Configurar minutos"
-                  placeholder="30"
+                  placeholder="Minutos"
                   aria-label="Minutos para el cronómetro"
                 />
                 <span className="absolute right-3 top-2 text-sm text-gray-500 dark:text-gray-400">m</span>
@@ -117,35 +121,35 @@ const TimeConfigModal: React.FC<TimeConfigModalProps> = ({
             </div>
           </div>
 
-          {/* Quick Presets */}
+      {/* Quick Presets */}
           <div className="mt-4">
             <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Presets comunes:
             </p>
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => { setHoras(0); setMinutos(30); }}
+        onClick={() => { setHoras('0'); setMinutos('30'); }}
                 className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
                          rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
               >
                 30 min
               </button>
               <button
-                onClick={() => { setHoras(1); setMinutos(0); }}
+        onClick={() => { setHoras('1'); setMinutos('0'); }}
                 className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
                          rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
               >
                 1 hora
               </button>
               <button
-                onClick={() => { setHoras(2); setMinutos(0); }}
+        onClick={() => { setHoras('2'); setMinutos('0'); }}
                 className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
                          rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
               >
                 2 horas
               </button>
               <button
-                onClick={() => { setHoras(4); setMinutos(0); }}
+        onClick={() => { setHoras('4'); setMinutos('0'); }}
                 className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
                          rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
               >
@@ -159,7 +163,7 @@ const TimeConfigModal: React.FC<TimeConfigModalProps> = ({
             <p className="text-sm text-orange-800 dark:text-orange-200">
               <Clock className="inline h-4 w-4 mr-1" />
               Tiempo configurado: <span className="font-semibold">
-                {horas > 0 ? `${horas}h ` : ''}{minutos}m
+                {(parseInt(horas || '0') > 0 ? `${parseInt(horas)}h ` : '')}{parseInt(minutos || '0')}m
               </span>
             </p>
           </div>
