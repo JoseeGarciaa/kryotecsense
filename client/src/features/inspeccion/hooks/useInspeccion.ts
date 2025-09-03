@@ -419,6 +419,57 @@ export const useInspeccion = () => {
     }
   }, [itemsParaInspeccion, cargarItemsParaInspeccion]);
 
+  // Devolver items inspeccionados a bodega (acción manual)
+  const devolverItemsABodega = useCallback(async (itemIds: number[]) => {
+    if (!itemIds || itemIds.length === 0) return;
+    try {
+      setError(null);
+      for (const itemId of itemIds) {
+        try {
+          // Estado En bodega/Disponible
+          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+            estado: 'En bodega',
+            sub_estado: 'Disponible'
+          });
+        } catch (e) {
+          await new Promise(r => setTimeout(r, 180));
+          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
+            estado: 'En bodega',
+            sub_estado: 'Disponible'
+          });
+        }
+        // Limpiar lote por consistencia
+        await actualizarInventarioConFallback(itemId, { lote: null });
+
+        // Registrar actividad (best-effort)
+        try {
+          const item = itemsParaInspeccion.find(i => String(i.id) === String(itemId))
+            || itemsInspeccionados.find(i => String(i.id) === String(itemId));
+          await apiServiceClient.post('/activities/actividades/', {
+            inventario_id: itemId,
+            usuario_id: 1,
+            descripcion: `${item?.nombre_unidad ?? 'Item'} devuelto a En bodega manualmente desde Inspección`,
+            estado_nuevo: 'En bodega',
+            sub_estado_nuevo: 'Disponible'
+          });
+        } catch {}
+
+        // Cancelar cronómetro de inspección si existe
+        try {
+          const t = timers.find(t => t.tipoOperacion === 'inspeccion' && new RegExp(`^Inspección\\s+#${String(itemId)}\\s+-`).test(t.nombre));
+          if (t) eliminarTimer(t.id);
+        } catch {}
+      }
+
+      // Re-sincronizar
+      await cargarItemsParaInspeccion();
+    } catch (err: any) {
+      const detalle = err?.response?.data?.detail || err?.message || 'Error al devolver a bodega';
+      setError(String(detalle));
+      throw err;
+    }
+  }, [actualizarInventarioConFallback, timers, cargarItemsParaInspeccion, itemsParaInspeccion, itemsInspeccionados]);
+
   // Agregar item a la cola de escaneos (sin procesar inmediatamente)
   const agregarAColaEscaneo = useCallback((item: ItemInspeccion) => {
     // Verificar que el item no esté ya en la cola o ya escaneado
@@ -570,6 +621,7 @@ export const useInspeccion = () => {
     completarInspeccion,
     completarInspeccionEnLote,
     completarInspeccionPorEscaneo,
+  devolverItemsABodega,
     // Estados y funciones para escaneo masivo
     itemsEscaneados,
     procesandoEscaneos,

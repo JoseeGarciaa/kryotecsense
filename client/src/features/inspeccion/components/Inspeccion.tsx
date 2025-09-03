@@ -13,7 +13,8 @@ export const Inspeccion: React.FC = () => {
     cargarItemsParaInspeccion,
     actualizarValidaciones,
     completarInspeccion,
-  completarInspeccionEnLote
+  completarInspeccionEnLote,
+  devolverItemsABodega
   } = useInspeccion();
 
   const [paginaActual, setPaginaActual] = useState(1);
@@ -102,6 +103,9 @@ export const Inspeccion: React.FC = () => {
   const indiceInicio = (paginaActual - 1) * itemsPorPagina;
   const indiceFin = indiceInicio + itemsPorPagina;
   const itemsInspeccionadosPaginados = itemsInspeccionados.slice(indiceInicio, indiceFin);
+  const [seleccionInspeccionados, setSeleccionInspeccionados] = useState<Record<number, boolean>>({});
+  const toggleSel = (id: number) => setSeleccionInspeccionados(prev => ({ ...prev, [id]: !prev[id] }));
+  const limpiarSel = () => setSeleccionInspeccionados({});
 
   // Función para manejar cambios en validaciones
   const handleValidacionChange = (itemId: number, tipo: 'limpieza' | 'goteo' | 'desinfeccion', valor: boolean) => {
@@ -428,10 +432,38 @@ export const Inspeccion: React.FC = () => {
               </div>
             ) : (
               <>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-sm text-gray-700">
+                    {Object.values(seleccionInspeccionados).filter(Boolean).length} seleccionados
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSeleccionInspeccionados(Object.fromEntries(itemsInspeccionados.map(i => [i.id, true])))}
+                      className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-white"
+                    >Seleccionar todos</button>
+                    <button
+                      onClick={limpiarSel}
+                      className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-white"
+                    >Limpiar</button>
+                    <button
+                      onClick={async () => {
+                        const ids = Object.entries(seleccionInspeccionados).filter(([,v]) => v).map(([k]) => Number(k));
+                        if (ids.length === 0) return;
+                        const ok = window.confirm(`¿Devolver ${ids.length} item(s) a bodega?`);
+                        if (!ok) return;
+                        await devolverItemsABodega(ids);
+                        limpiarSel();
+                      }}
+                      disabled={Object.values(seleccionInspeccionados).every(v => !v)}
+                      className="px-3 py-1.5 text-xs sm:text-sm rounded-md border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                    >Devolver a bodega</button>
+                  </div>
+                </div>
                 <div className="space-y-3">
                   {itemsInspeccionadosPaginados.map((item) => (
                     <div key={item.id} className="bg-green-50 rounded-lg p-3 flex items-center justify-between border border-green-200">
                       <div className="flex items-center space-x-3">
+                        <input type="checkbox" checked={!!seleccionInspeccionados[item.id]} onChange={() => toggleSel(item.id)} className="rounded" />
                         <CheckCircle className="h-5 w-5 text-green-600" />
                         <div>
                           <h4 className="text-sm font-medium text-gray-900">{item.nombre_unidad}</h4>
