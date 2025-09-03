@@ -289,11 +289,17 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             const restantesOptimistas = prev.filter(t => t.optimistic && !porIdONombre.has(t.id) && !porIdONombre.has(t.nombre));
             // Preservar cronómetros completados locales (el servidor a veces no los incluye en el snapshot)
             const completadosLocales = prev.filter(t => t.completado && !porIdONombre.has(t.id) && !porIdONombre.has(t.nombre));
-            // Detectar timers locales activos que desaparecieron del snapshot justo al completar (~0s)
+            // Detectar timers locales activos que desaparecieron del snapshot justo al completar.
+            // Ampliamos el umbral para cubrir desfases de reloj/red y limpieza inmediata del servidor.
             try {
               const desaparecidosCasiCompletos = prev.filter(t =>
                 !porIdONombre.has(t.id) && !porIdONombre.has(t.nombre) &&
-                !t.completado && t.activo && (t.tiempoRestanteSegundos <= 1 || (new Date(t.fechaFin).getTime() - Date.now() <= 1500))
+                !t.completado && t.activo && (
+                  // restante local muy bajo
+                  (t.tiempoRestanteSegundos ?? 0) <= 15 ||
+                  // o fecha fin a punto de ocurrir (15s)
+                  (new Date(t.fechaFin).getTime() - Date.now() <= 15_000)
+                )
               );
               for (const t of desaparecidosCasiCompletos) {
                 // Marcar como recientemente completado (incluye clave por ID si aplica)
@@ -379,8 +385,14 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         if (lastMessage.data.timerId) {
           setTimers(prev => {
             const borrado = prev.find(timer => timer.id === lastMessage.data.timerId);
-            // Si el timer estaba a punto de terminar, marcar como completado reciente
-            if (borrado && borrado.activo && !borrado.completado && (borrado.tiempoRestanteSegundos <= 1 || (new Date(borrado.fechaFin).getTime() - Date.now() <= 1500))) {
+            // Si el timer estaba a punto de terminar, marcar como completado reciente.
+            // Ampliamos el umbral para tolerar desfases: hasta 20s restantes o fin en los próximos 20s.
+            if (
+              borrado &&
+              borrado.activo &&
+              !borrado.completado &&
+              ((borrado.tiempoRestanteSegundos ?? 0) <= 20 || (new Date(borrado.fechaFin).getTime() - Date.now() <= 20_000))
+            ) {
               try { markRecentlyCompleted({ ...borrado, completado: true, activo: false }); } catch {}
             }
             const nuevos = prev.filter(timer => timer.id !== lastMessage.data.timerId);
