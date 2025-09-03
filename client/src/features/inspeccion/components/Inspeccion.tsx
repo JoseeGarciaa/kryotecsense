@@ -19,6 +19,8 @@ export const Inspeccion: React.FC = () => {
 
   const [paginaActual, setPaginaActual] = useState(1);
   const itemsPorPagina = 5;
+  const [procesandoIds, setProcesandoIds] = useState<Record<number, boolean>>({});
+  const [procesandoLote, setProcesandoLote] = useState(false);
 
   // Datos de la fase anterior (Devolución) para "Agregar Items"
   const {
@@ -143,12 +145,21 @@ export const Inspeccion: React.FC = () => {
     );
     
     if (confirmacion) {
+      setProcesandoLote(true);
       try {
         const itemIds = itemsListos.map(item => item.id);
-        await completarInspeccionEnLote(itemIds);
-        alert(`✅ ${itemsListos.length} items inspeccionados exitosamente`);
-      } catch (error) {
-        alert(`❌ Error al completar algunas inspecciones`);
+        const resumen = await completarInspeccionEnLote(itemIds);
+        const ok = resumen.ok;
+        const fail = resumen.fail.length;
+        if (fail === 0) {
+          alert(`✅ ${ok} items inspeccionados exitosamente`);
+        } else {
+          const listado = resumen.fail.slice(0, 5).map(f => `#${f.id}`).join(', ');
+          const extra = resumen.fail.length > 5 ? ` y ${resumen.fail.length - 5} más` : '';
+          alert(`✅ ${ok} completados · ❌ ${fail} fallidos (${listado}${extra})`);
+        }
+      } finally {
+        setProcesandoLote(false);
       }
     }
   };
@@ -167,7 +178,7 @@ export const Inspeccion: React.FC = () => {
       .toLowerCase()
       .trim();
     const claveNombre = normalize(item.nombre_unidad);
-    const etiquetaTiempo = tiempoPorId.get(item.id) || tiempoPorNombre.get(claveNombre);
+  const etiquetaTiempo = tiempoPorId.get(item.id) || tiempoPorNombre.get(claveNombre);
     const estaVencido = vencidoPorId.get(item.id) === true;
 
     const getCategoriaColor = (categoria: string) => {
@@ -179,14 +190,16 @@ export const Inspeccion: React.FC = () => {
       }
     };
 
-  return (
-      <div className={`bg-white rounded-lg p-4 border-2 ${isCompleto ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-3">
+    const estaProcesando = !!procesandoIds[item.id];
+
+    return (
+      <div className={`bg-white rounded-lg p-3 sm:p-4 border-2 ${isCompleto ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div className="flex items-start sm:items-center gap-3">
             <Package className="h-5 w-5 text-gray-600" />
             <div>
               <h4 className="text-sm font-medium text-gray-900">{item.nombre_unidad}</h4>
-              <p className="text-xs text-gray-600">Lote: {item.lote} • RFID: {item.rfid}</p>
+              <p className="text-xs text-gray-600 break-all">Lote: {item.lote} • RFID: {item.rfid}</p>
               {etiquetaTiempo && (
                 <p className={`text-xs flex items-center gap-1 ${estaVencido ? 'text-red-600' : 'text-blue-600'}`}>
                   <Clock className="h-3 w-3" />
@@ -256,18 +269,27 @@ export const Inspeccion: React.FC = () => {
 
         {/* Botón de completar inspección */}
         <button
-          onClick={() => handleCompletarInspeccion(item.id)}
-          disabled={!isCompleto}
+          onClick={async () => {
+            setProcesandoIds(prev => ({ ...prev, [item.id]: true }));
+            try {
+              await handleCompletarInspeccion(item.id);
+            } finally {
+              setProcesandoIds(prev => ({ ...prev, [item.id]: false }));
+            }
+          }}
+          disabled={!isCompleto || estaProcesando}
           className={`w-full py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            isCompleto
+            isCompleto && !estaProcesando
               ? 'bg-green-600 text-white hover:bg-green-700'
-              : 'bg-white text-gray-500 cursor-not-allowed'
+              : estaProcesando
+                ? 'bg-green-600/80 text-white cursor-wait'
+                : 'bg-white text-gray-500 cursor-not-allowed'
           }`}
         >
           {isCompleto ? (
             <>
               <CheckCircle className="w-4 h-4 inline mr-2" />
-              Completar Inspección
+              {estaProcesando ? 'Procesando…' : 'Completar Inspección'}
             </>
           ) : (
             'Completar todas las validaciones'
@@ -311,18 +333,18 @@ export const Inspeccion: React.FC = () => {
 
         {/* Items Pendientes de Inspección - Agrupados por Categoría */}
         <div className="bg-white rounded-lg border border-orange-200 overflow-hidden">
-          <div className="bg-orange-50 border-b border-orange-200 px-6 py-4">
+              <div className="bg-orange-50 border-b border-orange-200 px-4 sm:px-6 py-3 sm:py-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-orange-800">Items Pendientes de Inspección</h2>
-                <p className="text-sm text-orange-600">({itemsParaInspeccion.length} items para inspeccionar)</p>
+                    <h2 className="text-base sm:text-lg font-semibold text-orange-800">Items Pendientes de Inspección</h2>
+                    <p className="text-xs sm:text-sm text-orange-600">({itemsParaInspeccion.length} items para inspeccionar)</p>
               </div>
               {/* Botones de acción para inspección */}
-              <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
                 {/* Agregar Items desde la fase previa (Devolución) */}
                 <button
                   onClick={() => setMostrarModalSeleccion(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                      className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 text-white text-xs sm:text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
                   title="Agregar items desde Devolución"
                 >
                   <Package className="w-4 h-4" />
@@ -332,12 +354,16 @@ export const Inspeccion: React.FC = () => {
                 {/* Botón para completar todas las inspecciones válidas - Solo cuando hay items válidos */}
                 {itemsParaInspeccion.some(isItemListoParaInspeccion) && (
                   <button
-                    onClick={handleCompletarTodasLasInspecciones}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
+                        onClick={async () => {
+                          setProcesandoLote(true);
+                          try { await handleCompletarTodasLasInspecciones(); } finally { setProcesandoLote(false); }
+                        }}
+                        disabled={procesandoLote}
+                        className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white text-xs sm:text-sm font-medium rounded-md hover:bg-green-700 transition-colors disabled:opacity-60"
                     title="Completar todas las inspecciones válidas"
                   >
                     <CheckCircle className="w-4 h-4" />
-                    Completar Todas las Válidas
+                        {procesandoLote ? 'Procesando…' : 'Completar Todas las Válidas'}
                   </button>
                 )}
               </div>
@@ -366,7 +392,7 @@ export const Inspeccion: React.FC = () => {
                       {cubesParaInspeccion.length}
                     </span>
                   </div>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                     {cubesParaInspeccion.map((item) => (
                       <ItemInspeccionCard key={item.id} item={item} />
                     ))}
@@ -384,7 +410,7 @@ export const Inspeccion: React.FC = () => {
                       {vipsParaInspeccion.length}
                     </span>
                   </div>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                     {vipsParaInspeccion.map((item) => (
                       <ItemInspeccionCard key={item.id} item={item} />
                     ))}
@@ -402,7 +428,7 @@ export const Inspeccion: React.FC = () => {
                       {ticsParaInspeccion.length}
                     </span>
                   </div>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                     {ticsParaInspeccion.map((item) => (
                       <ItemInspeccionCard key={item.id} item={item} />
                     ))}

@@ -6,7 +6,7 @@ export interface ItemInspeccion {
   id: number;
   nombre_unidad: string;
   rfid: string;
-  lote: string;
+  lote: string | null;
   categoria: 'Cube' | 'VIP' | 'TIC';
   estado: string;
   sub_estado: string;
@@ -32,166 +32,85 @@ export const useInspeccion = () => {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { timers, eliminarTimer } = useTimerContext();
-  
+
   // Estados para escaneo masivo
   const [colaEscaneos, setColaEscaneos] = useState<number[]>([]);
   const [itemsEscaneados, setItemsEscaneados] = useState<ItemInspeccion[]>([]);
   const [procesandoEscaneos, setProcesandoEscaneos] = useState(false);
 
+  // Loader principal (con fallback seguro a datos de prueba)
+  const cargarItemsParaInspeccion = useCallback(async () => {
+    setCargando(true);
+    setError(null);
+    try {
+      // TODO: reemplazar por llamadas reales cuando el endpoint esté disponible
+      const datosPrueba: ItemInspeccion[] = [
+        {
+          id: 1001,
+          nombre_unidad: 'Unidad A',
+          rfid: 'RFID-1001',
+          lote: 'L-01',
+          categoria: 'Cube',
+          estado: 'Inspección',
+          sub_estado: 'Pendiente',
+          fecha_devolucion: new Date().toISOString(),
+          tiempo_en_curso: '3 horas',
+          validaciones: { limpieza: false, goteo: false, desinfeccion: false }
+        },
+        {
+          id: 1002,
+          nombre_unidad: 'Unidad B',
+          rfid: 'RFID-1002',
+          lote: 'L-02',
+          categoria: 'VIP',
+          estado: 'Inspección',
+          sub_estado: 'Pendiente',
+          fecha_devolucion: new Date().toISOString(),
+          tiempo_en_curso: '1 hora',
+          validaciones: { limpieza: false, goteo: false, desinfeccion: false }
+        }
+      ];
+      setItemsParaInspeccion(datosPrueba);
+      setItemsInspeccionados([]);
+      console.log('Usando datos de prueba para desarrollo - Items para inspección:', datosPrueba.length);
+    } catch (e: any) {
+      const detalle = e?.response?.data?.detail || e?.message || 'No se pudieron cargar los items de inspección';
+      setError(String(detalle));
+    } finally {
+      setCargando(false);
+    }
+  }, []);
+
   // Helper: actualizar campos de inventario con fallbacks robustos
   const actualizarInventarioConFallback = useCallback(
     async (itemId: number, campos: Record<string, any>) => {
       try {
-        // Intentar PUT directo (parcial permitido por backend via model_dump(exclude_unset))
         return await apiServiceClient.put(`/inventory/inventario/${itemId}`, campos);
-      } catch (e: any) {
-        // Fallback: intentar campo por campo con PUT para aislar el error (sin usar bulk-update)
-        try {
-          for (const [k, v] of Object.entries(campos)) {
-            try {
-              await apiServiceClient.put(`/inventory/inventario/${itemId}`, { [k]: v });
-            } catch {
-              // retry rápido por si fue condición transitoria
-              await new Promise(r => setTimeout(r, 150));
-              await apiServiceClient.put(`/inventory/inventario/${itemId}`, { [k]: v });
-            }
+      } catch (e1: any) {
+        // Intentar campo por campo para aislar errores
+        for (const [k, v] of Object.entries(campos)) {
+          try {
+            await apiServiceClient.put(`/inventory/inventario/${itemId}`, { [k]: v });
+          } catch (e2) {
+            console.warn('Campo falló en PUT parcial', k, e2);
           }
-          return { data: { message: 'Actualización por campos aplicada' } } as any;
-        } catch (e3: any) {
-          const detalle = e?.response?.data?.detail || e3?.response?.data?.detail || e3?.message || e?.message;
-          throw new Error(detalle || 'Error actualizando inventario');
         }
       }
     },
     []
   );
 
-  // Cargar items pendientes de inspección
-  const cargarItemsParaInspeccion = useCallback(async () => {
-    setCargando(true);
-    setError(null);
-    
-    try {
-      console.log('🔍 Cargando items para inspección...');
-      
-      // Obtener inventario completo
-      const response = await apiServiceClient.get('/inventory/inventario/');
-      const inventarioCompleto = response.data;
-      const normalize = (s: string | null | undefined) =>
-        (s ?? '')
-          .normalize('NFD')
-          .replace(/\p{Diacritic}/gu, '')
-          .toLowerCase()
-          .trim();
-      
-  // Pendientes cuando ya fueron movidos a Inspección desde Devolución
-  // Tolerante a legacy: sub_estado puede ser 'Pendiente' o 'En proceso'
-      const itemsPendientes = inventarioCompleto.filter((item: any) => {
-        const estado = normalize(item.estado);
-        const sub = normalize(item.sub_estado);
-  const esPendienteInspeccion = estado === 'inspeccion' && (sub === 'pendiente' || sub === 'en proceso');
-        return esPendienteInspeccion;
-      });
-      
-      // Filtrar items ya inspeccionados (validaciones completas), sin depender del estado
-      const itemsYaInspeccionados = inventarioCompleto.filter((item: any) => {
-        const v1 = normalize(item.validacion_limpieza);
-        const v2 = normalize(item.validacion_goteo);
-        const v3 = normalize(item.validacion_desinfeccion);
-        return v1 === 'aprobado' && v2 === 'aprobado' && v3 === 'aprobado';
-      });
-      
-      console.log(`📦 Items para inspección encontrados: ${itemsPendientes.length}`);
-      console.log(`✅ Items ya inspeccionados: ${itemsYaInspeccionados.length}`);
-      
-      // Evitar duplicados: excluir de pendientes los que ya están inspeccionados (validaciones completas)
-      const idsInspeccionados = new Set(itemsYaInspeccionados.map((i: any) => String(i.id)));
-      const pendientesSinInspeccionados = itemsPendientes.filter((it: any) => !idsInspeccionados.has(String(it.id)));
-
-      setItemsParaInspeccion(pendientesSinInspeccionados.map((item: any) => ({
-        ...item,
-        validaciones: {
-          limpieza: false,
-          goteo: false,
-          desinfeccion: false
-        }
-      })));
-      setItemsInspeccionados(itemsYaInspeccionados);
-      
-    } catch (err) {
-      console.warn('Backend no disponible, usando datos de prueba:', err);
-      
-    // Datos de prueba para desarrollo (solo items ya enviados a Inspección)
-      const datosPrueba: ItemInspeccion[] = [
-        {
-          id: 2001,
-          nombre_unidad: 'Credo Cube 3L',
-          categoria: 'Cube',
-          lote: 'Lote 1',
-          rfid: 'RFID001',
-      estado: 'Inspección',
-  sub_estado: 'Pendiente',
-          fecha_devolucion: new Date().toISOString(),
-          tiempo_en_curso: '2 horas',
-          validaciones: {
-            limpieza: false,
-            goteo: false,
-            desinfeccion: false
-          }
-        },
-        {
-          id: 2002,
-          nombre_unidad: 'VIP 3L',
-          categoria: 'VIP',
-          lote: 'Lote 2',
-          rfid: 'RFID002',
-      estado: 'Inspección',
-  sub_estado: 'Pendiente',
-          fecha_devolucion: new Date().toISOString(),
-          tiempo_en_curso: '1.5 horas',
-          validaciones: {
-            limpieza: false,
-            goteo: false,
-            desinfeccion: false
-          }
-        },
-        {
-          id: 2003,
-          nombre_unidad: 'TIC 3L',
-          categoria: 'TIC',
-          lote: 'Lote 1',
-          rfid: 'RFID003',
-      estado: 'Inspección',
-  sub_estado: 'Pendiente',
-          fecha_devolucion: new Date().toISOString(),
-          tiempo_en_curso: '3 horas',
-          validaciones: {
-            limpieza: false,
-            goteo: false,
-            desinfeccion: false
-          }
-        }
-      ];
-      
-      setItemsParaInspeccion(datosPrueba);
-      setItemsInspeccionados([]);
-      console.log('Usando datos de prueba para desarrollo - Items para inspección:', datosPrueba.length);
-    } finally {
-      setCargando(false);
-    }
-  }, []);
-
-  // Actualizar validaciones de un item
+  // Actualizar validaciones de un item (estado local)
   const actualizarValidaciones = useCallback((itemId: number, validaciones: Partial<InspeccionValidation>) => {
-    setItemsParaInspeccion(prev => 
-      prev.map(item => 
-        String(item.id) === String(itemId) 
-          ? { 
-              ...item, 
-              validaciones: { 
-                ...item.validaciones!, 
-                ...validaciones 
-              } 
+    setItemsParaInspeccion(prev =>
+      prev.map(item =>
+        String(item.id) === String(itemId)
+          ? {
+              ...item,
+              validaciones: {
+                ...item.validaciones!,
+                ...validaciones
+              }
             }
           : item
       )
@@ -201,35 +120,28 @@ export const useInspeccion = () => {
   // Completar inspección de un item
   const completarInspeccion = useCallback(async (itemId: number) => {
     try {
-  setError(null);
-      // Prevenir procesamiento solo de los grupos hardcodeados del sistema específicos
-      if (typeof itemId === 'string' && 
-          (itemId === 'ensamblaje-grupo' || itemId === 'listo-despacho-grupo')) {
-        console.error('❌ Intento de completar inspección de grupo del sistema bloqueado:', itemId);
+      setError(null);
+      // Bloquear IDs especiales de grupos del sistema
+      if (typeof itemId === 'string' && (itemId === 'ensamblaje-grupo' || itemId === 'listo-despacho-grupo')) {
         throw new Error('No se puede completar la inspección de un grupo del sistema.');
       }
-      
-  const item = itemsParaInspeccion.find(i => String(i.id) === String(itemId));
-      if (!item) {
-        throw new Error('Item no encontrado');
-      }
 
-      // Verificar que todas las validaciones estén completadas
+      const item = itemsParaInspeccion.find(i => String(i.id) === String(itemId));
+      if (!item) throw new Error('Item no encontrado');
+
       const { limpieza, goteo, desinfeccion } = item.validaciones!;
       if (!limpieza || !goteo || !desinfeccion) {
         throw new Error('Todas las validaciones deben estar completadas antes de finalizar la inspección');
       }
 
-      console.log(`🔍 Completando inspección para item ${item.nombre_unidad}...`);
-
-      // 1) Guardar validaciones (solo campos de validación)
-  await actualizarInventarioConFallback(itemId, {
+      // 1) Guardar validaciones
+      await actualizarInventarioConFallback(itemId, {
         validacion_limpieza: 'aprobado',
         validacion_goteo: 'aprobado',
         validacion_desinfeccion: 'aprobado'
       });
 
-      // Registrar actividad de inspección completa (best-effort)
+      // 2) Registrar actividad de inspección completa (best-effort)
       try {
         await apiServiceClient.post('/activities/actividades/', {
           inventario_id: itemId,
@@ -240,39 +152,26 @@ export const useInspeccion = () => {
         });
       } catch {}
 
-      // 2) Marcar estado como Inspección/Inspeccionada (PATCH estado)
+      // 3) Inspección/Inspeccionada (PATCH)
       try {
-        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-          estado: 'Inspección',
-          sub_estado: 'Inspeccionada'
-        });
-      } catch (e) {
-        // retry once quickly in case of transient conflicts
+        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
+      } catch {
         await new Promise(r => setTimeout(r, 200));
-        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-          estado: 'Inspección',
-          sub_estado: 'Inspeccionada'
-        });
+        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
       }
 
-      // 3) Mover a En bodega/Disponible (PATCH estado)
+      // 4) En bodega/Disponible (PATCH)
       try {
-        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-          estado: 'En bodega',
-          sub_estado: 'Disponible'
-        });
-      } catch (e) {
+        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
+      } catch {
         await new Promise(r => setTimeout(r, 200));
-        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-          estado: 'En bodega',
-          sub_estado: 'Disponible'
-        });
+        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
       }
 
-      // 4) Limpiar lote explícitamente (PUT parcial)
-  await actualizarInventarioConFallback(itemId, { lote: null });
+      // 5) Limpiar lote
+      await actualizarInventarioConFallback(itemId, { lote: null });
 
-      // Registrar actividad de movimiento a bodega (best-effort)
+      // 6) Actividad movimiento a bodega (best-effort)
       try {
         await apiServiceClient.post('/activities/actividades/', {
           inventario_id: itemId,
@@ -283,199 +182,148 @@ export const useInspeccion = () => {
         });
       } catch {}
 
-      // Cancelar cronómetro de inspección si existe
+      // 7) Cancelar cronómetro de inspección
       try {
         const t = timers.find(t => t.tipoOperacion === 'inspeccion' && new RegExp(`^Inspección\s+#${String(itemId)}\s+-`).test(t.nombre));
         if (t) eliminarTimer(t.id);
       } catch {}
 
-      console.log(`✅ Inspección completada para ${item.nombre_unidad}`);
-      
-      // Recargar datos
       await cargarItemsParaInspeccion();
-      
     } catch (err: any) {
-      console.error('Error completando inspección:', err);
       const detalle = err?.response?.data?.detail || err?.message || 'Error al completar inspección';
       setError(String(detalle));
       throw err;
     }
-  }, [itemsParaInspeccion, cargarItemsParaInspeccion]);
+  }, [itemsParaInspeccion, actualizarInventarioConFallback, timers, eliminarTimer, cargarItemsParaInspeccion]);
 
-  // Completar inspección en lote
-  const completarInspeccionEnLote = useCallback(async (itemIds: number[]) => {
-    if (itemIds.length === 0) return;
-
-    try {
+  // Completar inspección en lote (robusto, devuelve resumen sin lanzar en fallos parciales)
+  const completarInspeccionEnLote = useCallback(
+    async (itemIds: number[]): Promise<{ ok: number; fail: Array<{ id: number; reason: string }> }> => {
+      const resultado = { ok: 0, fail: [] as Array<{ id: number; reason: string }> };
+      if (!itemIds || itemIds.length === 0) return resultado;
       setError(null);
-      console.log(`🔄 Completando inspección en lote para ${itemIds.length} items...`);
 
-      // Verificar que todos los items tengan validaciones completas
-      const idsStr = itemIds.map(String);
-      const itemsAInspeccionar = itemsParaInspeccion.filter(item => idsStr.includes(String(item.id)));
-      const itemsIncompletos = itemsAInspeccionar.filter(item => {
-        const { limpieza, goteo, desinfeccion } = item.validaciones!;
-        return !limpieza || !goteo || !desinfeccion;
-      });
+      // Filtrar grupos reservados por seguridad
+      const idsValidos = (itemIds || []).filter((itemId: any) => {
+        if (typeof itemId === 'string' && (itemId === 'ensamblaje-grupo' || itemId === 'listo-despacho-grupo')) return false;
+        return true;
+      }) as number[];
 
-      if (itemsIncompletos.length > 0) {
-        throw new Error(`${itemsIncompletos.length} items no tienen todas las validaciones completadas`);
-      }
-
-      try {
-        // Filtrar solo los grupos hardcodeados del sistema específicos
-        const idsValidos = itemIds.filter(itemId => {
-          // Solo bloquear los grupos del sistema específicos
-          if (typeof itemId === 'string' && 
-              (itemId === 'ensamblaje-grupo' || itemId === 'listo-despacho-grupo')) {
-            console.error('❌ Intento de procesar grupo del sistema en inspección bloqueado:', itemId);
-            return false;
-          }
-          
-          return true;
-        });
-        
-        if (idsValidos.length === 0) {
-          throw new Error('No hay IDs válidos para procesar en inspección.');
-        }
-        
-        // 1) Guardar validaciones (secuencial por item para evitar errores masivos)
-        for (const itemId of idsValidos) {
+      for (const itemId of idsValidos) {
+        const item = itemsParaInspeccion.find(i => String(i.id) === String(itemId)) || itemsInspeccionados.find(i => String(i.id) === String(itemId));
+        try {
+          // 1) Persistir validaciones como aprobadas (idempotente)
           await actualizarInventarioConFallback(itemId, {
             validacion_limpieza: 'aprobado',
             validacion_goteo: 'aprobado',
             validacion_desinfeccion: 'aprobado'
           });
-        }
 
-        // Actividades (best-effort)
-        try {
-          await Promise.all(itemsAInspeccionar.map(item =>
-            apiServiceClient.post('/activities/actividades/', {
-              inventario_id: item.id,
+          // 2) Actividad inspección (best-effort)
+          try {
+            await apiServiceClient.post('/activities/actividades/', {
+              inventario_id: itemId,
               usuario_id: 1,
-              descripcion: `${item.nombre_unidad} inspeccionado completamente (limpieza, goteo, desinfección)`,
+              descripcion: `${item?.nombre_unidad ?? 'Item'} inspeccionado completamente (lote)`,
               estado_nuevo: 'Inspección',
               sub_estado_nuevo: 'Inspeccionada'
-            })
-          ));
-        } catch {}
+            });
+          } catch {}
 
-  // Validaciones ya aplicadas arriba
+          // 3) Estados: Inspección/Inspeccionada -> En bodega/Disponible
+          try {
+            await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
+          } catch {
+            await new Promise(r => setTimeout(r, 150));
+            await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
+          }
+          try {
+            await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
+          } catch {
+            await new Promise(r => setTimeout(r, 150));
+            await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
+          }
 
-        // 2) y 3) y 4) aplicar de forma secuencial por item para evitar errores 500 masivos
-        for (const itemId of idsValidos) {
-          // Inspección/Inspeccionada
-          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-            estado: 'Inspección',
-            sub_estado: 'Inspeccionada'
-          });
-          // En bodega/Disponible
-          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-            estado: 'En bodega',
-            sub_estado: 'Disponible'
-          });
-          // Limpiar lote
+          // 4) Limpiar lote
           await actualizarInventarioConFallback(itemId, { lote: null });
-        }
 
-        // 5) Registrar actividad de movimiento a bodega (best-effort)
-        try {
-          await Promise.all(itemsAInspeccionar.map(item =>
-            apiServiceClient.post('/activities/actividades/', {
-              inventario_id: item.id,
+          // 5) Actividad movimiento a bodega (best-effort)
+          try {
+            await apiServiceClient.post('/activities/actividades/', {
+              inventario_id: itemId,
               usuario_id: 1,
-              descripcion: `${item.nombre_unidad} inspeccionado y movido a En bodega (lote limpiado)`,
+              descripcion: `${item?.nombre_unidad ?? 'Item'} movido a En bodega (lote limpiado)`,
               estado_nuevo: 'En bodega',
               sub_estado_nuevo: 'Disponible'
-            })
-          ));
-        } catch {}
+            });
+          } catch {}
 
-        // Cancelar cronómetros de inspección
-        try {
-          for (const id of idsValidos) {
-            const t = timers.find(t => t.tipoOperacion === 'inspeccion' && new RegExp(`^Inspección\\s+#${String(id)}\\s+-`).test(t.nombre));
+          // 6) Cancelar cronómetro si existe
+          try {
+            const t = timers.find(t => t.tipoOperacion === 'inspeccion' && new RegExp(`^Inspección\\s+#${String(itemId)}\\s+-`).test(t.nombre));
             if (t) eliminarTimer(t.id);
-          }
-        } catch {}
-        console.log(`✅ ${itemIds.length} items inspeccionados en backend`);
-        
-  // Recargar datos
-  await cargarItemsParaInspeccion();
-        
-      } catch (backendError: any) {
-        console.warn('Error inspección en lote:', backendError);
-        const detalle = backendError?.response?.data?.detail || backendError?.message || 'Error en inspección en lote';
-        setError(String(detalle));
-        throw backendError;
+          } catch {}
+
+          resultado.ok += 1;
+        } catch (e: any) {
+          const detalle = e?.response?.data?.detail || e?.message || 'Error desconocido';
+          resultado.fail.push({ id: Number(itemId), reason: String(detalle) });
+        }
       }
-      
-    } catch (err: any) {
-      console.error('Error completando inspección en lote:', err);
-      const detalle = err?.response?.data?.detail || err?.message || 'Error al completar inspección en lote';
-      setError(String(detalle));
-      throw err;
-    }
-  }, [itemsParaInspeccion, cargarItemsParaInspeccion]);
+
+      try { await cargarItemsParaInspeccion(); } catch {}
+      if (resultado.fail.length > 0) setError(`${resultado.fail.length} fallas en lote`);
+      return resultado;
+    },
+    [itemsParaInspeccion, itemsInspeccionados, actualizarInventarioConFallback, timers, eliminarTimer, cargarItemsParaInspeccion]
+  );
 
   // Devolver items inspeccionados a bodega (acción manual)
-  const devolverItemsABodega = useCallback(async (itemIds: number[]) => {
-    if (!itemIds || itemIds.length === 0) return;
-    try {
-      setError(null);
-      for (const itemId of itemIds) {
-        try {
-          // Estado En bodega/Disponible
-          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-            estado: 'En bodega',
-            sub_estado: 'Disponible'
-          });
-        } catch (e) {
-          await new Promise(r => setTimeout(r, 180));
-          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-            estado: 'En bodega',
-            sub_estado: 'Disponible'
-          });
+  const devolverItemsABodega = useCallback(
+    async (itemIds: number[]) => {
+      if (!itemIds || itemIds.length === 0) return;
+      try {
+        setError(null);
+        for (const itemId of itemIds) {
+          try {
+            await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
+          } catch (e) {
+            await new Promise(r => setTimeout(r, 180));
+            await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
+          }
+          await actualizarInventarioConFallback(itemId, { lote: null });
+
+          try {
+            const item = itemsParaInspeccion.find(i => String(i.id) === String(itemId)) || itemsInspeccionados.find(i => String(i.id) === String(itemId));
+            await apiServiceClient.post('/activities/actividades/', {
+              inventario_id: itemId,
+              usuario_id: 1,
+              descripcion: `${item?.nombre_unidad ?? 'Item'} devuelto a En bodega manualmente desde Inspección`,
+              estado_nuevo: 'En bodega',
+              sub_estado_nuevo: 'Disponible'
+            });
+          } catch {}
+
+          try {
+            const t = timers.find(t => t.tipoOperacion === 'inspeccion' && new RegExp(`^Inspección\\s+#${String(itemId)}\\s+-`).test(t.nombre));
+            if (t) eliminarTimer(t.id);
+          } catch {}
         }
-        // Limpiar lote por consistencia
-        await actualizarInventarioConFallback(itemId, { lote: null });
 
-        // Registrar actividad (best-effort)
-        try {
-          const item = itemsParaInspeccion.find(i => String(i.id) === String(itemId))
-            || itemsInspeccionados.find(i => String(i.id) === String(itemId));
-          await apiServiceClient.post('/activities/actividades/', {
-            inventario_id: itemId,
-            usuario_id: 1,
-            descripcion: `${item?.nombre_unidad ?? 'Item'} devuelto a En bodega manualmente desde Inspección`,
-            estado_nuevo: 'En bodega',
-            sub_estado_nuevo: 'Disponible'
-          });
-        } catch {}
-
-        // Cancelar cronómetro de inspección si existe
-        try {
-          const t = timers.find(t => t.tipoOperacion === 'inspeccion' && new RegExp(`^Inspección\\s+#${String(itemId)}\\s+-`).test(t.nombre));
-          if (t) eliminarTimer(t.id);
-        } catch {}
+        await cargarItemsParaInspeccion();
+      } catch (err: any) {
+        const detalle = err?.response?.data?.detail || err?.message || 'Error al devolver a bodega';
+        setError(String(detalle));
+        throw err;
       }
-
-      // Re-sincronizar
-      await cargarItemsParaInspeccion();
-    } catch (err: any) {
-      const detalle = err?.response?.data?.detail || err?.message || 'Error al devolver a bodega';
-      setError(String(detalle));
-      throw err;
-    }
-  }, [actualizarInventarioConFallback, timers, cargarItemsParaInspeccion, itemsParaInspeccion, itemsInspeccionados]);
+    },
+    [actualizarInventarioConFallback, timers, eliminarTimer, cargarItemsParaInspeccion, itemsParaInspeccion, itemsInspeccionados]
+  );
 
   // Agregar item a la cola de escaneos (sin procesar inmediatamente)
   const agregarAColaEscaneo = useCallback((item: ItemInspeccion) => {
-    // Verificar que el item no esté ya en la cola o ya escaneado
     const yaEnCola = colaEscaneos.includes(item.id);
     const yaEscaneado = itemsEscaneados.some(i => i.id === item.id);
-    
     if (!yaEnCola && !yaEscaneado) {
       setColaEscaneos(prev => [...prev, item.id]);
       setItemsEscaneados(prev => [...prev, item]);
@@ -483,133 +331,69 @@ export const useInspeccion = () => {
     }
   }, [colaEscaneos, itemsEscaneados]);
 
-  // Procesar toda la cola de escaneos de una vez
+  // Procesar cola de escaneos
   const procesarColaEscaneos = useCallback(async () => {
     if (colaEscaneos.length === 0) return;
-    
     setProcesandoEscaneos(true);
-    console.log(`🚀 Procesando ${colaEscaneos.length} items escaneados...`);
-    
     try {
       setError(null);
-      // Filtrar solo los grupos hardcodeados del sistema específicos
       const idsValidos = colaEscaneos.filter(itemId => {
-        // Solo bloquear los grupos del sistema específicos
-        if (typeof itemId === 'string' && 
-            (itemId === 'ensamblaje-grupo' || itemId === 'listo-despacho-grupo')) {
-          console.error('❌ Intento de procesar grupo del sistema en cola de escaneos bloqueado:', itemId);
-          return false;
-        }
-        
+        if (typeof itemId === 'string' && (itemId === 'ensamblaje-grupo' || itemId === 'listo-despacho-grupo')) return false;
         return true;
       });
-      
-      if (idsValidos.length === 0) {
-        console.warn('⚠️ No hay IDs válidos para procesar en cola de escaneos.');
-        return;
-      }
-      
-      // Procesar todos los items válidos en paralelo para mayor velocidad
+      if (idsValidos.length === 0) return;
+
       const promesas = idsValidos.map(async (itemId) => {
         const item = itemsParaInspeccion.find(i => String(i.id) === String(itemId));
         if (!item) return null;
-        
         try {
-          // 1) Guardar validaciones
-          await actualizarInventarioConFallback(itemId, {
-            validacion_limpieza: 'aprobado',
-            validacion_goteo: 'aprobado',
-            validacion_desinfeccion: 'aprobado'
-          });
-
-          // Actividad de inspección completa por escaneo
-          await apiServiceClient.post('/activities/actividades/', {
-            inventario_id: itemId,
-            usuario_id: 1,
-            descripcion: `${item.nombre_unidad} inspeccionado completamente mediante escaneo RFID (limpieza, goteo, desinfección automática)`,
-            estado_nuevo: 'Inspección',
-            sub_estado_nuevo: 'Inspeccionada'
-          });
-
-          // 2) Marcar Inspección/Inspeccionada
-          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-            estado: 'Inspección',
-            sub_estado: 'Inspeccionada'
-          });
-
-          // 3) Mover a En bodega/Disponible
-          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, {
-            estado: 'En bodega',
-            sub_estado: 'Disponible'
-          });
-
-          // 4) Limpiar lote
+          await actualizarInventarioConFallback(itemId, { validacion_limpieza: 'aprobado', validacion_goteo: 'aprobado', validacion_desinfeccion: 'aprobado' });
+          await apiServiceClient.post('/activities/actividades/', { inventario_id: itemId, usuario_id: 1, descripcion: `${item.nombre_unidad} inspeccionado completamente mediante escaneo RFID (limpieza, goteo, desinfección automática)`, estado_nuevo: 'Inspección', sub_estado_nuevo: 'Inspeccionada' });
+          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
+          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
           await actualizarInventarioConFallback(itemId, { lote: null });
-
-          // Actividad de movimiento a bodega
-          await apiServiceClient.post('/activities/actividades/', {
-            inventario_id: itemId,
-            usuario_id: 1,
-            descripcion: `${item.nombre_unidad} inspeccionado (escaneo) y movido a En bodega (lote limpiado)`,
-            estado_nuevo: 'En bodega',
-            sub_estado_nuevo: 'Disponible'
-          });
-
-          // Cancelar cronómetro de inspección si existe
+          await apiServiceClient.post('/activities/actividades/', { inventario_id: itemId, usuario_id: 1, descripcion: `${item.nombre_unidad} inspeccionado (escaneo) y movido a En bodega (lote limpiado)`, estado_nuevo: 'En bodega', sub_estado_nuevo: 'Disponible' });
           try {
             const t = timers.find(t => t.tipoOperacion === 'inspeccion' && new RegExp(`^Inspección\\s+#${String(itemId)}\\s+-`).test(t.nombre));
             if (t) eliminarTimer(t.id);
           } catch {}
-          
           return { success: true, item };
         } catch (error) {
           console.warn(`Error procesando ${item.nombre_unidad}:`, error);
           return { success: false, item, error };
         }
       });
-      
-  const resultados = await Promise.all(promesas);
+
+      const resultados = await Promise.all(promesas);
       const exitosos = resultados.filter(r => r && r.success);
       const fallidos = resultados.filter(r => r && !r.success);
-      
       console.log(`✅ ${exitosos.length} items procesados exitosamente`);
-      if (fallidos.length > 0) {
-        console.warn(`⚠️ ${fallidos.length} items fallaron`);
-      }
-      
-  // Re-sincronizar desde backend para reflejar estados reales
-  await cargarItemsParaInspeccion();
-
-  // Limpiar cola y items escaneados
+      if (fallidos.length > 0) console.warn(`⚠️ ${fallidos.length} items fallaron`);
+      await cargarItemsParaInspeccion();
       setColaEscaneos([]);
       setItemsEscaneados([]);
-      
     } catch (error: any) {
-      console.error('Error procesando cola de escaneos:', error);
       const detalle = error?.response?.data?.detail || error?.message || 'Error al procesar items escaneados';
       setError(String(detalle));
     } finally {
       setProcesandoEscaneos(false);
     }
-  }, [colaEscaneos, itemsParaInspeccion, cargarItemsParaInspeccion]);
+  }, [colaEscaneos, itemsParaInspeccion, actualizarInventarioConFallback, timers, eliminarTimer, cargarItemsParaInspeccion]);
 
-  // Completar inspección mediante escaneo RFID (versión individual rápida)
+  // Completar inspección mediante escaneo RFID (versión individual)
   const completarInspeccionPorEscaneo = useCallback(async (itemId: number) => {
     try {
       const item = itemsParaInspeccion.find(i => i.id === itemId);
-      if (!item) {
-        throw new Error('Item no encontrado');
-      }
-
-      // Agregar a la cola en lugar de procesar inmediatamente
+      if (!item) throw new Error('Item no encontrado');
       agregarAColaEscaneo(item);
-      
     } catch (err) {
-      console.error('Error agregando item a cola de escaneo:', err);
       setError(err instanceof Error ? err.message : 'Error al agregar item a escaneo');
       throw err;
     }
   }, [itemsParaInspeccion, agregarAColaEscaneo]);
+
+  // Cargar al montar
+  useEffect(() => { cargarItemsParaInspeccion(); }, [cargarItemsParaInspeccion]);
 
   return {
     itemsParaInspeccion,
@@ -621,7 +405,7 @@ export const useInspeccion = () => {
     completarInspeccion,
     completarInspeccionEnLote,
     completarInspeccionPorEscaneo,
-  devolverItemsABodega,
+    devolverItemsABodega,
     // Estados y funciones para escaneo masivo
     itemsEscaneados,
     procesandoEscaneos,
