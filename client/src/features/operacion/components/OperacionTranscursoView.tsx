@@ -137,166 +137,22 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     }
   };
 
-  // Función para obtener el cronómetro asociado a un item (con logging detallado)
+  // Función para obtener el cronómetro asociado a un item (ID-estricto)
   const obtenerTemporizadorParaItem = useCallback((itemId: number) => {
-    // Incluir tanto timers activos como completados
-    const todosLosTimers = [...timers];
-
-    // Estrategia 1: Buscar por registro de envío (más confiable)
+    // 1) Si hay registro de envío con timerId, usarlo
     const registroEnvio = envio.itemsEnEnvio.find((e: any) => e.id === itemId);
-    
-    if (registroEnvio && registroEnvio.timerId) {
-      // Buscar tanto en activos como completados
-      const timer = todosLosTimers.find((timer: any) => timer.id === registroEnvio.timerId);
-      if (timer) {
-        return timer;
-      } else {
-        // Timer con ID no encontrado en contexto
-      }
+    if (registroEnvio?.timerId) {
+      const t = timers.find((x: any) => x.id === registroEnvio.timerId);
+      if (t) return t;
     }
 
-    // Estrategia 2: Buscar el item en inventario para obtener su información
-    const item = inventarioCompleto.find(i => i.id === itemId);
-    if (!item) {
-      return undefined;
-    }
+    // 2) Buscar por ID parseado del nombre del timer (activos o completados)
+    const tById = activosPorId.get(itemId) || completadosPorId.get(itemId);
+    if (tById) return tById;
 
-  // Estrategia 3: Buscar cronómetro por nombre del item (incluir completados) - MEJORADA
-    const posiblesNombres = [
-      `Envío #${item.id} - ${item.nombre_unidad}`,
-      `Envío #${item.id} - ${item.rfid}`,
-      `Envío ${item.nombre_unidad}`,
-      `Envío ${item.rfid}`,
-      item.nombre_unidad,
-      item.rfid,
-      `TIC ${item.nombre_unidad}`,
-      `TIC ${item.rfid}`
-    ].filter(Boolean);
-
-    for (const posibleNombre of posiblesNombres) {
-      const timer = todosLosTimers.find(t => t.nombre === posibleNombre);
-      if (timer) {
-        
-        // Si encontramos el timer pero no hay registro de envío, crearlo
-        if (!registroEnvio && timer.tipoOperacion === 'envio') {
-          const fechaInicio = new Date(timer.fechaInicio);
-          const tiempoEnvioMinutos = timer.tiempoInicialMinutos;
-          const fechaEstimada = new Date(fechaInicio.getTime() + (tiempoEnvioMinutos * 60 * 1000));
-
-          const itemEnvio = {
-            id: item.id,
-            nombre_unidad: item.nombre_unidad,
-            rfid: item.rfid,
-            lote: item.lote || 'Sin lote',
-            estado: 'operación',
-            sub_estado: 'En transito',
-            categoria: item.categoria || 'tics',
-            tiempoEnvio: tiempoEnvioMinutos,
-            timerId: timer.id,
-            fechaInicioEnvio: fechaInicio,
-            fechaEstimadaLlegada: fechaEstimada
-          };
-
-          // Actualizar estado local de envío
-          envio.setItemsEnEnvio(prev => {
-            const sinItemAnterior = prev.filter(i => i.id !== itemId);
-            const nuevosItems = [...sinItemAnterior, itemEnvio];
-            return nuevosItems;
-          });
-        }
-        
-        return timer;
-      }
-    }
-
-  // Estrategia 4: Buscar cronómetro que contenga parte del nombre del item (incluir completados)
-    const timerConNombre = todosLosTimers.find(timer => {
-      const nombreTimer = timer.nombre.toLowerCase();
-      const nombreItem = (item.nombre_unidad || item.rfid || '').toLowerCase();
-      return nombreItem && (nombreTimer.includes(nombreItem) || nombreItem.includes(nombreTimer));
-    });
-
-    if (timerConNombre) {
-      
-      // Si encontramos el timer pero no hay registro de envío, crearlo
-      if (!registroEnvio && timerConNombre.tipoOperacion === 'envio') {
-        const fechaInicio = new Date(timerConNombre.fechaInicio);
-        const tiempoEnvioMinutos = timerConNombre.tiempoInicialMinutos;
-        const fechaEstimada = new Date(fechaInicio.getTime() + (tiempoEnvioMinutos * 60 * 1000));
-
-        const itemEnvio = {
-          id: item.id,
-          nombre_unidad: item.nombre_unidad,
-          rfid: item.rfid,
-          lote: item.lote || 'Sin lote',
-          estado: 'operación',
-          sub_estado: 'En transito',
-          categoria: item.categoria || 'tics',
-          tiempoEnvio: tiempoEnvioMinutos,
-          timerId: timerConNombre.id,
-          fechaInicioEnvio: fechaInicio,
-          fechaEstimadaLlegada: fechaEstimada
-        };
-
-        // Actualizar estado local de envío
-        envio.setItemsEnEnvio(prev => {
-          const sinItemAnterior = prev.filter(i => i.id !== itemId);
-          const nuevosItems = [...sinItemAnterior, itemEnvio];
-          return nuevosItems;
-        });
-      }
-      
-      return timerConNombre;
-    }
-
-  // Estrategia 5: Para items sin cronómetro, si están en estado "En transito", buscar cronómetros huérfanos de envío
-    if (item.estado === 'operación' && item.sub_estado === 'En transito') {
-      const timersEnvioSinAsociar = todosLosTimers.filter(timer => {
-        // Es un timer de envío
-        if (timer.tipoOperacion !== 'envio') return false;
-        
-        // No está asociado a ningún item en envío
-        const estaAsociado = envio.itemsEnEnvio.some(e => e.timerId === timer.id);
-        return !estaAsociado;
-      });
-      
-      if (timersEnvioSinAsociar.length === 1) {
-        const timerHuerfano = timersEnvioSinAsociar[0];
-        
-        // Crear registro de envío para asociar el timer huérfano
-        const fechaInicio = new Date(timerHuerfano.fechaInicio);
-        const tiempoEnvioMinutos = timerHuerfano.tiempoInicialMinutos;
-        const fechaEstimada = new Date(fechaInicio.getTime() + (tiempoEnvioMinutos * 60 * 1000));
-
-        const itemEnvio = {
-          id: item.id,
-          nombre_unidad: item.nombre_unidad,
-          rfid: item.rfid,
-          lote: item.lote || 'Sin lote',
-          estado: 'operación',
-          sub_estado: 'En transito',
-          categoria: item.categoria || 'tics',
-          tiempoEnvio: tiempoEnvioMinutos,
-          timerId: timerHuerfano.id,
-          fechaInicioEnvio: fechaInicio,
-          fechaEstimadaLlegada: fechaEstimada
-        };
-
-        // Actualizar estado local de envío
-        envio.setItemsEnEnvio(prev => {
-          const sinItemAnterior = prev.filter(i => i.id !== itemId);
-          const nuevosItems = [...sinItemAnterior, itemEnvio];
-          return nuevosItems;
-        });
-        
-        return timerHuerfano;
-      }
-    }
-
-    // Log de debugging adicional cuando no se encuentra nada
-  // No se encontró cronómetro
+    // 3) No asociar por nombre para evitar asignaciones cruzadas
     return undefined;
-  }, [timers, envio.itemsEnEnvio, inventarioCompleto, itemsListosParaDespacho.length, envio.setItemsEnEnvio]);
+  }, [envio.itemsEnEnvio, timers, activosPorId, completadosPorId]);
 
   const renderizarTemporizador = (itemId: number) => {
     const timer = obtenerTemporizadorParaItem(itemId);
