@@ -27,7 +27,7 @@ interface ItemEnTransito {
 const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   const { inventarioCompleto, actualizarColumnasDesdeBackend } = useOperaciones();
   const envio = useEnvio(actualizarColumnasDesdeBackend);
-  const { timers, formatearTiempo, pausarTimer, reanudarTimer, eliminarTimer, crearTimer, obtenerTimersCompletados, isConnected } = useTimerContext();
+  const { timers, formatearTiempo, pausarTimer, reanudarTimer, eliminarTimer, crearTimer, obtenerTimersCompletados, isConnected, getRecentCompletion, getRecentCompletionById, forzarSincronizacion } = useTimerContext();
 
   // InlineCountdown compartido
   const [busqueda, setBusqueda] = useState('');
@@ -44,6 +44,67 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   // Tiempo manual en el modal (opcional)
   const [horasEnvio, setHorasEnvio] = useState<string>('');
   const [minutosEnvio, setMinutosEnvio] = useState<string>('');
+
+  // Índices de timers de envío (activos y completados) para lookup rápido por id
+  const { activosPorId, completadosPorId } = useMemo(() => {
+    const extractFromNombre = (nombre: string): { id?: number } => {
+      const n = (nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+      const re = /^envio(?:\s*\([^)]*\))?\s+(?:#(\d+)\s*-\s*)?/i;
+      const m = n.match(re);
+      if (m && m[1]) return { id: Number(m[1]) };
+      const m2 = n.match(/#(\d+)\s*-\s*/);
+      if (m2 && m2[1]) return { id: Number(m2[1]) };
+      return {};
+    };
+    const activosPorId = new Map<number, any>();
+    const completadosPorId = new Map<number, any>();
+    for (const t of timers) {
+      if (t.tipoOperacion !== 'envio') continue;
+      const { id } = extractFromNombre(t.nombre || '');
+      if (typeof id === 'number' && !Number.isNaN(id)) {
+        if (t.completado) completadosPorId.set(id, t);
+        else activosPorId.set(id, t);
+      }
+    }
+    return { activosPorId, completadosPorId };
+  }, [timers]);
+
+  // Derivar listas visibles desde inventario y timers
+  useEffect(() => {
+    // 1) Items en transcurso (tabla principal): estado operación > En transito
+    const enTransito = (inventarioCompleto || []).filter(
+      (item: any) => item.estado === 'operación' && item.sub_estado === 'En transito'
+    );
+    setItemsListosParaDespacho(enTransito);
+
+    // 2) Items disponibles para iniciar envío en modal: en Ensamblaje y con tiempo de envío completado
+    const baseEnsamblaje = (inventarioCompleto || []).filter(
+      (item: any) => item.estado === 'Acondicionamiento' && item.sub_estado === 'Ensamblaje'
+    );
+
+    const filtrados = baseEnsamblaje.filter((item: any) => {
+      // Persistente completado por ID
+      const tComp = completadosPorId.get(item.id);
+      if (tComp) {
+        const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
+        try {
+          const inicioTimer = new Date(tComp.fechaInicio).getTime();
+          if (Number.isNaN(llegadaEtapa) || inicioTimer >= llegadaEtapa - 60_000) return true;
+        } catch {}
+      }
+      // Reciente completado por ID o por nombre común
+      const reciente = getRecentCompletionById('envio', item.id)
+        || getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
+        || getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio');
+      if (reciente) return true;
+      // Activo ya en 0s
+      const tActivo = activosPorId.get(item.id);
+      if (tActivo && (tActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
+      return false;
+    });
+
+    setItemsListosDespacho(filtrados);
+  }, [inventarioCompleto, activosPorId, completadosPorId, getRecentCompletion, getRecentCompletionById]);
   
   // Lista filtrada para el modal (memoizada)
   const itemsFiltradosModal = useMemo(() => {
@@ -77,57 +138,27 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
 
   // Función para obtener el cronómetro asociado a un item (con logging detallado)
   const obtenerTemporizadorParaItem = useCallback((itemId: number) => {
-  // console.log('🔍 ===== BÚSQUEDA DE CRONÓMETRO =====');
-    // console.log('📦 Item ID:', itemId);
-    
     // Incluir tanto timers activos como completados
     const todosLosTimers = [...timers];
-    // console.log('⏲️ Timers disponibles en contexto:', {
-    //   cantidad: todosLosTimers.length,
-    //   timers: todosLosTimers.map(t => ({ 
-    //     id: t.id, 
-    //     nombre: t.nombre, 
-    //     tipo: t.tipoOperacion || 'sin_tipo', 
-    //     completado: t.completado,
-    //     activo: t.activo,
-    //     tiempoRestante: t.tiempoRestanteSegundos
-    //   }))
-    // });
-
-    // console.log('📦 Items en envío en hook:', {
-    //   cantidad: envio.itemsEnEnvio.length,
-    //   items: envio.itemsEnEnvio.map(e => ({ id: e.id, timerId: e.timerId, nombre: e.nombre_unidad }))
-    // });
 
     // Estrategia 1: Buscar por registro de envío (más confiable)
     const registroEnvio = envio.itemsEnEnvio.find((e: any) => e.id === itemId);
-    // console.log('🔍 Registro de envío encontrado:', registroEnvio);
     
     if (registroEnvio && registroEnvio.timerId) {
       // Buscar tanto en activos como completados
       const timer = todosLosTimers.find((timer: any) => timer.id === registroEnvio.timerId);
       if (timer) {
-        console.log(`✅ Timer encontrado por registro de envío para item ${itemId}:`, timer.nombre, `(completado: ${timer.completado})`);
         return timer;
       } else {
-        console.log(`❌ Timer con ID ${registroEnvio.timerId} no encontrado en contexto`);
+        // Timer con ID no encontrado en contexto
       }
     }
 
     // Estrategia 2: Buscar el item en inventario para obtener su información
     const item = inventarioCompleto.find(i => i.id === itemId);
     if (!item) {
-      console.log(`❌ Item ${itemId} no encontrado en inventario`);
       return undefined;
     }
-
-    console.log('📦 Item encontrado:', {
-      id: item.id,
-      nombre: item.nombre_unidad,
-      rfid: item.rfid,
-      estado: item.estado,
-      sub_estado: item.sub_estado
-    });
 
   // Estrategia 3: Buscar cronómetro por nombre del item (incluir completados) - MEJORADA
     const posiblesNombres = [
@@ -141,16 +172,12 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       `TIC ${item.rfid}`
     ].filter(Boolean);
 
-    console.log('🔍 Probando nombres posibles:', posiblesNombres);
-
     for (const posibleNombre of posiblesNombres) {
       const timer = todosLosTimers.find(t => t.nombre === posibleNombre);
       if (timer) {
-        console.log(`✅ Timer encontrado por nombre "${posibleNombre}" para item ${itemId}:`, timer.nombre, `(completado: ${timer.completado})`);
         
         // Si encontramos el timer pero no hay registro de envío, crearlo
         if (!registroEnvio && timer.tipoOperacion === 'envio') {
-          console.log('🔧 Creando registro de envío faltante para asociar timer...');
           const fechaInicio = new Date(timer.fechaInicio);
           const tiempoEnvioMinutos = timer.tiempoInicialMinutos;
           const fechaEstimada = new Date(fechaInicio.getTime() + (tiempoEnvioMinutos * 60 * 1000));
@@ -173,7 +200,6 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
           envio.setItemsEnEnvio(prev => {
             const sinItemAnterior = prev.filter(i => i.id !== itemId);
             const nuevosItems = [...sinItemAnterior, itemEnvio];
-            console.log('🔧 Registro de envío creado y agregado:', itemEnvio);
             return nuevosItems;
           });
         }
@@ -190,11 +216,9 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     });
 
     if (timerConNombre) {
-      console.log(`✅ Timer encontrado por coincidencia parcial para item ${itemId}:`, timerConNombre.nombre, `(completado: ${timerConNombre.completado})`);
       
       // Si encontramos el timer pero no hay registro de envío, crearlo
       if (!registroEnvio && timerConNombre.tipoOperacion === 'envio') {
-        console.log('🔧 Creando registro de envío faltante para timer por coincidencia...');
         const fechaInicio = new Date(timerConNombre.fechaInicio);
         const tiempoEnvioMinutos = timerConNombre.tiempoInicialMinutos;
         const fechaEstimada = new Date(fechaInicio.getTime() + (tiempoEnvioMinutos * 60 * 1000));
@@ -217,7 +241,6 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
         envio.setItemsEnEnvio(prev => {
           const sinItemAnterior = prev.filter(i => i.id !== itemId);
           const nuevosItems = [...sinItemAnterior, itemEnvio];
-          console.log('� Registro de envío creado por coincidencia:', itemEnvio);
           return nuevosItems;
         });
       }
@@ -236,11 +259,8 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
         return !estaAsociado;
       });
       
-      console.log('🔄 Timers de envío sin asociar:', timersEnvioSinAsociar.map(t => ({ nombre: t.nombre, id: t.id })));
-      
       if (timersEnvioSinAsociar.length === 1) {
         const timerHuerfano = timersEnvioSinAsociar[0];
-        console.log('� Asociando timer huérfano a item sin timer:', timerHuerfano.nombre);
         
         // Crear registro de envío para asociar el timer huérfano
         const fechaInicio = new Date(timerHuerfano.fechaInicio);
@@ -265,7 +285,6 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
         envio.setItemsEnEnvio(prev => {
           const sinItemAnterior = prev.filter(i => i.id !== itemId);
           const nuevosItems = [...sinItemAnterior, itemEnvio];
-          console.log('🔧 Timer huérfano asociado:', itemEnvio);
           return nuevosItems;
         });
         
@@ -274,15 +293,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     }
 
     // Log de debugging adicional cuando no se encuentra nada
-  console.log('❌ ===== NO SE ENCONTRÓ CRONÓMETRO =====');
-    console.log('❌ Estrategias probadas:');
-    console.log('   1. Por registro de envío:', registroEnvio ? `timerId: ${registroEnvio.timerId}` : 'No disponible');
-    console.log('   2. Por nombres exactos:', posiblesNombres);
-    console.log('   3. Por coincidencia parcial con:', item.nombre_unidad);
-  console.log('   4. Por cronómetros huérfanos de envío para items en tránsito');
-  console.log('❌ Cronómetros en contexto:', todosLosTimers.map(t => `"${t.nombre}" (tipo: ${t.tipoOperacion}, completado: ${t.completado}, activo: ${t.activo})`));
-    console.log('❌ Items en envío:', envio.itemsEnEnvio.map(e => ({ id: e.id, timerId: e.timerId, nombre: e.nombre_unidad })));
-    
+  // No se encontró cronómetro
     return undefined;
   }, [timers, envio.itemsEnEnvio, inventarioCompleto, itemsListosParaDespacho.length, envio.setItemsEnEnvio]);
 
@@ -444,14 +455,10 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
 
       // Actualizar estado local de envío - siempre reemplazar/agregar
       envio.setItemsEnEnvio(prev => {
-        console.log('🔄 Actualizando items en envío, agregando/actualizando item:', itemEnvio);
         const sinItemAnterior = prev.filter(i => i.id !== itemIdParaTimer);
         const nuevosItems = [...sinItemAnterior, itemEnvio];
-        console.log('📦 Items en envío después de actualizar:', nuevosItems);
         return nuevosItems;
       });
-
-      console.log(`✅ Timer creado exitosamente: ID ${timerId} para item ${item.nombre_unidad}`);
 
       // Cerrar modal
       setMostrarModalTimer(false);
@@ -459,7 +466,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       setTimerEnEdicion(null);
 
     } catch (error) {
-  console.error('Error configurando cronómetro:', error);
+      console.error('Error configurando cronómetro:', error);
     } finally {
       setCargandoTimer(false);
     }
@@ -477,16 +484,15 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     
     if (confirmacion) {
       try {
-        console.log(`🔄 Completando ${itemsListosParaDespacho.length} envíos en lote...`);
+  // Procesando en lote
         
         // Procesar todos los items en paralelo para mayor velocidad
         const promesas = itemsListosParaDespacho.map(item => envio.completarEnvio(item.id));
         await Promise.all(promesas);
         
-        console.log(`✅ ${itemsListosParaDespacho.length} envíos completados exitosamente`);
         alert(`✅ ${itemsListosParaDespacho.length} envíos completados exitosamente`);
       } catch (error) {
-        console.error('❌ Error al completar envíos en lote:', error);
+  console.error('Error al completar envíos en lote:', error);
         alert(`❌ Error al completar algunos envíos`);
       }
     }
@@ -504,7 +510,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     
     if (confirmacion) {
       try {
-        console.log(`🔄 Cancelando ${itemsListosParaDespacho.length} envíos en lote...`);
+  // Procesando cancelación en lote
         
         // Procesar todos los items en paralelo para mayor velocidad
         const promesas = itemsListosParaDespacho.map(item => 
@@ -512,7 +518,6 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
         );
         await Promise.all(promesas);
         
-        console.log(`✅ ${itemsListosParaDespacho.length} envíos cancelados exitosamente`);
         alert(`✅ ${itemsListosParaDespacho.length} envíos cancelados exitosamente`);
       } catch (error) {
         console.error('❌ Error al cancelar envíos en lote:', error);
@@ -572,7 +577,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   setHorasEnvio('');
   setMinutosEnvio('');
     } catch (error) {
-      console.error('Error iniciando envío:', error);
+  console.error('Error iniciando envío:', error);
     }
   };
 
@@ -688,7 +693,10 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                   </>
                 )}
                 <button
-                  onClick={() => setMostrarModalSeleccion(true)}
+                  onClick={() => {
+                    try { if (isConnected) forzarSincronizacion(); } catch {}
+                    setMostrarModalSeleccion(true);
+                  }}
                   className="inline-flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white text-xs sm:text-sm font-medium rounded-md hover:bg-blue-700 transition-colors w-full sm:w-auto"
                 >
                   <Package className="w-4 h-4" />

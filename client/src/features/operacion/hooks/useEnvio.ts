@@ -34,7 +34,7 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
           fechaEstimadaLlegada: item.fechaEstimadaLlegada ? new Date(item.fechaEstimadaLlegada) : undefined
         }));
         setItemsEnEnvio(itemsConFechas);
-        console.log('📦 Items en envío cargados desde localStorage:', itemsConFechas.length);
+  // Items en envío cargados desde localStorage
       } catch (error) {
         console.error('Error al cargar items en envío:', error);
       }
@@ -44,7 +44,7 @@ export const useEnvio = (refetchInventario?: () => Promise<void>) => {
   // Guardar items en envío en localStorage cuando cambien
   useEffect(() => {
     localStorage.setItem('kryotec_items_envio', JSON.stringify(itemsEnEnvio));
-    console.log('💾 Items en envío guardados en localStorage:', itemsEnEnvio.length);
+  // Items en envío guardados en localStorage
   }, [itemsEnEnvio]);
 
   /**
