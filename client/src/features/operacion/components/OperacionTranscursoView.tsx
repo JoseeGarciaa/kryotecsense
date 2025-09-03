@@ -78,12 +78,35 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
     setItemsListosParaDespacho(enTransito);
 
     // 2) Items disponibles para iniciar envío en modal:
-    //    Tomar directamente los que están en Acondicionamiento > Lista para Despacho
+    //    Base: Acondicionamiento > Lista para Despacho
     const baseListaDespacho = (inventarioCompleto || []).filter(
       (item: any) => item.estado === 'Acondicionamiento' && item.sub_estado === 'Lista para Despacho'
     );
-    setItemsListosDespacho(baseListaDespacho);
-  }, [inventarioCompleto]);
+
+    //    Filtro: solo los que tienen su tiempo de envío COMPLETADO (persistente, reciente o llegó a 0)
+    const elegibles = baseListaDespacho.filter((item: any) => {
+      const timerCompletado = completadosPorId.get(item.id);
+      if (timerCompletado) {
+        const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
+        try {
+          const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
+          if (Number.isNaN(llegadaEtapa) || inicioTimer >= (llegadaEtapa - 60_000)) return true;
+        } catch {}
+      }
+
+      const reciente = getRecentCompletionById('envio', item.id)
+        || getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
+        || getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio');
+      if (reciente) return true;
+
+      const timerActivo = activosPorId.get(item.id);
+      if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
+
+      return false;
+    });
+
+    setItemsListosDespacho(elegibles);
+  }, [inventarioCompleto, completadosPorId, activosPorId, getRecentCompletionById, getRecentCompletion]);
   
   // Lista filtrada para el modal (memoizada)
   const itemsFiltradosModal = useMemo(() => {
