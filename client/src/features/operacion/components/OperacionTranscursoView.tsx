@@ -951,7 +951,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
             </div>
             
             {/* Controles del modal */}
-            <div className="p-4 sm:p-6 border-t border-gray-200 flex items-center justify-end gap-2 sm:gap-3">
+    <div className="p-4 sm:p-6 border-t border-gray-200 flex items-center justify-end gap-2 sm:gap-3">
                 <button
                   onClick={() => {
                     setMostrarModalSeleccion(false);
@@ -960,20 +960,16 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     setHorasEnvio('');
                     setMinutosEnvio('');
                   }}
-                  className="px-3 py-2 sm:px-4 sm:py-2 text-gray-600 bg-white rounded-lg hover:bg-white transition-colors text-sm"
+      className="px-4 py-2 text-sm text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={confirmarSeleccion}
                   disabled={itemsSeleccionadosModal.length === 0 || ((parseInt(horasEnvio || '0', 10) * 60 + parseInt(minutosEnvio || '0', 10)) <= 0)}
-                  className={`px-3 py-2 sm:px-4 sm:py-2 rounded-lg transition-colors text-sm ${
-                    itemsSeleccionadosModal.length > 0 && ((parseInt(horasEnvio || '0', 10) * 60 + parseInt(minutosEnvio || '0', 10)) > 0)
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                      : 'bg-white text-gray-500 cursor-not-allowed'
-                  }`}
+      className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
-                  Iniciar envío ({itemsSeleccionadosModal.length} TICs)
+      Iniciar envío ({itemsSeleccionadosModal.length})
                 </button>
             </div>
           </div>
