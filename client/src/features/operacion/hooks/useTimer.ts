@@ -161,11 +161,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   // Unificado: derivar SIEMPRE del host de la API (VITE_API_URL) o same-origin en dev.
   // Nota: Ignoramos VITE_TIMER_WS_URL para evitar "split-brain" entre servicios distintos.
   const timerWsUrl = (() => {
-    const explicit = (import.meta.env.VITE_TIMER_WS_URL as string | undefined)?.trim();
-    if (explicit) {
-      // Aviso visible en consola si alguien intentó forzar otra URL de WS
-      console.warn('VITE_TIMER_WS_URL está definido pero será ignorado para unificar el endpoint WS en API Gateway:', explicit);
-    }
+  // Nota: ignoramos VITE_TIMER_WS_URL para unificar el endpoint WS en API Gateway y evitar logs ruidosos.
 
     const apiBase = (import.meta.env.VITE_API_URL as string | undefined) || '';
     if (apiBase) {
