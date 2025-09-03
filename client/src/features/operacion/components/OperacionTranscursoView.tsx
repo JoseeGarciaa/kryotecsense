@@ -820,7 +820,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
         </div>
       </div>
 
-      {/* Modal de Selección de Items (diseño sin lotes, mobile-first) */}
+      {/* Modal de Selección de Items (alineado al diseño de Ensamblaje) */}
       {mostrarModalSeleccion && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white rounded-lg shadow-xl w-[92vw] max-w-md sm:max-w-2xl md:max-w-4xl max-h-[88vh] overflow-hidden flex flex-col">
@@ -843,7 +843,7 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
               </button>
             </div>
             <div className="p-4 sm:p-6 flex flex-col gap-4 sm:gap-6 flex-1 overflow-y-auto">
-              {/* Filtros y búsqueda */}
+              {/* Búsqueda y tiempo (como Ensamblaje) */}
               <div className="space-y-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -856,28 +856,10 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
                 </div>
-                {/* filtros por categoría y 'Solo sin lote' removidos */}
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-gray-600">
-                    Resultados: {itemsFiltradosModal.length}
-                    {itemsFiltradosModal.length > 0 && (
-                      <span className="ml-2 text-gray-400">• Seleccionados: {itemsSeleccionadosModal.length}</span>
-                    )}
-                  </div>
-                  <label className="inline-flex items-center gap-2 text-sm text-gray-700 select-none cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="rounded border-gray-300"
-                      checked={itemsFiltradosModal.length > 0 && itemsFiltradosModal.every(i => itemsSeleccionadosModal.includes(i.id))}
-                      onChange={toggleSeleccionTodosModal}
-                    />
-                    Seleccionar todo
-                  </label>
-                </div>
-        {/* Tiempo manual para envío (obligatorio) */}
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
                   <div className="sm:col-span-2">
-          <label className="block text-xs text-gray-600 mb-1">Tiempo de envío (obligatorio)</label>
+                    <label className="block text-xs text-gray-600 mb-1">Tiempo de envío (obligatorio)</label>
                     <div className="flex gap-2">
                       <input
                         type="number"
@@ -900,9 +882,25 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                   </div>
                   <div className="text-xs text-gray-500">Debes ingresar horas y/o minutos para iniciar el envío.</div>
                 </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                  <button
+                    onClick={() => setItemsSeleccionadosModal(itemsFiltradosModal.map(i => i.id))}
+                    className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded"
+                  >
+                    Seleccionar todos ({itemsFiltradosModal.length})
+                  </button>
+                  <button
+                    onClick={() => setItemsSeleccionadosModal([])}
+                    className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded"
+                  >
+                    Limpiar selección
+                  </button>
+                  <span className="text-gray-600">{itemsSeleccionadosModal.length} seleccionado(s)</span>
+                </div>
               </div>
 
-              {/* Lista de items */}
+              {/* Lista de items, estilo tarjetas con checkbox a la izquierda */}
               <div className="space-y-2 max-h-[50vh] sm:max-h-[55vh] overflow-y-auto pr-1">
                 {itemsFiltradosModal.length === 0 ? (
                   <div className="text-center text-gray-500 py-8">
@@ -910,30 +908,44 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
                     <p>No hay items que coincidan con la búsqueda</p>
                   </div>
                 ) : (
-                  itemsFiltradosModal.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => toggleSeleccionItemModal(item.id)}
-                      className={`w-full text-left p-3 rounded-lg border transition-colors text-sm flex items-center justify-between ${
-                        itemsSeleccionadosModal.includes(item.id)
-                          ? 'bg-blue-50 border-blue-200'
-                          : 'bg-white border-gray-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{item.nombre_unidad}</div>
-                        <div className="text-xs text-gray-500 truncate">RFID: {item.rfid} • {item.lote || 'Sin lote'} • {item.categoria?.toUpperCase?.()}</div>
+                  itemsFiltradosModal.map((item) => {
+                    const selected = itemsSeleccionadosModal.includes(item.id);
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => toggleSeleccionItemModal(item.id)}
+                        className={`p-3 border rounded cursor-pointer transition-all ${
+                          selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => {}}
+                            className="mt-0.5 rounded"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`px-2 py-0.5 text-[11px] rounded ${
+                                item.categoria === 'TIC' ? 'bg-green-100 text-green-800' :
+                                item.categoria === 'VIP' ? 'bg-purple-100 text-purple-800' :
+                                item.categoria === 'Cube' ? 'bg-blue-100 text-blue-800' :
+                                'bg-orange-100 text-orange-800'
+                              }`}>
+                                {item.categoria}
+                              </span>
+                              <span className="font-medium text-sm truncate" title={item.nombre_unidad}>{item.nombre_unidad}</span>
+                            </div>
+                            <div className="text-xs text-gray-600 mt-1 break-words">
+                              <span className="mr-2">RFID: {item.rfid}</span>
+                              {item.lote && <span className="mr-2">Lote: {item.lote}</span>}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <input
-                        type="checkbox"
-                        checked={itemsSeleccionadosModal.includes(item.id)}
-                        onChange={(e) => e.stopPropagation()}
-                        className="rounded border-gray-300 ml-3"
-                        aria-label={`Seleccionar ${item.nombre_unidad}`}
-                        readOnly
-                      />
-                    </button>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
