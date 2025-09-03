@@ -18,7 +18,44 @@ export const useDevolucion = () => {
   const [itemsDevueltos, setItemsDevueltos] = useState<ItemDevolucion[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { timers, eliminarTimer, crearTimer } = useTimerContext();
+  const { timers, eliminarTimer, crearTimer, forzarSincronizacion } = useTimerContext();
+
+  // Restaura el cronómetro de envío de un item si falta, usando la info persistida en localStorage
+  const ensureEnvioTimerForItem = useCallback((id: number, nombre?: string) => {
+    try {
+      // Si ya existe un timer activo de envío para este item, no hacer nada
+      const yaExiste = timers.some(
+        (t) => t.tipoOperacion === 'envio' && new RegExp(`^Envío\\s+#${id}\\s+-`).test(t.nombre)
+      );
+      if (yaExiste) return;
+
+      const raw = localStorage.getItem('kryotec_items_envio');
+      if (!raw) return;
+      let lista: any[] = [];
+      try {
+        lista = JSON.parse(raw);
+      } catch {
+        return;
+      }
+      const item = Array.isArray(lista) ? lista.find((it) => Number(it.id) === Number(id)) : undefined;
+      if (!item || !item.fechaEstimadaLlegada) return;
+
+      const ahora = new Date();
+      const eta = new Date(item.fechaEstimadaLlegada);
+      const restanteMs = eta.getTime() - ahora.getTime();
+      const restanteMin = Math.ceil(restanteMs / 60000);
+      if (restanteMin <= 0) return; // Ya vencido; no recrear cronómetro activo
+
+      const nombreTimer = `Envío #${id} - ${nombre ?? item.nombre_unidad ?? 'Item'}`;
+      crearTimer(nombreTimer, 'envio', Math.max(1, restanteMin));
+      // Opcional: forzar sincronización para compartir el nuevo timer
+      setTimeout(() => {
+        try { forzarSincronizacion(); } catch {}
+      }, 250);
+    } catch (e) {
+      console.warn('No se pudo restaurar cronómetro de envío para item', id, e);
+    }
+  }, [timers, crearTimer, forzarSincronizacion]);
 
   // Cargar items pendientes de devolución
   const cargarItemsDevolucion = useCallback(async () => {
@@ -255,6 +292,8 @@ export const useDevolucion = () => {
           estado_nuevo: 'operación',
           sub_estado_nuevo: 'En transito'
         });
+  // Asegurar que el cronómetro de envío siga activo o se restaure si no existe
+  ensureEnvioTimerForItem(id, nombre);
         await cargarItemsDevolucion();
         alert('✅ Regresó a Operación (cronómetro continúa)');
       } catch (err) {
@@ -301,7 +340,7 @@ export const useDevolucion = () => {
       window.removeEventListener('devolucion:regresar-operacion', onRegresarOperacion as EventListener);
       window.removeEventListener('devolucion:pasar-inspeccion', onPasarInspeccion as EventListener);
     };
-  }, [cargarItemsDevolucion, timers, eliminarTimer]);
+  }, [cargarItemsDevolucion, timers, eliminarTimer, ensureEnvioTimerForItem]);
 
   // Batch: regresar a Operación
   const regresarItemsAOperacion = useCallback(async (itemIds: number[], nombres?: Record<number, string>) => {
@@ -323,6 +362,8 @@ export const useDevolucion = () => {
           estado_nuevo: 'operación',
           sub_estado_nuevo: 'En transito'
         });
+    // Asegurar cronómetro de envío activo
+    ensureEnvioTimerForItem(id, nombre);
       }));
 
       await cargarItemsDevolucion();
@@ -331,7 +372,7 @@ export const useDevolucion = () => {
       setError('Error regresando items a operación');
       throw err;
     }
-  }, [cargarItemsDevolucion]);
+  }, [cargarItemsDevolucion, ensureEnvioTimerForItem]);
 
   // Batch: pasar a Inspección (cancela timer de envío y crea timer de inspección con duración elegida)
   const pasarItemsAInspeccion = useCallback(async (itemIds: number[], nombres?: Record<number, string>, duracionMinutos?: number) => {
