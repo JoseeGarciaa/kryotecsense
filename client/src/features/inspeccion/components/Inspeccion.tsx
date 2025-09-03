@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Package, CheckCircle, AlertCircle, Clock, Settings, Shield, Scan, Search } from 'lucide-react';
+import { Package, CheckCircle, AlertCircle, Clock, Settings, Shield, Search } from 'lucide-react';
 import { useInspeccion, ItemInspeccion } from '../hooks/useInspeccion';
-import { InspeccionScanModal } from './InspeccionScanModal';
 import { useTimerContext } from '../../../contexts/TimerContext';
 import { useDevolucion } from '../../devolucion/hooks/useDevolucion';
 
@@ -14,17 +13,10 @@ export const Inspeccion: React.FC = () => {
     cargarItemsParaInspeccion,
     actualizarValidaciones,
     completarInspeccion,
-    completarInspeccionEnLote,
-    completarInspeccionPorEscaneo,
-    // Estados y funciones para escaneo masivo
-    itemsEscaneados,
-    procesandoEscaneos,
-    colaEscaneos,
-    procesarColaEscaneos
+  completarInspeccionEnLote
   } = useInspeccion();
 
   const [paginaActual, setPaginaActual] = useState(1);
-  const [mostrarModalEscaneo, setMostrarModalEscaneo] = useState(false);
   const itemsPorPagina = 5;
 
   // Datos de la fase anterior (Devolución) para "Agregar Items"
@@ -157,21 +149,7 @@ export const Inspeccion: React.FC = () => {
     }
   };
 
-  // Función para manejar el escaneo de items
-  const handleScanItem = async (item: any) => {
-    try {
-      console.log(`🔍 Procesando escaneo para item ${item.nombre_unidad}...`);
-      
-      // Usar la función especializada para escaneo que no requiere validaciones previas
-      await completarInspeccionPorEscaneo(item.id);
-      
-      console.log(`✅ Item ${item.nombre_unidad} inspeccionado exitosamente mediante escaneo`);
-    } catch (error) {
-      console.error('Error al procesar item escaneado:', error);
-      // Mostrar error al usuario
-      alert(`❌ Error al procesar item ${item.nombre_unidad}: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-    }
-  };
+  // Escaneo masivo deshabilitado en esta vista (botón y modal removidos)
 
   // Componente para renderizar un item de inspección
   const ItemInspeccionCard: React.FC<{ item: ItemInspeccion }> = ({ item }) => {
@@ -346,37 +324,6 @@ export const Inspeccion: React.FC = () => {
                   <Package className="w-4 h-4" />
                   Agregar Items
                 </button>
-                {/* Botón de escaneo RFID - Siempre visible */}
-                <button
-                  onClick={() => setMostrarModalEscaneo(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-                  title="Escanear items para inspección masiva"
-                >
-                  <Scan className="w-4 h-4" />
-                  Escaneo Masivo
-                  {itemsEscaneados.length > 0 && (
-                    <span className="bg-blue-800 text-xs px-2 py-0.5 rounded-full">
-                      {itemsEscaneados.length}
-                    </span>
-                  )}
-                </button>
-                
-                {/* Botón para procesar cola de escaneos */}
-                {colaEscaneos.length > 0 && (
-                  <button
-                    onClick={procesarColaEscaneos}
-                    disabled={procesandoEscaneos}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-md hover:bg-orange-700 disabled:bg-orange-400 transition-colors"
-                    title={`Procesar ${colaEscaneos.length} items escaneados`}
-                  >
-                    {procesandoEscaneos ? (
-                      <Clock className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <CheckCircle className="w-4 h-4" />
-                    )}
-                    {procesandoEscaneos ? 'Procesando...' : `Procesar ${colaEscaneos.length}`}
-                  </button>
-                )}
                 
                 {/* Botón para completar todas las inspecciones válidas - Solo cuando hay items válidos */}
                 {itemsParaInspeccion.some(isItemListoParaInspeccion) && (
@@ -545,15 +492,7 @@ export const Inspeccion: React.FC = () => {
         )}
       </div>
 
-      {/* Modal de escaneo RFID */}
-      <InspeccionScanModal
-        isOpen={mostrarModalEscaneo}
-        onClose={() => setMostrarModalEscaneo(false)}
-        onScanItem={handleScanItem}
-        itemsDisponibles={itemsParaInspeccion}
-        itemsEscaneados={itemsEscaneados}
-        procesandoEscaneos={procesandoEscaneos}
-      />
+  {/* Modal de escaneo RFID removido */}
 
       {/* Modal de Selección de Items desde Devolución (mismo diseño que otros) */}
       {mostrarModalSeleccion && (
