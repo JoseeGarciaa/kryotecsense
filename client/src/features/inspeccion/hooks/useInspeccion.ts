@@ -87,14 +87,7 @@ export const useInspeccion = () => {
           continue;
         }
 
-        // Caso 2: Items ya movidos a En bodega pero con todas las validaciones aprobadas
-        // Esto asegura que, al completar inspección, se sigan mostrando como "Inspeccionados" en la UI
-        if (est === 'en bodega') {
-          const { limpieza, goteo, desinfeccion } = base.validaciones!;
-          if (limpieza && goteo && desinfeccion) {
-            inspeccionados.push(base);
-          }
-        }
+  // Nota: ya NO incluimos items en "En bodega" aquí; una vez pasen a bodega, dejan de mostrarse en esta vista
       }
 
       setItemsParaInspeccion(pendientes);
@@ -188,7 +181,7 @@ export const useInspeccion = () => {
         });
       } catch {}
 
-      // 3) Inspección/Inspeccionada (PATCH) con tolerancia a no encontrado
+    // 3) Inspección/Inspeccionada (PATCH) con tolerancia a no encontrado (no mover a bodega aquí)
       try {
         await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
       } catch (e: any) {
@@ -198,29 +191,14 @@ export const useInspeccion = () => {
           await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
         }
       }
-
-      // 4) En bodega/Disponible (PATCH) con tolerancia a no encontrado
-      try {
-        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
-      } catch (e: any) {
-        const msg = e?.response?.data?.detail || e?.message || '';
-        if (!/no encontrado|not found/i.test(String(msg))) {
-          await new Promise(r => setTimeout(r, 200));
-          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
-        }
-      }
-
-      // 5) Limpiar lote
-      await actualizarInventarioConFallback(itemId, { lote: null });
-
-      // 6) Actividad movimiento a bodega (best-effort)
+    // 4) Actividad: inspección completada (sin mover a bodega)
       try {
         await apiServiceClient.post('/activities/actividades/', {
           inventario_id: itemId,
           usuario_id: 1,
-          descripcion: `${item.nombre_unidad} inspeccionado y movido a En bodega (lote limpiado)`,
-          estado_nuevo: 'En bodega',
-          sub_estado_nuevo: 'Disponible'
+      descripcion: `${item.nombre_unidad} inspeccionado (validaciones completas)`,
+      estado_nuevo: 'Inspección',
+      sub_estado_nuevo: 'Inspeccionada'
         });
       } catch {}
 
@@ -238,7 +216,7 @@ export const useInspeccion = () => {
         // Reflejar que ya está inspeccionado aunque el backend tarde en responder
         return [...prev, { ...item, estado: 'Inspección', sub_estado: 'Inspeccionada' }];
       });
-      try { await cargarItemsParaInspeccion(); } catch {}
+  try { await cargarItemsParaInspeccion(); } catch {}
     } catch (err: any) {
       const detalle = err?.response?.data?.detail || err?.message || 'Error al completar inspección';
       setError(String(detalle));
@@ -280,7 +258,7 @@ export const useInspeccion = () => {
             });
           } catch {}
 
-          // 3) Estados: Inspección/Inspeccionada -> En bodega/Disponible (tolerante a no encontrado)
+      // 3) Estado: Inspección/Inspeccionada (no mover a bodega en este paso)
           try {
             await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
           } catch (e: any) {
@@ -290,31 +268,18 @@ export const useInspeccion = () => {
               await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
             }
           }
-          try {
-            await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
-          } catch (e: any) {
-            const msg = e?.response?.data?.detail || e?.message || '';
-            if (!/no encontrado|not found/i.test(String(msg))) {
-              await new Promise(r => setTimeout(r, 150));
-              await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
-            }
-          }
-
-          // 4) Limpiar lote
-          await actualizarInventarioConFallback(itemId, { lote: null });
-
-          // 5) Actividad movimiento a bodega (best-effort)
+      // 4) Actividad: inspección completada (best-effort)
           try {
             await apiServiceClient.post('/activities/actividades/', {
               inventario_id: itemId,
               usuario_id: 1,
-              descripcion: `${item?.nombre_unidad ?? 'Item'} movido a En bodega (lote limpiado)`,
-              estado_nuevo: 'En bodega',
-              sub_estado_nuevo: 'Disponible'
+        descripcion: `${item?.nombre_unidad ?? 'Item'} inspeccionado completamente (lote)`,
+        estado_nuevo: 'Inspección',
+        sub_estado_nuevo: 'Inspeccionada'
             });
           } catch {}
 
-          // 6) Cancelar cronómetro si existe
+          // 5) Cancelar cronómetro si existe
           try {
             const t = timers.find(t => t.tipoOperacion === 'inspeccion' && new RegExp(`^Inspección\\s+#${String(itemId)}\\s+-`).test(t.nombre));
             if (t) eliminarTimer(t.id);
@@ -404,11 +369,8 @@ export const useInspeccion = () => {
         if (!item) return null;
         try {
           await actualizarInventarioConFallback(itemId, { validacion_limpieza: 'aprobado', validacion_goteo: 'aprobado', validacion_desinfeccion: 'aprobado' });
-          await apiServiceClient.post('/activities/actividades/', { inventario_id: itemId, usuario_id: 1, descripcion: `${item.nombre_unidad} inspeccionado completamente mediante escaneo RFID (limpieza, goteo, desinfección automática)`, estado_nuevo: 'Inspección', sub_estado_nuevo: 'Inspeccionada' });
+          await apiServiceClient.post('/activities/actividades/', { inventario_id: itemId, usuario_id: 1, descripcion: `${item.nombre_unidad} inspeccionado completamente mediante escaneo RFID (validaciones completas)`, estado_nuevo: 'Inspección', sub_estado_nuevo: 'Inspeccionada' });
           await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
-          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
-          await actualizarInventarioConFallback(itemId, { lote: null });
-          await apiServiceClient.post('/activities/actividades/', { inventario_id: itemId, usuario_id: 1, descripcion: `${item.nombre_unidad} inspeccionado (escaneo) y movido a En bodega (lote limpiado)`, estado_nuevo: 'En bodega', sub_estado_nuevo: 'Disponible' });
           try {
             const t = timers.find(t => t.tipoOperacion === 'inspeccion' && new RegExp(`^Inspección\\s+#${String(itemId)}\\s+-`).test(t.nombre));
             if (t) eliminarTimer(t.id);
