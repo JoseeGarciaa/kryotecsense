@@ -28,8 +28,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   const [itemParaTemporizador, setItemParaTemporizador] = useState<any | null>(null);
   const [destinoTimer, setDestinoTimer] = useState<'Ensamblaje' | 'Lista para Despacho' | null>(null);
   const [cargandoTimer, setCargandoTimer] = useState(false);
-  // Toggle para mostrar solo los que tienen tiempo de Despacho completo
-  const [soloCompletadosDespacho, setSoloCompletadosDespacho] = useState(true);
+  // (Eliminado) Toggle 'Solo completados' para Lista para Despacho
 
   // Acción rápida: completar desde Ensamblaje -> mover a Lista para Despacho
   const completarDesdeEnsamblaje = async (item: any) => {
@@ -149,53 +148,14 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     return { activosPorId, activosPorNombre, completadosPorId, completadosPorNombre };
   }, [timers]);
 
-  // Solo permitir mover a "Lista para Despacho" los items en Ensamblaje cuyo cronómetro de operación (envío) esté COMPLETADO
+  // Mostrar todos los items en Ensamblaje para el modal de 'Lista para Despacho' (auto-populado como antes)
   itemsDisponiblesParaDespacho = useMemo(() => {
-    const base = (inventarioCompleto || []).filter(item =>
+    return (inventarioCompleto || []).filter(item =>
       item.estado === 'Acondicionamiento' && item.sub_estado === 'Ensamblaje'
     );
+  }, [inventarioCompleto]);
 
-    return base.filter(item => {
-      // 1) Timer completado persistente por ID
-      const timerCompletado = completadosPorId.get(item.id);
-      if (timerCompletado) {
-        // Validación ligera: el timer debe ser razonablemente reciente respecto a la llegada a Ensamblaje
-        const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
-        try {
-          const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
-          if (Number.isNaN(llegadaEtapa) || inicioTimer >= (llegadaEtapa - 60_000)) return true;
-        } catch { /* continuar con otras heurísticas */ }
-      }
-
-      // 2) Completado reciente (si el servidor ya limpió el timer)
-      const reciente = getRecentCompletionById('envio', item.id)
-        || getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
-        || getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio');
-      if (reciente) return true;
-
-      // 3) Timer activo que ya llegó a 0s (latencia de sync)
-      const timerActivo = activosPorId.get(item.id);
-      if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
-
-      return false;
-    });
-  }, [inventarioCompleto, completadosPorId, activosPorId, getRecentCompletionById, getRecentCompletion]);
-
-  // Filtrar la sección "Lista para Despacho" para mostrar SOLO items con tiempo de Despacho COMPLETADO
-  const itemsListaDespachoCompletos = useMemo(() => {
-    return itemsListaDespacho.filter(item => {
-      const nombreBase = `#${item.id} -`;
-      const timerActivo = timers.find(t => t.tipoOperacion === 'envio' && t.activo && !t.completado && (t.nombre || '').includes(nombreBase) && /\(\s*despacho\s*\)/i.test(t.nombre || ''));
-      const timerCompletado = timers.find(t => t.tipoOperacion === 'envio' && t.completado && (t.nombre || '').includes(nombreBase) && /\(\s*despacho\s*\)/i.test(t.nombre || ''));
-      const reciente = !timerCompletado
-        ? getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
-        : null;
-      if (reciente) return true;
-      if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
-      if (timerCompletado) return true;
-      return false;
-    });
-  }, [itemsListaDespacho, timers, getRecentCompletion]);
+  // (Eliminado) Filtro de 'solo completados' para Lista para Despacho
 
   // Refuerzo de sincronización al montar para minimizar “—” por desfase
   useEffect(() => {
@@ -318,8 +278,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     item.lote?.toLowerCase().includes(busquedaEnsamblaje.toLowerCase())
   );
 
-  const fuenteListaDespacho = soloCompletadosDespacho ? itemsListaDespachoCompletos : itemsListaDespacho;
-  const itemsListaDespachoFiltrados = fuenteListaDespacho.filter(item =>
+  const itemsListaDespachoFiltrados = itemsListaDespacho.filter(item =>
     item.nombre_unidad?.toLowerCase().includes(busquedaListaDespacho.toLowerCase()) ||
     item.rfid?.toLowerCase().includes(busquedaListaDespacho.toLowerCase()) ||
     item.lote?.toLowerCase().includes(busquedaListaDespacho.toLowerCase())
@@ -567,14 +526,6 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                 <p className="text-sm text-green-600">({itemsListaDespachoFiltrados.length} de {itemsListaDespacho.length})</p>
               </div>
               <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 text-sm text-green-800">
-                  <input
-                    type="checkbox"
-                    checked={soloCompletadosDespacho}
-                    onChange={(e) => setSoloCompletadosDespacho(e.target.checked)}
-                  />
-                  Solo completados
-                </label>
                 <button
                   onClick={() => {
                     try { if (isConnected) forzarSincronizacion(); } catch {}
