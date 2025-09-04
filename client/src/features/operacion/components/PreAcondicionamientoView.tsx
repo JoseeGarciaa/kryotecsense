@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Scan, Plus, Loader, ChevronDown, Menu, Play, Pause, Edit, Trash2, Search, CheckCircle, X } from 'lucide-react';
 import { useOperaciones } from '../hooks/useOperaciones';
 import RfidScanModal from './RfidScanModal';
@@ -151,14 +151,8 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   getRecentCompletion
   } = useTimerContext();
 
-  // Re-render 1s to keep lists fresh (timers tick via InlineCountdown itself)
-
-  // Tick local para re-renderizar cada segundo y asegurar conteo visual fluido
-  const [nowTick, setNowTick] = useState<number>(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNowTick(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  // Nota: No necesitamos un re-render artificial cada segundo aquí.
+  // El contexto de timers ya emite un tick global sincronizado que actualiza el estado y re-renderiza esta vista.
   
   // Efecto para cargar los datos iniciales
   useEffect(() => {
@@ -309,6 +303,19 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
+
+  // RFIDs por sección para filtrar timers a lo que está visible en pantalla
+  const rfidsCongelamientoSet = useMemo(() => new Set(ticsCongelamiento.map(t => norm(t.rfid))), [ticsCongelamiento]);
+  const rfidsAtemperamientoSet = useMemo(() => new Set(ticsAtemperamiento.map(t => norm(t.rfid))), [ticsAtemperamiento]);
+
+  const timersCongelamientoCompletadosEnSeccion = useMemo(
+    () => timers.filter((t: any) => t.completado && t.tipoOperacion === 'congelamiento' && rfidsCongelamientoSet.has(norm(t.nombre))),
+    [timers, rfidsCongelamientoSet]
+  );
+  const timersAtemperamientoCompletadosEnSeccion = useMemo(
+    () => timers.filter((t: any) => t.completado && t.tipoOperacion === 'atemperamiento' && rfidsAtemperamientoSet.has(norm(t.nombre))),
+    [timers, rfidsAtemperamientoSet]
+  );
   
   // Función para abrir modal de escaneo según el tipo
   const abrirModalEscaneo = (tipo: 'congelamiento' | 'atemperamiento') => {
@@ -630,7 +637,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   // Completar todas las TICs con timer completado en Congelamiento → Atemperamiento (sin nuevo timer por defecto)
   const completarTodasCongelamiento = async () => {
     try {
-      const timersCongelamiento = timers.filter((t: any) => t.completado && t.tipoOperacion === 'congelamiento');
+      const timersCongelamiento = timersCongelamientoCompletadosEnSeccion;
       if (timersCongelamiento.length === 0) {
         alert('No hay TICs con congelamiento completado.');
         return;
@@ -665,7 +672,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   // Completar todas las TICs con timer completado en Atemperamiento → Acondicionamiento
   const completarTodasAtemperamiento = async () => {
     try {
-      const timersAtemp = timers.filter((t: any) => t.completado && t.tipoOperacion === 'atemperamiento');
+      const timersAtemp = timersAtemperamientoCompletadosEnSeccion;
       if (timersAtemp.length === 0) {
         alert('No hay TICs con atemperamiento completado.');
         return;
@@ -737,9 +744,13 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   }, [eliminarTimer]); // Solo depende de eliminarTimer
 
   // Limpiar timers completados por tipo
-  const limpiarTimersCompletadosPorTipo = async (tipo: 'congelamiento' | 'atemperamiento') => {
+  const limpiarTimersCompletadosPorTipo = async (tipo: 'congelamiento' | 'atemperamiento', onlyIds?: string[]) => {
     try {
-      const aLimpiar = timers.filter((t: any) => t.completado && t.tipoOperacion === tipo);
+      let aLimpiar = timers.filter((t: any) => t.completado && t.tipoOperacion === tipo);
+      if (onlyIds && onlyIds.length > 0) {
+        const ids = new Set(onlyIds);
+        aLimpiar = aLimpiar.filter((t: any) => ids.has(t.id));
+      }
       if (aLimpiar.length === 0) {
         alert(`No hay cronómetros completados de ${tipo}.`);
         return;
@@ -1004,9 +1015,9 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 </button>
               )}
               {/* Limpiar timers completados de congelación */}
-              {timers.some((t: any) => t.completado && t.tipoOperacion === 'congelamiento') && (
+        {timersCongelamientoCompletadosEnSeccion.length > 0 && (
                 <button
-                  onClick={() => limpiarTimersCompletadosPorTipo('congelamiento')}
+          onClick={() => limpiarTimersCompletadosPorTipo('congelamiento', timersCongelamientoCompletadosEnSeccion.map((t: any) => t.id))}
                   className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm transition-colors"
                   title="Limpiar cronómetros completados de congelación"
                 >
@@ -1015,7 +1026,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 </button>
               )}
               {/* Completar todas: Congelamiento → Atemperamiento */}
-              {timers.some((t: any) => t.completado && t.tipoOperacion === 'congelamiento') && (
+        {timersCongelamientoCompletadosEnSeccion.length > 0 && (
                 <button
                   onClick={completarTodasCongelamiento}
                   className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm transition-colors"
@@ -1278,9 +1289,9 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 </button>
               )}
               {/* Limpiar timers completados de atemperamiento */}
-              {timers.some((t: any) => t.completado && t.tipoOperacion === 'atemperamiento') && (
+        {timersAtemperamientoCompletadosEnSeccion.length > 0 && (
                 <button
-                  onClick={() => limpiarTimersCompletadosPorTipo('atemperamiento')}
+          onClick={() => limpiarTimersCompletadosPorTipo('atemperamiento', timersAtemperamientoCompletadosEnSeccion.map((t: any) => t.id))}
                   className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm transition-colors"
                   title="Limpiar cronómetros completados de atemperamiento"
                 >
@@ -1289,7 +1300,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 </button>
               )}
               {/* Completar todas: Atemperamiento → Acondicionamiento */}
-              {timers.some((t: any) => t.completado && t.tipoOperacion === 'atemperamiento') && (
+        {timersAtemperamientoCompletadosEnSeccion.length > 0 && (
                 <button
                   onClick={completarTodasAtemperamiento}
                   className="flex items-center justify-center gap-2 px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm transition-colors"
