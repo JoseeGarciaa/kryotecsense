@@ -4,6 +4,7 @@ import useTimer, { Timer } from '../features/operacion/hooks/useTimer';
 interface TimerContextType {
   timers: Timer[];
   crearTimer: (nombre: string, tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => string;
+  crearTimersBatch: (nombres: string[], tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number, opts?: { alignToServerSecond?: boolean }) => string[];
   crearTimerLocal: (nombre: string, tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => string;
   pausarTimer: (id: string) => void;
   reanudarTimer: (id: string) => void;

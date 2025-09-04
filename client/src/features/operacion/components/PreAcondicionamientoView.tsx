@@ -140,7 +140,8 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   // Hook para manejar timers
   const {
     timers,
-    crearTimer,
+  crearTimer,
+  crearTimersBatch,
   crearTimerLocal,
     pausarTimer,
     reanudarTimer,
@@ -441,21 +442,36 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     await new Promise(resolve => setTimeout(resolve, 0));
 
     try {
-    // 2) Crear cronómetros en lotes pequeños para evitar frame drops
-      const crear = isConnected ? crearTimer : crearTimerLocal;
-      const CHUNK = 50; // tamaño de lote
-      for (let i = 0; i < rfidsSeleccionados.length; i += CHUNK) {
-        const batch = rfidsSeleccionados.slice(i, i + CHUNK);
-        batch.forEach((rfid, idx) => {
-          if (!obtenerTemporizadorTIC(rfid)) {
-            const id = crear(rfid, tipoSeleccionado, tiempoMinutos);
-            // Log ligero solo por el primero del lote para no saturar
-            if (idx === 0) console.log(`🚀 Timers creados lote ${Math.floor(i / CHUNK) + 1}`);
+      // 2) Crear cronómetros usando batch sincronizado cuando hay WS; si no, fallback local por lotes
+      if (isConnected) {
+        // Filtrar duplicados que ya tienen timer activo
+        const candidatos = rfidsSeleccionados.filter(r => !obtenerTemporizadorTIC(r));
+        if (candidatos.length > 0) {
+          // Usar batch con ancla al segundo del servidor para perfecta sincronía visual
+          const CHUNK = 100; // enviar en grupos grandes, WS maneja múltiples mensajes
+          for (let i = 0; i < candidatos.length; i += CHUNK) {
+            const grupo = candidatos.slice(i, i + CHUNK);
+            crearTimersBatch(grupo, tipoSeleccionado, tiempoMinutos, { alignToServerSecond: true });
+            if (i === 0) console.log(`🚀 Batch sincronizado enviado (${grupo.length})`);
+            // ceder un frame
+            // eslint-disable-next-line no-await-in-loop
+            await new Promise(r => setTimeout(r, 0));
           }
-        });
-        // Ceder control para mantener la UI fluida entre lotes
-        // eslint-disable-next-line no-await-in-loop
-        await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      } else {
+        const crear = crearTimerLocal;
+        const CHUNK = 50;
+        for (let i = 0; i < rfidsSeleccionados.length; i += CHUNK) {
+          const batch = rfidsSeleccionados.slice(i, i + CHUNK);
+          batch.forEach((rfid, idx) => {
+            if (!obtenerTemporizadorTIC(rfid)) {
+              const id = crear(rfid, tipoSeleccionado, tiempoMinutos);
+              if (idx === 0) console.log(`🚀 Timers locales creados lote ${Math.floor(i / CHUNK) + 1}`);
+            }
+          });
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
       }
 
       setCargandoTemporizador(false);
