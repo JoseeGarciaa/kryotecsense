@@ -152,20 +152,26 @@ export const useInspeccion = () => {
         });
       } catch {}
 
-      // 3) Inspección/Inspeccionada (PATCH)
+      // 3) Inspección/Inspeccionada (PATCH) con tolerancia a no encontrado
       try {
         await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
-      } catch {
-        await new Promise(r => setTimeout(r, 200));
-        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
+      } catch (e: any) {
+        const msg = e?.response?.data?.detail || e?.message || '';
+        if (!/no encontrado|not found/i.test(String(msg))) {
+          await new Promise(r => setTimeout(r, 200));
+          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
+        }
       }
 
-      // 4) En bodega/Disponible (PATCH)
+      // 4) En bodega/Disponible (PATCH) con tolerancia a no encontrado
       try {
         await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
-      } catch {
-        await new Promise(r => setTimeout(r, 200));
-        await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
+      } catch (e: any) {
+        const msg = e?.response?.data?.detail || e?.message || '';
+        if (!/no encontrado|not found/i.test(String(msg))) {
+          await new Promise(r => setTimeout(r, 200));
+          await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
+        }
       }
 
       // 5) Limpiar lote
@@ -188,7 +194,13 @@ export const useInspeccion = () => {
         if (t) eliminarTimer(t.id);
       } catch {}
 
-      await cargarItemsParaInspeccion();
+      // Actualizar estado local si el backend dijo "no encontrado" para que el flujo no se bloquee
+      setItemsParaInspeccion(prev => prev.filter(i => String(i.id) !== String(itemId)));
+      setItemsInspeccionados(prev => [
+        ...prev,
+        item
+      ]);
+      try { await cargarItemsParaInspeccion(); } catch {}
     } catch (err: any) {
       const detalle = err?.response?.data?.detail || err?.message || 'Error al completar inspección';
       setError(String(detalle));
@@ -230,18 +242,24 @@ export const useInspeccion = () => {
             });
           } catch {}
 
-          // 3) Estados: Inspección/Inspeccionada -> En bodega/Disponible
+          // 3) Estados: Inspección/Inspeccionada -> En bodega/Disponible (tolerante a no encontrado)
           try {
             await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
-          } catch {
-            await new Promise(r => setTimeout(r, 150));
-            await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
+          } catch (e: any) {
+            const msg = e?.response?.data?.detail || e?.message || '';
+            if (!/no encontrado|not found/i.test(String(msg))) {
+              await new Promise(r => setTimeout(r, 150));
+              await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'Inspección', sub_estado: 'Inspeccionada' });
+            }
           }
           try {
             await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
-          } catch {
-            await new Promise(r => setTimeout(r, 150));
-            await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
+          } catch (e: any) {
+            const msg = e?.response?.data?.detail || e?.message || '';
+            if (!/no encontrado|not found/i.test(String(msg))) {
+              await new Promise(r => setTimeout(r, 150));
+              await apiServiceClient.patch(`/inventory/inventario/${itemId}/estado`, { estado: 'En bodega', sub_estado: 'Disponible' });
+            }
           }
 
           // 4) Limpiar lote
@@ -271,7 +289,7 @@ export const useInspeccion = () => {
         }
       }
 
-      try { await cargarItemsParaInspeccion(); } catch {}
+  try { await cargarItemsParaInspeccion(); } catch {}
       if (resultado.fail.length > 0) setError(`${resultado.fail.length} fallas en lote`);
       return resultado;
     },
