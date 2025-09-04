@@ -38,41 +38,56 @@ export const useInspeccion = () => {
   const [itemsEscaneados, setItemsEscaneados] = useState<ItemInspeccion[]>([]);
   const [procesandoEscaneos, setProcesandoEscaneos] = useState(false);
 
-  // Loader principal (con fallback seguro a datos de prueba)
+  // Loader principal (usa backend; sin datos demo)
   const cargarItemsParaInspeccion = useCallback(async () => {
     setCargando(true);
     setError(null);
     try {
-      // TODO: reemplazar por llamadas reales cuando el endpoint esté disponible
-      const datosPrueba: ItemInspeccion[] = [
-        {
-          id: 1001,
-          nombre_unidad: 'Unidad A',
-          rfid: 'RFID-1001',
-          lote: 'L-01',
-          categoria: 'Cube',
-          estado: 'Inspección',
-          sub_estado: 'Pendiente',
-          fecha_devolucion: new Date().toISOString(),
-          tiempo_en_curso: '3 horas',
-          validaciones: { limpieza: false, goteo: false, desinfeccion: false }
-        },
-        {
-          id: 1002,
-          nombre_unidad: 'Unidad B',
-          rfid: 'RFID-1002',
-          lote: 'L-02',
-          categoria: 'VIP',
-          estado: 'Inspección',
-          sub_estado: 'Pendiente',
-          fecha_devolucion: new Date().toISOString(),
-          tiempo_en_curso: '1 hora',
-          validaciones: { limpieza: false, goteo: false, desinfeccion: false }
+      const resp = await apiServiceClient.get('/inventory/inventario/');
+      const data = Array.isArray(resp.data) ? resp.data : [];
+
+      const normalize = (s: string | null | undefined) => {
+        if (!s) return '';
+        try {
+          return s
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .trim();
+        } catch {
+          return String(s).toLowerCase().trim();
         }
-      ];
-      setItemsParaInspeccion(datosPrueba);
-      setItemsInspeccionados([]);
-      console.log('Usando datos de prueba para desarrollo - Items para inspección:', datosPrueba.length);
+      };
+
+      // Mapear inventario a estructura local, separando pendientes vs inspeccionados
+      const pendientes: ItemInspeccion[] = [];
+      const inspeccionados: ItemInspeccion[] = [];
+      for (const item of data) {
+        const est = normalize(item.estado);
+        const sub = normalize(item.sub_estado);
+        if (est !== 'inspeccion') continue;
+
+        const base: ItemInspeccion = {
+          id: Number(item.id),
+          nombre_unidad: item.nombre_unidad,
+          rfid: item.rfid || '',
+          lote: item.lote ?? null,
+          categoria: (item.categoria as any) || 'TIC',
+          estado: item.estado,
+          sub_estado: item.sub_estado,
+          validaciones: {
+            limpieza: normalize(item.validacion_limpieza) === 'aprobado',
+            goteo: normalize(item.validacion_goteo) === 'aprobado',
+            desinfeccion: normalize(item.validacion_desinfeccion) === 'aprobado'
+          }
+        };
+
+        if (sub === 'pendiente') pendientes.push(base);
+        else inspeccionados.push(base);
+      }
+
+      setItemsParaInspeccion(pendientes);
+      setItemsInspeccionados(inspeccionados);
     } catch (e: any) {
       const detalle = e?.response?.data?.detail || e?.message || 'No se pudieron cargar los items de inspección';
       setError(String(detalle));
@@ -102,20 +117,30 @@ export const useInspeccion = () => {
 
   // Actualizar validaciones de un item (estado local)
   const actualizarValidaciones = useCallback((itemId: number, validaciones: Partial<InspeccionValidation>) => {
-    setItemsParaInspeccion(prev =>
-      prev.map(item =>
-        String(item.id) === String(itemId)
-          ? {
-              ...item,
-              validaciones: {
-                ...item.validaciones!,
-                ...validaciones
-              }
-            }
-          : item
-      )
-    );
-  }, []);
+    // Actualizar UI inmediata
+    setItemsParaInspeccion(prev => prev.map(item =>
+      String(item.id) === String(itemId)
+        ? { ...item, validaciones: { ...item.validaciones!, ...validaciones } }
+        : item
+    ));
+
+    // Persistir en backend los campos de validación cambiados
+    try {
+      const payload: Record<string, string | null> = {};
+      if (typeof validaciones.limpieza === 'boolean') {
+        payload['validacion_limpieza'] = validaciones.limpieza ? 'aprobado' : null;
+      }
+      if (typeof validaciones.goteo === 'boolean') {
+        payload['validacion_goteo'] = validaciones.goteo ? 'aprobado' : null;
+      }
+      if (typeof validaciones.desinfeccion === 'boolean') {
+        payload['validacion_desinfeccion'] = validaciones.desinfeccion ? 'aprobado' : null;
+      }
+      if (Object.keys(payload).length > 0) {
+        actualizarInventarioConFallback(itemId, payload);
+      }
+    } catch {}
+  }, [actualizarInventarioConFallback]);
 
   // Completar inspección de un item
   const completarInspeccion = useCallback(async (itemId: number) => {

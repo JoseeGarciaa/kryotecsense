@@ -319,17 +319,7 @@ export const Inspeccion: React.FC = () => {
         </div>
       </div>
       
-      <div className="flex-1 overflow-auto p-6 space-y-6">
-        {/* Instrucciones */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h2 className="text-lg font-semibold text-blue-900 mb-2">Proceso de Inspección</h2>
-          <ol className="list-decimal list-inside space-y-1 text-blue-800">
-            <li>Los items aparecerán aquí solo cuando en Devolución se elija “Pasar a Inspección”.</li>
-            <li>Realizar validación: limpieza, prueba de goteo y desinfección.</li>
-            <li>Marcar cada validación completada con los checkboxes.</li>
-            <li>Una vez completadas todas las validaciones, finalizar la inspección.</li>
-          </ol>
-        </div>
+  <div className="flex-1 overflow-auto p-6 space-y-6">
 
         {/* Items Pendientes de Inspección - Agrupados por Categoría */}
         <div className="bg-white rounded-lg border border-orange-200 overflow-hidden">
@@ -375,9 +365,7 @@ export const Inspeccion: React.FC = () => {
               <div className="text-center py-8 text-gray-500">
                 <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>No hay items pendientes de inspección</p>
-                <p className="text-sm text-gray-400 mt-1">
-                  Los items aparecerán aquí cuando en Devolución se decida “Pasar a Inspección”.
-                </p>
+                <p className="text-sm text-gray-400 mt-1">Agrega items desde Devolución con el botón “Agregar Items”.</p>
               </div>
             </div>
           ) : (
