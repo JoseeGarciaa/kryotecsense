@@ -90,19 +90,14 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
       (item: any) => item.estado === 'Acondicionamiento' && item.sub_estado === 'Lista para Despacho'
     );
 
-    //    Filtro: solo los que tienen su tiempo de envío COMPLETADO (persistente, reciente o llegó a 0)
+    //    Filtro: solo los que tienen su tiempo de envío de Despacho COMPLETADO (persistente, reciente etiqueta '(Despacho)' o llegó a 0)
     const elegibles = baseListaDespacho.filter((item: any) => {
       // Considerar preferentemente la variante "Envío (Despacho)" para habilitar el modal
       const timerCompletadoDesp = completadosDespachoPorId.get(item.id);
       if (timerCompletadoDesp) return true;
 
-      // Fallback: si existe cualquier envío COMPLETADO para este ID, admitirlo (el item ya está en "Lista para Despacho")
-      const timerCompletadoCualquiera = completadosPorId.get(item.id);
-      if (timerCompletadoCualquiera) return true;
-
-      // Considerar "reciente" del nombre exacto de Despacho o por ID (envío)
-      const reciente = getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
-        || getRecentCompletionById('envio', item.id);
+      // Considerar "reciente" SOLO del nombre exacto de Despacho (no por ID genérico para evitar confundir con Ensamblaje)
+      const reciente = getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio');
       if (reciente) return true;
 
   const timerActivoDesp = activosDespachoPorId.get(item.id);
