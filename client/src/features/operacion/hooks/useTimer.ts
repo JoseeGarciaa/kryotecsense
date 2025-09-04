@@ -156,6 +156,9 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   useEffect(() => {
     serverTimeDiffRef.current = serverTimeDiff;
   }, [serverTimeDiff]);
+
+  // Helper: current time aligned to server (ms)
+  const nowServerMs = () => Date.now() + (serverTimeDiffRef.current || 0);
   
   // WebSocket para sincronización en tiempo real:
   // Unificado: derivar SIEMPRE del host de la API (VITE_API_URL) o same-origin en dev.
@@ -193,12 +196,12 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       if (timersGuardados) {
         try {
           const timersParseados = JSON.parse(timersGuardados);
-          const ahora = new Date();
+          const ahoraMs = nowServerMs();
           const timersConFechas = timersParseados.map((timer: Timer) => {
             const inicio = new Date(timer.fechaInicio);
             const fin = new Date(timer.fechaFin);
-            const tiempoRestanteMs = fin.getTime() - ahora.getTime();
-            const tiempoRestanteSegundos = Math.max(0, Math.floor(tiempoRestanteMs / 1000));
+            const tiempoRestanteMs = fin.getTime() - ahoraMs;
+            const tiempoRestanteSegundos = Math.max(0, Math.ceil(tiempoRestanteMs / 1000));
             return {
               ...timer,
               fechaInicio: inicio,
@@ -246,7 +249,11 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             const normalizadosServidor: Timer[] = (lastMessage.data.timers as any[]).map((timer: any) => {
               const key = timer.id || timer.nombre;
               const previo = prevIndex.get(key);
-              const serverSecs = Number(timer.server_remaining_time ?? timer.tiempoRestanteSegundos ?? 0) || 0;
+              // Preferimos calcular el restante a partir de fechaFin + reloj del servidor para evitar drift
+              const finMsSrv = new Date(timer.fechaFin).getTime();
+              const calcFromEnd = Math.ceil((finMsSrv - nowServerMs()) / 1000);
+              const serverSecsRaw = Number(timer.server_remaining_time ?? timer.tiempoRestanteSegundos ?? 0) || 0;
+              const serverSecs = Math.max(0, isFinite(calcFromEnd) ? calcFromEnd : serverSecsRaw);
               const completado = Boolean(timer.completado) || serverSecs === 0;
               // Si el servidor no envía 'activo', asumir activo mientras no esté completado
               const activoServer = timer.activo !== undefined ? Boolean(timer.activo) : !completado;
@@ -318,10 +325,14 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       case 'TIMER_CREATED':
         // Nuevo timer desde otro dispositivo
         if (lastMessage.data.timer) {
+          const fechaInicio = new Date(lastMessage.data.timer.fechaInicio);
+          const fechaFin = new Date(lastMessage.data.timer.fechaFin);
+          const restante = Math.max(0, Math.ceil((fechaFin.getTime() - nowServerMs()) / 1000));
           const nuevoTimer = {
             ...lastMessage.data.timer,
-            fechaInicio: new Date(lastMessage.data.timer.fechaInicio),
-            fechaFin: new Date(lastMessage.data.timer.fechaFin),
+            fechaInicio,
+            fechaFin,
+            tiempoRestanteSegundos: restante,
             server_timestamp: lastMessage.data.timer.server_timestamp
           };
           setTimers(prev => {
@@ -391,12 +402,14 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
 
       case 'TIMER_TIME_UPDATE':
         // Actualización de tiempo desde el servidor - AUTORIDAD ABSOLUTA
-        if (lastMessage.data.timerId && lastMessage.data.tiempoRestanteSegundos !== undefined) {
+    if (lastMessage.data.timerId && lastMessage.data.tiempoRestanteSegundos !== undefined) {
           setTimers(prev => prev.map(timer => {
             if (timer.id === lastMessage.data.timerId) {
               const nuevoTiempoRestante = lastMessage.data.tiempoRestanteSegundos;
               const completado = lastMessage.data.completado || nuevoTiempoRestante === 0;
               const activo = lastMessage.data.activo !== undefined ? lastMessage.data.activo : (!completado && timer.activo);
+      // Re-alinear fechaFin con reloj de servidor para evitar drift entre clientes
+      const alignedEnd = new Date(nowServerMs() + Math.max(0, nuevoTiempoRestante) * 1000);
               
               // Si se completó, ejecutar callback
               if (completado && !timer.completado) {
@@ -438,7 +451,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
                 completado: completado || tiempoActualizado === 0,
                 activo,
                 server_timestamp: lastMessage.data.server_timestamp,
-                optimistic: false
+                optimistic: false,
+                fechaFin: alignedEnd
               };
             }
             return timer;
@@ -551,9 +565,10 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
       setTimers(prevTimers =>
         prevTimers.map(timer => {
           if (!timer.activo || timer.completado) return timer;
-
-          // Disminuir 1 segundo del valor sincronizado para evitar desajustes entre dispositivos
-          const nuevoTiempoRestante = Math.max(0, (timer.tiempoRestanteSegundos || 0) - 1);
+          // Calcular el restante a partir de la fecha fin absoluta sincronizada
+          const finMs = (timer.fechaFin instanceof Date ? timer.fechaFin.getTime() : new Date(timer.fechaFin).getTime());
+          const restanteCalc = Math.ceil((finMs - nowServerMs()) / 1000);
+          const nuevoTiempoRestante = Math.max(0, restanteCalc);
           const seCompletoAhora = nuevoTiempoRestante === 0 && !timer.completado;
 
           // Si se completó por conteo local, notificar una sola vez (batch + dedup evita duplicados)
@@ -614,14 +629,15 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     
   // Creando timer (silenciado)
     // Crear timer local optimista inmediatamente para mostrar el conteo regresivo
-  const ahora = new Date();
-    const fin = new Date(ahora.getTime() + tiempoMinutos * 60 * 1000);
+  const ahoraMs = nowServerMs();
+    const ahora = new Date(ahoraMs);
+    const fin = new Date(ahoraMs + tiempoMinutos * 60 * 1000);
     const nuevoTimerLocal = {
       id: timerId,
       nombre,
       tipoOperacion,
       tiempoInicialMinutos: tiempoMinutos,
-      tiempoRestanteSegundos: tiempoMinutos * 60,
+      tiempoRestanteSegundos: Math.ceil((fin.getTime() - ahoraMs) / 1000),
       fechaInicio: ahora,
       fechaFin: fin,
       activo: true,
@@ -673,14 +689,15 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     tiempoMinutos: number
   ): string => {
     const timerId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  const ahora = new Date();
-    const fin = new Date(ahora.getTime() + tiempoMinutos * 60 * 1000);
+  const ahoraMs = nowServerMs();
+    const ahora = new Date(ahoraMs);
+    const fin = new Date(ahoraMs + tiempoMinutos * 60 * 1000);
     const nuevoTimerLocal: Timer = {
       id: timerId,
       nombre,
       tipoOperacion,
       tiempoInicialMinutos: tiempoMinutos,
-      tiempoRestanteSegundos: tiempoMinutos * 60,
+      tiempoRestanteSegundos: Math.ceil((fin.getTime() - ahoraMs) / 1000),
       fechaInicio: ahora,
       fechaFin: fin,
       activo: true,
@@ -701,9 +718,19 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
 
   const pausarTimer = useCallback((id: string) => {
     setTimers(prev => 
-      prev.map(timer => 
-        timer.id === id ? { ...timer, activo: false } : timer
-      )
+      prev.map(timer => {
+        if (timer.id !== id) return timer;
+        // Congelar el restante con reloj del servidor y detener el conteo
+        const finMs = (timer.fechaFin instanceof Date ? timer.fechaFin.getTime() : new Date(timer.fechaFin).getTime());
+        const restante = Math.max(0, Math.ceil((finMs - nowServerMs()) / 1000));
+        return {
+          ...timer,
+          activo: false,
+          tiempoRestanteSegundos: restante,
+          // Mantener fechaFin relativa al restante (útil si se reanuda sin servidor)
+          fechaFin: new Date(nowServerMs() + restante * 1000)
+        };
+      })
     );
     
     // Enviar al WebSocket si está conectado
@@ -721,9 +748,16 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
 
   const reanudarTimer = useCallback((id: string) => {
     setTimers(prev => 
-      prev.map(timer => 
-        timer.id === id && !timer.completado ? { ...timer, activo: true } : timer
-      )
+      prev.map(timer => {
+        if (timer.id !== id || timer.completado) return timer;
+        const restante = Math.max(0, timer.tiempoRestanteSegundos || 0);
+        return {
+          ...timer,
+          activo: true,
+          // Reprogramar fechaFin a partir del restante actual y reloj del servidor
+          fechaFin: new Date(nowServerMs() + restante * 1000)
+        };
+      })
     );
     
     // Enviar al WebSocket si está conectado
