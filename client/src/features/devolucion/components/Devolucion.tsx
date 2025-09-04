@@ -61,7 +61,8 @@ export const Devolucion: React.FC = () => {
   // Timers para mostrar la cuenta regresiva de Operación (96h)
   const { timers, formatearTiempo } = useTimerContext();
 
-  // Mapa de tiempo ACTIVO por ID de item, incluye: segundos restantes, fecha fin e inicio configurado (minutos)
+  // Mapa por ID de item con: segundos restantes, fecha fin e inicio configurado (minutos)
+  // Incluye timers activos y, si faltan, reconstruye desde localStorage (ETA) para conservar visibilidad
   const { infoPorId } = useMemo(() => {
     const normalize = (s: string | null | undefined) => {
       if (!s) return '';
@@ -92,17 +93,54 @@ export const Devolucion: React.FC = () => {
       return { base: n };
     };
 
-  const infoPorId = new Map<number, { seconds: number; endTime: Date; initialMinutes: number }>();
+    const infoPorId = new Map<number, { seconds: number; endTime: Date; initialMinutes: number }>();
 
+    // 1) Timers de envío presentes (activos o pausados con tiempo restante)
     for (const t of timers) {
-      if (t.tipoOperacion === 'envio' && t.activo && !t.completado) {
-        const data = { seconds: t.tiempoRestanteSegundos, endTime: t.fechaFin, initialMinutes: t.tiempoInicialMinutos };
-        const { id, base } = extractFromNombre(t.nombre);
-        if (typeof id === 'number' && !Number.isNaN(id)) {
-          infoPorId.set(id, data);
+      if (t.tipoOperacion !== 'envio') continue;
+      if (t.completado) continue; // si ya venció, no aporta tiempo restante
+      const { id } = extractFromNombre(t.nombre);
+      if (typeof id === 'number' && !Number.isNaN(id)) {
+        const seconds = Math.max(0, t.tiempoRestanteSegundos || 0);
+        if (seconds >= 0) {
+          infoPorId.set(id, {
+            seconds,
+            endTime: t.fechaFin,
+            initialMinutes: t.tiempoInicialMinutos
+          });
         }
       }
     }
+
+    // 2) Fallback desde localStorage (kryotec_items_envio) cuando no hay timer asociado
+    try {
+      const raw = localStorage.getItem('kryotec_items_envio');
+      if (raw) {
+        const lista = JSON.parse(raw);
+        if (Array.isArray(lista)) {
+          const ahoraMs = Date.now();
+          for (const it of lista) {
+            const id = Number(it?.id);
+            if (!id || Number.isNaN(id)) continue;
+            if (infoPorId.has(id)) continue; // ya cubierto por timer
+            const etaStr = it?.fechaEstimadaLlegada;
+            const minutosIniciales = Number(it?.tiempoEnvio);
+            if (!etaStr || Number.isNaN(minutosIniciales)) continue;
+            const etaMs = new Date(etaStr).getTime();
+            if (!Number.isFinite(etaMs)) continue;
+            const remainingSec = Math.floor((etaMs - ahoraMs) / 1000);
+            // Incluir aunque esté en 0 para mostrar que terminó; evitar negativos
+            const seconds = Math.max(0, remainingSec);
+            infoPorId.set(id, {
+              seconds,
+              endTime: new Date(etaMs),
+              initialMinutes: Math.max(0, minutosIniciales | 0)
+            });
+          }
+        }
+      }
+    } catch {}
+
     return { infoPorId };
   }, [timers]);
 
