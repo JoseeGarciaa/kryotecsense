@@ -463,14 +463,14 @@ export const Inspeccion: React.FC = () => {
                       onClick={async () => {
                         const ids = Object.entries(seleccionInspeccionados).filter(([,v]) => v).map(([k]) => Number(k));
                         if (ids.length === 0) return;
-                        const ok = window.confirm(`¿Devolver ${ids.length} item(s) a bodega?`);
+                        const ok = window.confirm(`¿Pasar ${ids.length} item(s) a Bodega?`);
                         if (!ok) return;
                         await devolverItemsABodega(ids);
                         limpiarSel();
                       }}
                       disabled={Object.values(seleccionInspeccionados).every(v => !v)}
                       className="px-3 py-1.5 text-xs sm:text-sm rounded-md border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                    >Devolver a bodega</button>
+                    >Pasar a Bodega</button>
                   </div>
                 </div>
                 <div className="space-y-3">
@@ -491,6 +491,14 @@ export const Inspeccion: React.FC = () => {
                         <span className="text-xs text-green-600 font-medium bg-green-100 px-2 py-1 rounded">
                           Inspeccionado
                         </span>
+                        <button
+                          onClick={async () => {
+                            const ok = window.confirm(`¿Pasar "${item.nombre_unidad}" a Bodega?`);
+                            if (!ok) return;
+                            await devolverItemsABodega([item.id]);
+                          }}
+                          className="px-2 py-1 text-xs rounded-md border border-blue-300 text-blue-700 hover:bg-blue-50"
+                        >Pasar a Bodega</button>
                       </div>
                     </div>
                   ))}

@@ -65,8 +65,6 @@ export const useInspeccion = () => {
       for (const item of data) {
         const est = normalize(item.estado);
         const sub = normalize(item.sub_estado);
-        if (est !== 'inspeccion') continue;
-
         const base: ItemInspeccion = {
           id: Number(item.id),
           nombre_unidad: item.nombre_unidad,
@@ -82,8 +80,21 @@ export const useInspeccion = () => {
           }
         };
 
-        if (sub === 'pendiente') pendientes.push(base);
-        else inspeccionados.push(base);
+        // Caso 1: Items en Inspección (Pendiente o Inspeccionada)
+        if (est === 'inspeccion') {
+          if (sub === 'pendiente') pendientes.push(base);
+          else inspeccionados.push(base);
+          continue;
+        }
+
+        // Caso 2: Items ya movidos a En bodega pero con todas las validaciones aprobadas
+        // Esto asegura que, al completar inspección, se sigan mostrando como "Inspeccionados" en la UI
+        if (est === 'en bodega') {
+          const { limpieza, goteo, desinfeccion } = base.validaciones!;
+          if (limpieza && goteo && desinfeccion) {
+            inspeccionados.push(base);
+          }
+        }
       }
 
       setItemsParaInspeccion(pendientes);
@@ -219,12 +230,14 @@ export const useInspeccion = () => {
         if (t) eliminarTimer(t.id);
       } catch {}
 
-      // Actualizar estado local si el backend dijo "no encontrado" para que el flujo no se bloquee
+      // Actualizar estado local inmediatamente para feedback instantáneo
       setItemsParaInspeccion(prev => prev.filter(i => String(i.id) !== String(itemId)));
-      setItemsInspeccionados(prev => [
-        ...prev,
-        item
-      ]);
+      setItemsInspeccionados(prev => {
+        const ya = prev.some(i => String(i.id) === String(itemId));
+        if (ya) return prev;
+        // Reflejar que ya está inspeccionado aunque el backend tarde en responder
+        return [...prev, { ...item, estado: 'Inspección', sub_estado: 'Inspeccionada' }];
+      });
       try { await cargarItemsParaInspeccion(); } catch {}
     } catch (err: any) {
       const detalle = err?.response?.data?.detail || err?.message || 'Error al completar inspección';
