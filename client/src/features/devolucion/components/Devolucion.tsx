@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Package, Scan, CheckCircle, AlertCircle } from 'lucide-react';
+import { Package, CheckCircle, AlertCircle, Search } from 'lucide-react';
 import TimerModal from '../../operacion/components/TimerModal';
 import { useDevolucion } from '../hooks/useDevolucion';
-import { DevolucionScanModal } from './DevolucionScanModal';
 import { useTimerContext } from '../../../contexts/TimerContext';
 import InlineCountdown from '../../../shared/components/InlineCountdown';
 
@@ -19,7 +18,10 @@ export const Devolucion: React.FC = () => {
     pasarItemsAInspeccion
   } = useDevolucion();
 
-  const [mostrarModal, setMostrarModal] = useState(false);
+  // Modal de selección “Agregar Items” (reemplaza escaneo)
+  const [mostrarModalSeleccion, setMostrarModalSeleccion] = useState(false);
+  const [modalBusqueda, setModalBusqueda] = useState('');
+  const [itemsSeleccionadosModal, setItemsSeleccionadosModal] = useState<number[]>([]);
   const [paginaActual, setPaginaActual] = useState(1);
   const itemsPorPagina = 5;
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<'Cube' | 'VIP' | 'TIC' | null>(null);
@@ -153,20 +155,31 @@ export const Devolucion: React.FC = () => {
     setPaginaActual(1);
   }, [itemsDevueltos.length]);
 
-  const handleScanItem = (item: any) => {
-    console.log('Escaneando item:', item);
-    setMostrarModal(true);
+  // Derivados del modal
+  const itemsFiltradosModal = useMemo(() => {
+    const term = modalBusqueda.toLowerCase();
+    return itemsDevolucion.filter((item) =>
+      (typeof item.nombre_unidad === 'string' && item.nombre_unidad.toLowerCase().includes(term)) ||
+      (typeof item.rfid === 'string' && item.rfid.toLowerCase().includes(term))
+    );
+  }, [itemsDevolucion, modalBusqueda]);
+  const toggleSeleccionItemModal = (itemId: number) => {
+    setItemsSeleccionadosModal(prev => prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]);
   };
-
-  const handleConfirmarDevolucion = async (itemsEscaneados: any[]) => {
+  const toggleSeleccionTodosModal = () => {
+    const ids = itemsFiltradosModal.map(i => i.id);
+    const all = ids.length > 0 && ids.every(id => itemsSeleccionadosModal.includes(id));
+    setItemsSeleccionadosModal(all ? [] : ids);
+  };
+  const confirmarSeleccionModal = async () => {
+    if (itemsSeleccionadosModal.length === 0) return;
     try {
-      // Procesar todos los items en lote (una sola operación)
-      const itemIds = itemsEscaneados.map(item => item.id);
-      await marcarItemsComoDevueltos(itemIds);
-      setMostrarModal(false);
-      // No necesitamos recargar aquí, el hook ya lo hace
-    } catch (error) {
-      console.error('Error al confirmar devolución:', error);
+      await marcarItemsComoDevueltos(itemsSeleccionadosModal);
+      setMostrarModalSeleccion(false);
+      setItemsSeleccionadosModal([]);
+      setModalBusqueda('');
+    } catch (e) {
+      console.error('Error devolviendo items seleccionados:', e);
     }
   };
 
@@ -241,7 +254,7 @@ export const Devolucion: React.FC = () => {
           <ol className="list-decimal list-inside space-y-1 text-blue-800 text-sm">
             <li>Los items completados en operación aparecen automáticamente como pendientes de devolución</li>
             <li>Separar físicamente los Cubes, VIPs y TICs que han llegado a bodega</li>
-            <li>Usar el botón "Escanear Items" para confirmar la devolución</li>
+            <li>Usar el botón "Agregar Items" para seleccionar y confirmar la devolución</li>
           </ol>
         </div>
 
@@ -255,16 +268,16 @@ export const Devolucion: React.FC = () => {
               </div>
               {/* Botones de acción para items pendientes */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                {/* Botón de escaneo RFID - Siempre visible */}
+                {/* Botón Agregar Items (modal de selección) */}
                 <button
-                  onClick={() => setMostrarModal(true)}
+                  onClick={() => setMostrarModalSeleccion(true)}
                   className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-3 sm:px-4 py-2 bg-blue-600 text-white text-xs sm:text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-                  title="Escanear items para devolver"
+                  title="Agregar items para devolver"
                 >
-                  <Scan className="w-4 h-4" />
-                  Escanear Items
+                  <Package className="w-4 h-4" />
+                  Agregar Items
                 </button>
-                
+
                 {/* Botón para devolver todos los items en lote - Solo cuando hay items */}
                 {itemsDevolucion.length > 0 && (
                   <button
@@ -690,15 +703,117 @@ export const Devolucion: React.FC = () => {
   )}
       </div>
 
-      {/* Modal de escaneo */}
-      {mostrarModal && (
-        <DevolucionScanModal
-          isOpen={mostrarModal}
-          onClose={() => setMostrarModal(false)}
-          itemsPendientes={itemsDevolucion}
-          onConfirmar={handleConfirmarDevolucion}
-        />
-      )}
+          {/* Modal de selección de Items para devolver */}
+          {mostrarModalSeleccion && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+              <div className="bg-white rounded-lg shadow-xl w-[92vw] max-w-md sm:max-w-2xl md:max-w-4xl max-h-[88vh] overflow-hidden flex flex-col">
+                <div className="p-4 sm:p-6 border-b border-gray-200 flex items-start justify-between gap-2">
+                  <div>
+                    <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Seleccionar items para devolución</h2>
+                    <p className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-2">Disponibles: {itemsDevolucion.length}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setMostrarModalSeleccion(false);
+                      setItemsSeleccionadosModal([]);
+                      setModalBusqueda('');
+                    }}
+                    aria-label="Cerrar"
+                    className="text-gray-500 hover:text-gray-700 p-1 -mt-1"
+                    title="Cerrar"
+                  >
+                    <span className="text-xl leading-none">×</span>
+                  </button>
+                </div>
+                <div className="p-4 sm:p-6 flex flex-col gap-4 sm:gap-6 flex-1 overflow-y-auto">
+                  {/* Búsqueda */}
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <input
+                        type="text"
+                        placeholder="Buscar por RFID o nombre..."
+                        value={modalBusqueda}
+                        onChange={(e) => setModalBusqueda(e.target.value)}
+                        maxLength={24}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                      <button onClick={toggleSeleccionTodosModal} className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded">
+                        {itemsFiltradosModal.length > 0 && itemsFiltradosModal.every(i => itemsSeleccionadosModal.includes(i.id)) ?
+                          `Quitar todos (${itemsFiltradosModal.length})` : `Seleccionar todos (${itemsFiltradosModal.length})`}
+                      </button>
+                      <button onClick={() => setItemsSeleccionadosModal([])} className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded">Limpiar selección</button>
+                      <span className="text-gray-600">{itemsSeleccionadosModal.length} seleccionado(s)</span>
+                    </div>
+                  </div>
+
+                  {/* Lista */}
+                  <div className="space-y-2 max-h-[50vh] sm:max-h-[55vh] overflow-y-auto pr-1">
+                    {itemsFiltradosModal.length === 0 ? (
+                      <div className="text-center text-gray-500 py-8">
+                        <Package className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-gray-400" />
+                        <p>No hay items que coincidan con la búsqueda</p>
+                      </div>
+                    ) : (
+                      itemsFiltradosModal.map((item) => {
+                        const selected = itemsSeleccionadosModal.includes(item.id);
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() => toggleSeleccionItemModal(item.id)}
+                            className={`p-3 border rounded cursor-pointer transition-all ${selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <input type="checkbox" checked={selected} onChange={() => {}} className="mt-0.5 rounded" />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={`px-2 py-0.5 text-[11px] rounded ${
+                                    item.categoria === 'TIC' ? 'bg-yellow-100 text-yellow-800' :
+                                    item.categoria === 'VIP' ? 'bg-green-100 text-green-800' :
+                                    item.categoria === 'Cube' ? 'bg-blue-100 text-blue-800' :
+                                    'bg-orange-100 text-orange-800'
+                                  }`}>
+                                    {item.categoria}
+                                  </span>
+                                  <span className="font-medium text-sm truncate" title={item.nombre_unidad}>{item.nombre_unidad}</span>
+                                </div>
+                                <div className="text-xs text-gray-600 mt-1 break-words">
+                                  <span className="mr-2">RFID: {item.rfid || 'N/A'}</span>
+                                  {item.lote && <span className="mr-2">Lote: {item.lote}</span>}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+                {/* Footer */}
+                <div className="p-4 sm:p-6 border-t border-gray-200 flex items-center justify-end gap-2 sm:gap-3">
+                  <button
+                    onClick={() => {
+                      setMostrarModalSeleccion(false);
+                      setItemsSeleccionadosModal([]);
+                      setModalBusqueda('');
+                    }}
+                    className="px-4 py-2 text-sm text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={confirmarSeleccionModal}
+                    disabled={itemsSeleccionadosModal.length === 0}
+                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    Confirmar devolución ({itemsSeleccionadosModal.length})
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
     </div>
   );
 };
