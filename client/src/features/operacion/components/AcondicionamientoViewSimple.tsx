@@ -148,12 +148,39 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     return { activosPorId, activosPorNombre, completadosPorId, completadosPorNombre };
   }, [timers]);
 
-  // Mostrar todos los items en Ensamblaje para el modal de 'Lista para Despacho' (auto-populado como antes)
+  // Mostrar en el modal solo items en Ensamblaje cuyo cronómetro de envío (no 'Despacho') esté COMPLETO
   itemsDisponiblesParaDespacho = useMemo(() => {
-    return (inventarioCompleto || []).filter(item =>
+    const base = (inventarioCompleto || []).filter(item =>
       item.estado === 'Acondicionamiento' && item.sub_estado === 'Ensamblaje'
     );
-  }, [inventarioCompleto]);
+
+    return base.filter(item => {
+      const nombreBase = `#${item.id} -`;
+      // Timer de Ensamblaje: etiqueta 'Envío #...'; excluir '(Despacho)'
+      const timerActivo = timers.find(
+        t => t.tipoOperacion === 'envio'
+          && t.activo && !t.completado
+          && (t.nombre || '').includes(nombreBase)
+          && !/(\s*\(\s*despacho\s*\))/i.test(t.nombre || '')
+      );
+      const timerCompletado = timers.find(
+        t => t.tipoOperacion === 'envio'
+          && t.completado
+          && (t.nombre || '').includes(nombreBase)
+          && !/(\s*\(\s*despacho\s*\))/i.test(t.nombre || '')
+      );
+
+      // Completado reciente: 'Envío #<id> - <nombre>'
+      const reciente = !timerCompletado
+        ? getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
+        : null;
+
+      if (reciente) return true;
+      if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
+      if (timerCompletado) return true;
+      return false;
+    });
+  }, [inventarioCompleto, timers, getRecentCompletion]);
 
   // (Eliminado) Filtro de 'solo completados' para Lista para Despacho
 
