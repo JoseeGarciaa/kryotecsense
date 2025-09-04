@@ -29,6 +29,27 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   const [destinoTimer, setDestinoTimer] = useState<'Ensamblaje' | 'Lista para Despacho' | null>(null);
   const [cargandoTimer, setCargandoTimer] = useState(false);
 
+  // Acción rápida: completar desde Ensamblaje -> mover a Lista para Despacho
+  const completarDesdeEnsamblaje = async (item: any) => {
+    try {
+      const ok = window.confirm(`¿Mover "${item.nombre_unidad}" a Lista para Despacho?`);
+      if (!ok) return;
+      // Actualizar estado del item
+      await cambiarEstadoItem(item.id, 'Acondicionamiento', 'Lista para Despacho');
+      // Cancelar cronómetros relacionados (si existieran)
+      try {
+        const relacionados = timers.filter(t => t.tipoOperacion === 'envio' && (t.nombre || '').includes(`#${item.id} -`));
+        relacionados.forEach(t => eliminarTimer(t.id));
+      } catch {}
+      // Refrescar datos y sincronizar
+      try { await actualizarColumnasDesdeBackend(); } catch {}
+      try { if (isConnected) forzarSincronizacion(); } catch {}
+    } catch (e) {
+      console.error('Error completando desde Ensamblaje:', e);
+      alert('No se pudo mover el item a Lista para Despacho.');
+    }
+  };
+
   // Obtener items por sub-estado
   const itemsEnsamblaje = inventarioCompleto?.filter(item => 
     item.estado === 'Acondicionamiento' && item.sub_estado === 'Ensamblaje'
@@ -158,6 +179,22 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     });
   }, [inventarioCompleto, completadosPorId, activosPorId, getRecentCompletionById, getRecentCompletion]);
 
+  // Filtrar la sección "Lista para Despacho" para mostrar SOLO items con tiempo de Despacho COMPLETADO
+  const itemsListaDespachoCompletos = useMemo(() => {
+    return itemsListaDespacho.filter(item => {
+      const nombreBase = `#${item.id} -`;
+      const timerActivo = timers.find(t => t.tipoOperacion === 'envio' && t.activo && !t.completado && (t.nombre || '').includes(nombreBase) && /\(\s*despacho\s*\)/i.test(t.nombre || ''));
+      const timerCompletado = timers.find(t => t.tipoOperacion === 'envio' && t.completado && (t.nombre || '').includes(nombreBase) && /\(\s*despacho\s*\)/i.test(t.nombre || ''));
+      const reciente = !timerCompletado
+        ? getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
+        : null;
+      if (reciente) return true;
+      if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
+      if (timerCompletado) return true;
+      return false;
+    });
+  }, [itemsListaDespacho, timers, getRecentCompletion]);
+
   // Refuerzo de sincronización al montar para minimizar “—” por desfase
   useEffect(() => {
     const id = setTimeout(() => {
@@ -279,7 +316,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     item.lote?.toLowerCase().includes(busquedaEnsamblaje.toLowerCase())
   );
 
-  const itemsListaDespachoFiltrados = itemsListaDespacho.filter(item =>
+  const itemsListaDespachoFiltrados = itemsListaDespachoCompletos.filter(item =>
     item.nombre_unidad?.toLowerCase().includes(busquedaListaDespacho.toLowerCase()) ||
     item.rfid?.toLowerCase().includes(busquedaListaDespacho.toLowerCase()) ||
     item.lote?.toLowerCase().includes(busquedaListaDespacho.toLowerCase())
@@ -434,11 +471,11 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                                     <X className="w-3 h-3" />
                                   </button>
                                   <button
-                                    onClick={() => abrirTemporizadorParaItem(item, 'Ensamblaje')}
+                                    onClick={() => completarDesdeEnsamblaje(item)}
                                     className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
-                                    title="Crear nuevo cronómetro"
+                                    title="Completar"
                                   >
-                                    <Play className="w-3 h-3" />
+                                    <CheckCircle className="w-3 h-3" />
                                   </button>
                                 </div>
                               </div>
@@ -524,7 +561,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-green-800">Items Lista para Despacho</h2>
-                <p className="text-sm text-green-600">({itemsListaDespacho.length} de {itemsListaDespacho.length})</p>
+                <p className="text-sm text-green-600">({itemsListaDespachoFiltrados.length} de {itemsListaDespacho.length})</p>
               </div>
               <button
                 onClick={() => {
