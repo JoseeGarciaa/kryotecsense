@@ -57,6 +57,42 @@ export const useDevolucion = () => {
     }
   }, [timers, crearTimer, forzarSincronizacion]);
 
+  // Lee el umbral (horas/min) de localStorage y lo convierte a segundos
+  const getThresholdSecs = useCallback((): number => {
+    try {
+      const raw = localStorage.getItem('devolucionThreshold');
+      if (!raw) return 0;
+      const { h, m } = JSON.parse(raw) as { h?: string; m?: string };
+      const horas = parseInt(h || '0', 10);
+      const mins = parseInt(m || '0', 10);
+      const total = (Number.isNaN(horas) ? 0 : horas) * 3600 + (Number.isNaN(mins) ? 0 : mins) * 60;
+      return total > 0 ? total : 0;
+    } catch {
+      return 0;
+    }
+  }, []);
+
+  // Tiempo restante (segundos) para un item por ID a partir de timers o de kryotec_items_envio
+  const getTiempoRestanteSegundos = useCallback((id: number): number | null => {
+    try {
+      const t = timers.find(t => t.tipoOperacion === 'envio' && t.activo && !t.completado && new RegExp(`^Envío\\s+#${id}\\s+-`).test(t.nombre));
+      if (t) return Math.max(0, t.tiempoRestanteSegundos || 0);
+
+      // Fallback: calcular desde localStorage por ETA
+      const raw = localStorage.getItem('kryotec_items_envio');
+      if (!raw) return null;
+      const lista = JSON.parse(raw);
+      if (!Array.isArray(lista)) return null;
+      const item = lista.find((it: any) => Number(it.id) === Number(id));
+      if (!item || !item.fechaEstimadaLlegada) return null;
+      const eta = new Date(item.fechaEstimadaLlegada);
+      const restante = Math.floor((eta.getTime() - Date.now()) / 1000);
+      return Math.max(0, restante);
+    } catch {
+      return null;
+    }
+  }, [timers]);
+
   // Cargar items pendientes de devolución
   const cargarItemsDevolucion = useCallback(async () => {
     try {
@@ -280,6 +316,16 @@ export const useDevolucion = () => {
       const nombre = (e as CustomEvent).detail?.nombre as string | undefined;
       if (!id) return;
       try {
+        // Validar umbral: si falta menos que el límite, bloquear regreso a Operación
+        const threshold = getThresholdSecs();
+        if (threshold > 0) {
+          const restante = getTiempoRestanteSegundos(id);
+          if (typeof restante === 'number' && restante < threshold) {
+            alert('Este item no puede regresar a Operación: el tiempo restante es menor al límite configurado. Envíalo a Inspección.');
+            return;
+          }
+        }
+
         await apiServiceClient.patch(`/inventory/inventario/${id}/estado`, {
           estado: 'operación',
           sub_estado: 'En transito'
@@ -340,13 +386,28 @@ export const useDevolucion = () => {
       window.removeEventListener('devolucion:regresar-operacion', onRegresarOperacion as EventListener);
       window.removeEventListener('devolucion:pasar-inspeccion', onPasarInspeccion as EventListener);
     };
-  }, [cargarItemsDevolucion, timers, eliminarTimer, ensureEnvioTimerForItem]);
+  }, [cargarItemsDevolucion, timers, eliminarTimer, ensureEnvioTimerForItem, getThresholdSecs, getTiempoRestanteSegundos]);
 
   // Batch: regresar a Operación
   const regresarItemsAOperacion = useCallback(async (itemIds: number[], nombres?: Record<number, string>) => {
     if (!itemIds || itemIds.length === 0) return;
     try {
       setError(null);
+      // Validación previa por umbral: bloquear ids que no cumplen
+      const threshold = getThresholdSecs();
+      if (threshold > 0) {
+        const bloqueados: number[] = [];
+        for (const id of itemIds) {
+          const restante = getTiempoRestanteSegundos(id);
+          if (typeof restante === 'number' && restante < threshold) {
+            bloqueados.push(id);
+          }
+        }
+        if (bloqueados.length > 0) {
+          alert(`No se puede regresar a Operación: ${bloqueados.length} item(s) tienen tiempo restante menor al límite. Envíalos a Inspección.`);
+          return;
+        }
+      }
       // Ejecutar en paralelo
       await Promise.all(itemIds.map(async (id) => {
         const nombre = nombres?.[id];
@@ -372,7 +433,7 @@ export const useDevolucion = () => {
       setError('Error regresando items a operación');
       throw err;
     }
-  }, [cargarItemsDevolucion, ensureEnvioTimerForItem]);
+  }, [cargarItemsDevolucion, ensureEnvioTimerForItem, getThresholdSecs, getTiempoRestanteSegundos]);
 
   // Batch: pasar a Inspección (cancela timer de envío y crea timer de inspección con duración elegida)
   const pasarItemsAInspeccion = useCallback(async (itemIds: number[], nombres?: Record<number, string>, duracionMinutos?: number) => {
