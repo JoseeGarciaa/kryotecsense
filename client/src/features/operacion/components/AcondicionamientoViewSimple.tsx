@@ -28,6 +28,8 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   const [itemParaTemporizador, setItemParaTemporizador] = useState<any | null>(null);
   const [destinoTimer, setDestinoTimer] = useState<'Ensamblaje' | 'Lista para Despacho' | null>(null);
   const [cargandoTimer, setCargandoTimer] = useState(false);
+  // Toggle para mostrar solo los que tienen tiempo de Despacho completo
+  const [soloCompletadosDespacho, setSoloCompletadosDespacho] = useState(true);
 
   // Acción rápida: completar desde Ensamblaje -> mover a Lista para Despacho
   const completarDesdeEnsamblaje = async (item: any) => {
@@ -316,7 +318,8 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     item.lote?.toLowerCase().includes(busquedaEnsamblaje.toLowerCase())
   );
 
-  const itemsListaDespachoFiltrados = itemsListaDespachoCompletos.filter(item =>
+  const fuenteListaDespacho = soloCompletadosDespacho ? itemsListaDespachoCompletos : itemsListaDespacho;
+  const itemsListaDespachoFiltrados = fuenteListaDespacho.filter(item =>
     item.nombre_unidad?.toLowerCase().includes(busquedaListaDespacho.toLowerCase()) ||
     item.rfid?.toLowerCase().includes(busquedaListaDespacho.toLowerCase()) ||
     item.lote?.toLowerCase().includes(busquedaListaDespacho.toLowerCase())
@@ -563,16 +566,26 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                 <h2 className="text-lg font-semibold text-green-800">Items Lista para Despacho</h2>
                 <p className="text-sm text-green-600">({itemsListaDespachoFiltrados.length} de {itemsListaDespacho.length})</p>
               </div>
-              <button
-                onClick={() => {
-                  try { if (isConnected) forzarSincronizacion(); } catch {}
-                  setMostrarModalTraerDespacho(true);
-                }}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-md hover:bg-orange-700 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Agregar Items
-              </button>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-sm text-green-800">
+                  <input
+                    type="checkbox"
+                    checked={soloCompletadosDespacho}
+                    onChange={(e) => setSoloCompletadosDespacho(e.target.checked)}
+                  />
+                  Solo completados
+                </label>
+                <button
+                  onClick={() => {
+                    try { if (isConnected) forzarSincronizacion(); } catch {}
+                    setMostrarModalTraerDespacho(true);
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-md hover:bg-orange-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Agregar Items
+                </button>
+              </div>
             </div>
           </div>
 
