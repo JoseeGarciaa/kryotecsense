@@ -27,7 +27,7 @@ interface ItemEnTransito {
 const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   const { inventarioCompleto, actualizarColumnasDesdeBackend } = useOperaciones();
   const envio = useEnvio(actualizarColumnasDesdeBackend);
-  const { timers, formatearTiempo, pausarTimer, reanudarTimer, eliminarTimer, crearTimer, obtenerTimersCompletados, isConnected, getRecentCompletion, forzarSincronizacion } = useTimerContext();
+  const { timers, formatearTiempo, pausarTimer, reanudarTimer, eliminarTimer, crearTimer, obtenerTimersCompletados, isConnected, getRecentCompletion, getRecentCompletionById, forzarSincronizacion } = useTimerContext();
 
   // InlineCountdown compartido
   const [busqueda, setBusqueda] = useState('');
@@ -92,28 +92,27 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
 
     //    Filtro: solo los que tienen su tiempo de envío COMPLETADO (persistente, reciente o llegó a 0)
     const elegibles = baseListaDespacho.filter((item: any) => {
-      // Considerar SOLO la variante "Envío (Despacho)" para habilitar el modal
-      const timerCompletado = completadosDespachoPorId.get(item.id);
-      if (timerCompletado) {
-        const llegadaEtapa = item.ultima_actualizacion ? new Date(item.ultima_actualizacion).getTime() : NaN;
-        try {
-          const inicioTimer = new Date(timerCompletado.fechaInicio).getTime();
-          if (Number.isNaN(llegadaEtapa) || inicioTimer >= (llegadaEtapa - 60_000)) return true;
-        } catch {}
-      }
+      // Considerar preferentemente la variante "Envío (Despacho)" para habilitar el modal
+      const timerCompletadoDesp = completadosDespachoPorId.get(item.id);
+      if (timerCompletadoDesp) return true;
 
-      // Solo considerar "reciente" para el nombre exacto de Despacho
-      const reciente = getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio');
+      // Fallback: si existe cualquier envío COMPLETADO para este ID, admitirlo (el item ya está en "Lista para Despacho")
+      const timerCompletadoCualquiera = completadosPorId.get(item.id);
+      if (timerCompletadoCualquiera) return true;
+
+      // Considerar "reciente" del nombre exacto de Despacho o por ID (envío)
+      const reciente = getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
+        || getRecentCompletionById('envio', item.id);
       if (reciente) return true;
 
-      const timerActivoDesp = activosDespachoPorId.get(item.id);
-      if (timerActivoDesp && (timerActivoDesp.tiempoRestanteSegundos ?? 0) <= 0) return true;
+  const timerActivoDesp = activosDespachoPorId.get(item.id);
+  if (timerActivoDesp && (timerActivoDesp.tiempoRestanteSegundos ?? 0) <= 0) return true;
 
       return false;
     });
 
     setItemsListosDespacho(elegibles);
-  }, [inventarioCompleto, completadosDespachoPorId, activosDespachoPorId, getRecentCompletion]);
+  }, [inventarioCompleto, completadosDespachoPorId, activosDespachoPorId, completadosPorId, getRecentCompletion, getRecentCompletionById]);
   
   // Lista filtrada para el modal (memoizada)
   const itemsFiltradosModal = useMemo(() => {
