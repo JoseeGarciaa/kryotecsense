@@ -91,6 +91,9 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [serverTimeDiff, setServerTimeDiff] = useState<number>(0);
   const serverTimeDiffRef = useRef<number>(0);
+  // Persistencia segura para evitar exceder la cuota de localStorage
+  const storageWritesDisabledRef = useRef<boolean>(false);
+  const lastStorageErrorAtRef = useRef<number>(0);
   // Cache de completados recientes para mostrar "Completo" aunque el servidor limpie el timer enseguida
   // key = `${tipo}|${norm(nombre)}`
   const recentCompletionsRef = useRef<Map<string, { minutes: number; at: number; startMs: number }>>(new Map());
@@ -159,6 +162,70 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
 
   // Helper: current time aligned to server (ms)
   const nowServerMs = () => Date.now() + (serverTimeDiffRef.current || 0);
+
+  // Utilidades para persistir solo lo esencial y limitar el tamaño en localStorage
+  type TimerPersist = {
+    id: string;
+    nombre: string;
+    tipoOperacion: Timer['tipoOperacion'];
+    tiempoInicialMinutos: number;
+    fechaInicio: string; // ISO
+    fechaFin: string; // ISO
+    activo: boolean;
+    completado: boolean;
+    optimistic?: boolean;
+  };
+
+  const toPersistList = (list: Timer[]): TimerPersist[] =>
+    list.map(t => ({
+      id: t.id,
+      nombre: t.nombre,
+      tipoOperacion: t.tipoOperacion,
+      tiempoInicialMinutos: t.tiempoInicialMinutos,
+      fechaInicio: (t.fechaInicio instanceof Date ? t.fechaInicio : new Date(t.fechaInicio)).toISOString(),
+      fechaFin: (t.fechaFin instanceof Date ? t.fechaFin : new Date(t.fechaFin)).toISOString(),
+      activo: !!t.activo,
+      completado: !!t.completado,
+      optimistic: t.optimistic,
+    }));
+
+  const pruneForSize = (list: TimerPersist[]): TimerPersist[] => {
+    // Mantener activos y limitar completados a los más recientes
+    const activos = list.filter(t => t.activo && !t.completado);
+    const completados = list.filter(t => t.completado || !t.activo);
+    const completadosOrdenados = completados.sort((a, b) => new Date(b.fechaFin).getTime() - new Date(a.fechaFin).getTime());
+    const completadosLimitados = completadosOrdenados.slice(0, 100);
+    return [...activos, ...completadosLimitados];
+  };
+
+  const saveTimersToStorage = (list: Timer[]) => {
+    if (storageWritesDisabledRef.current) return;
+    try {
+      let persist = toPersistList(list);
+      let json = JSON.stringify(persist);
+      // Si excede ~2.5MB, recortar completados
+      if (json.length > 2_500_000) {
+        persist = pruneForSize(persist);
+        json = JSON.stringify(persist);
+      }
+      // Si aún excede, limitar duramente a 300 elementos (por fechaFin próxima)
+      if (json.length > 2_500_000 && persist.length > 300) {
+        persist = persist
+          .sort((a, b) => new Date(a.fechaFin).getTime() - new Date(b.fechaFin).getTime())
+          .slice(0, 300);
+        json = JSON.stringify(persist);
+      }
+      localStorage.setItem('kryotec_timers', json);
+    } catch (e) {
+      const now = Date.now();
+      if (now - lastStorageErrorAtRef.current > 30_000) {
+        console.warn('kryotec_timers: persistencia deshabilitada por cuota/permiso. Continuará sin localStorage.', e);
+        lastStorageErrorAtRef.current = now;
+      }
+      storageWritesDisabledRef.current = true;
+      setTimeout(() => { storageWritesDisabledRef.current = false; }, 5 * 60 * 1000);
+    }
+  };
   
   // WebSocket para sincronización en tiempo real:
   // Unificado: derivar SIEMPRE del host de la API (VITE_API_URL) o same-origin en dev.
@@ -306,7 +373,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             } catch {}
 
             const combinados = [...normalizadosServidor, ...completadosLocales, ...restantesOptimistas];
-            localStorage.setItem('kryotec_timers', JSON.stringify(combinados));
+            try { saveTimersToStorage(combinados); } catch {}
             return combinados;
           });
           
@@ -345,7 +412,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
               // Si el existente es optimista, reemplazarlo por el del servidor
               if (existenteMismoNombre.optimistic) {
                 const reemplazados = prev.map(t => t === existenteMismoNombre ? { ...nuevoTimer, optimistic: false } : t);
-                localStorage.setItem('kryotec_timers', JSON.stringify(reemplazados));
+                try { saveTimersToStorage(reemplazados); } catch {}
                 return reemplazados;
               }
               // Si no es optimista, evitar duplicado (quedarse con el primero)
@@ -353,7 +420,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             }
 
             const nuevos = [...prev, nuevoTimer];
-            localStorage.setItem('kryotec_timers', JSON.stringify(nuevos));
+            try { saveTimersToStorage(nuevos); } catch {}
             return nuevos;
           });
           // console.log('➕ Timer creado desde otro dispositivo:', nuevoTimer.nombre);
@@ -372,7 +439,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
             const nuevos = prev.map(timer => 
               timer.id === timerActualizado.id ? timerActualizado : timer
             );
-            localStorage.setItem('kryotec_timers', JSON.stringify(nuevos));
+            try { saveTimersToStorage(nuevos); } catch {}
             return nuevos;
           });
         }
@@ -394,7 +461,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
               try { markRecentlyCompleted({ ...borrado, completado: true, activo: false }); } catch {}
             }
             const nuevos = prev.filter(timer => timer.id !== lastMessage.data.timerId);
-            localStorage.setItem('kryotec_timers', JSON.stringify(nuevos));
+            try { saveTimersToStorage(nuevos); } catch {}
             return nuevos;
           });
         }
@@ -525,13 +592,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     }
   }, [isConnected, isInitialized]);
 
-  // Guardar timers en localStorage cuando cambien (inmediatamente)
-  useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem('kryotec_timers', JSON.stringify(timers));
-      // console.log('💾 Timers guardados en localStorage:', timers.length);
-    }
-  }, [timers, isInitialized]);
+  // Nota: evitamos persistir en cada tick para no saturar la cuota.
 
   // Detectar cambios de pestaña y sincronizar SOLO cuando es necesario
   useEffect(() => {
@@ -655,7 +716,11 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   completado: false,
   optimistic: true
     } as Timer;
-    setTimers(prev => [...prev, nuevoTimerLocal]);
+    setTimers(prev => {
+      const next = [...prev, nuevoTimerLocal];
+      try { saveTimersToStorage(next); } catch {}
+      return next;
+    });
     
     // ENVIAR DIRECTAMENTE AL SERVIDOR (si hay conexión) - el servidor es la autoridad
     if (isConnected) {
@@ -721,15 +786,15 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         return prev;
       }
       const nuevos = [...prev, nuevoTimerLocal];
-      localStorage.setItem('kryotec_timers', JSON.stringify(nuevos));
+      try { saveTimersToStorage(nuevos); } catch {}
       return nuevos;
     });
     return timerId;
   }, []);
 
   const pausarTimer = useCallback((id: string) => {
-    setTimers(prev => 
-      prev.map(timer => {
+    setTimers(prev => {
+      const next = prev.map(timer => {
         if (timer.id !== id) return timer;
         // Congelar el restante con reloj del servidor y detener el conteo
         const finMs = (timer.fechaFin instanceof Date ? timer.fechaFin.getTime() : new Date(timer.fechaFin).getTime());
@@ -741,8 +806,10 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
           // Mantener fechaFin relativa al restante (útil si se reanuda sin servidor)
           fechaFin: new Date(nowServerMs() + restante * 1000)
         };
-      })
-    );
+      });
+      try { saveTimersToStorage(next); } catch {}
+      return next;
+    });
     
     // Enviar al WebSocket si está conectado
     if (isConnected) {
@@ -758,8 +825,8 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
   }, [isConnected, sendMessage]);
 
   const reanudarTimer = useCallback((id: string) => {
-    setTimers(prev => 
-      prev.map(timer => {
+    setTimers(prev => {
+      const next = prev.map(timer => {
         if (timer.id !== id || timer.completado) return timer;
         const restante = Math.max(0, timer.tiempoRestanteSegundos || 0);
         return {
@@ -768,8 +835,10 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
           // Reprogramar fechaFin a partir del restante actual y reloj del servidor
           fechaFin: new Date(nowServerMs() + restante * 1000)
         };
-      })
-    );
+      });
+      try { saveTimersToStorage(next); } catch {}
+      return next;
+    });
     
     // Enviar al WebSocket si está conectado
     if (isConnected) {
@@ -790,22 +859,9 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     // Eliminar inmediatamente del estado local
     setTimers(prev => {
       const nuevoArray = prev.filter(timer => timer.id !== id);
-  // Timer eliminado localmente (silenciado)
+      try { saveTimersToStorage(nuevoArray); } catch {}
       return nuevoArray;
     });
-    
-    // Eliminar del localStorage inmediatamente
-    const timersGuardados = localStorage.getItem('kryotec_timers');
-    if (timersGuardados) {
-      try {
-        const timersParseados = JSON.parse(timersGuardados);
-        const timersFiltrados = timersParseados.filter((timer: Timer) => timer.id !== id);
-        localStorage.setItem('kryotec_timers', JSON.stringify(timersFiltrados));
-  // Timer eliminado de localStorage (silenciado)
-      } catch (error) {
-        console.error('Error al eliminar timer del localStorage:', error);
-      }
-    }
     
     // Enviar al WebSocket si está conectado
     if (isConnected) {
