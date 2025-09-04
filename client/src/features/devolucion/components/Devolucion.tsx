@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Package, CheckCircle, AlertCircle, Search } from 'lucide-react';
-import TimerModal from '../../operacion/components/TimerModal';
 import { useDevolucion } from '../hooks/useDevolucion';
 import { useTimerContext } from '../../../contexts/TimerContext';
 import InlineCountdown from '../../../shared/components/InlineCountdown';
@@ -26,9 +25,7 @@ export const Devolucion: React.FC = () => {
   const itemsPorPagina = 5;
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<'Cube' | 'VIP' | 'TIC' | null>(null);
   const [seleccionados, setSeleccionados] = useState<Record<number, boolean>>({});
-  const [mostrarModalTiempoInspeccion, setMostrarModalTiempoInspeccion] = useState(false);
-  const [idsParaInspeccion, setIdsParaInspeccion] = useState<number[]>([]);
-  const [nombresParaInspeccion, setNombresParaInspeccion] = useState<Record<number, string>>({});
+  // Eliminado: modal de tiempo para inspección (usaremos 36h por defecto desde el hook)
   // Umbral de tiempo para decidir si puede regresar a Operación o debe ir a Inspección
   const [limiteHoras, setLimiteHoras] = useState<string>('');
   const [limiteMinutos, setLimiteMinutos] = useState<string>('');
@@ -218,13 +215,13 @@ export const Devolucion: React.FC = () => {
 
   return (
   <div className="flex-1 overflow-hidden bg-white">
-      <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
+    <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Gestión de Devolución</h1>
+      <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Gestión de Devolución</h1>
         </div>
       </div>
       
-      <div className="flex-1 overflow-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
+    <div className="flex-1 overflow-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
         {/* Estados de carga y error sin cortar el flujo de hooks */}
         {cargando && (
           <div className="bg-white border border-gray-200 rounded-lg p-6">
@@ -632,7 +629,7 @@ export const Devolucion: React.FC = () => {
                           : 'Regresar a Operación';
 
                       return (
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                           <button
                             className={`px-3 py-2 text-xs sm:text-sm rounded-md border ${disabled ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-blue-300 text-blue-700 hover:bg-blue-50'}`}
                             title={title}
@@ -659,15 +656,16 @@ export const Devolucion: React.FC = () => {
                           >Regresar a Operación</button>
                           <button
                             className="px-3 py-2 text-xs sm:text-sm rounded-md border border-purple-300 text-purple-700 hover:bg-purple-50"
-                            onClick={() => {
+                            onClick={async () => {
                               if (selectedIds.length === 0) return;
                               const nombres: Record<number, string> = {};
                               itemsDevueltosDeCategoria.forEach((i) => {
                                 if (selectedIds.includes(i.id)) nombres[i.id] = i.nombre_unidad;
                               });
-                              setIdsParaInspeccion(selectedIds);
-                              setNombresParaInspeccion(nombres);
-                              setMostrarModalTiempoInspeccion(true);
+                              const ok = window.confirm(`¿Pasar ${selectedIds.length} item(s) a Inspección?`);
+                              if (!ok) return;
+                              await pasarItemsAInspeccion(selectedIds, nombres); // usa 36h por defecto
+                              setSeleccionados({});
                             }}
                           >Pasar a Inspección</button>
                         </div>
@@ -679,26 +677,7 @@ export const Devolucion: React.FC = () => {
             )}
           </div>
     </div>
-
-  {/* Modal de tiempo para Inspección (estándar y obligatorio) */}
-  <TimerModal
-          mostrarModal={mostrarModalTiempoInspeccion}
-          titulo="Tiempo de Inspección"
-          descripcion="Define el tiempo de inspección para los items seleccionados. Este tiempo es obligatorio."
-          tipoOperacion="inspeccion"
-          initialMinutes={36 * 60}
-          onCancelar={() => {
-            setMostrarModalTiempoInspeccion(false);
-          }}
-          onConfirmar={async (tiempoMinutos) => {
-            if (!idsParaInspeccion.length || tiempoMinutos <= 0) return;
-            await pasarItemsAInspeccion(idsParaInspeccion, nombresParaInspeccion, tiempoMinutos);
-            setSeleccionados({});
-            setIdsParaInspeccion([]);
-            setNombresParaInspeccion({});
-            setMostrarModalTiempoInspeccion(false);
-          }}
-        />
+  {/* Modal de tiempo eliminado: se usa duración por defecto (36h) */}
   </>
   )}
       </div>

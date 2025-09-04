@@ -31,8 +31,6 @@ export const Inspeccion: React.FC = () => {
 
   const [mostrarModalSeleccion, setMostrarModalSeleccion] = useState(false);
   const [modalBusqueda, setModalBusqueda] = useState('');
-  const [horasInspeccion, setHorasInspeccion] = useState<string>('');
-  const [minutosInspeccion, setMinutosInspeccion] = useState<string>('');
   const [itemsSeleccionadosModal, setItemsSeleccionadosModal] = useState<number[]>([]);
 
   // Items elegibles desde la fase previa: en Devolución y marcados como Devuelto
@@ -313,13 +311,13 @@ export const Inspeccion: React.FC = () => {
   return (
   <div className="flex-1 overflow-hidden bg-white">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-white border-b border-gray-200 px-3 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Gestión de Inspección</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Gestión de Inspección</h1>
         </div>
       </div>
       
-  <div className="flex-1 overflow-auto p-6 space-y-6">
+  <div className="flex-1 overflow-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
 
         {/* Items Pendientes de Inspección - Agrupados por Categoría */}
         <div className="bg-white rounded-lg border border-orange-200 overflow-hidden">
@@ -369,7 +367,7 @@ export const Inspeccion: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
               {/* Cubes */}
               {cubesParaInspeccion.length > 0 && (
                 <div className="space-y-3">
@@ -429,16 +427,16 @@ export const Inspeccion: React.FC = () => {
 
         {/* Items Inspeccionados */}
         <div className="bg-white rounded-lg shadow border border-gray-200">
-          <div className="bg-green-50 border-b border-green-200 px-6 py-4">
-            <h3 className="text-lg font-semibold text-green-800 flex items-center">
+          <div className="bg-green-50 border-b border-green-200 px-4 sm:px-6 py-3 sm:py-4">
+            <h3 className="text-base sm:text-lg font-semibold text-green-800 flex items-center">
               <CheckCircle className="h-5 w-5 mr-2" />
               Items Inspeccionados
-              <span className="ml-2 bg-green-100 text-green-800 px-2 py-1 rounded text-sm">
+              <span className="ml-2 bg-green-100 text-green-800 px-2 py-1 rounded text-xs sm:text-sm">
                 {itemsInspeccionados.length}
               </span>
             </h3>
           </div>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {itemsInspeccionados.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -446,11 +444,11 @@ export const Inspeccion: React.FC = () => {
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-sm text-gray-700">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                  <div className="text-xs sm:text-sm text-gray-700">
                     {Object.values(seleccionInspeccionados).filter(Boolean).length} seleccionados
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
                       onClick={() => setSeleccionInspeccionados(Object.fromEntries(itemsInspeccionados.map(i => [i.id, true])))}
                       className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-white"
@@ -548,7 +546,7 @@ export const Inspeccion: React.FC = () => {
 
   {/* Modal de escaneo RFID removido */}
 
-      {/* Modal de Selección de Items desde Devolución (mismo diseño que otros) */}
+      {/* Modal de Selección de Items desde Devolución (sin tiempo obligatorio) */}
       {mostrarModalSeleccion && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white rounded-lg shadow-xl w-[92vw] max-w-md sm:max-w-2xl md:max-w-4xl max-h-[88vh] overflow-hidden flex flex-col">
@@ -571,7 +569,7 @@ export const Inspeccion: React.FC = () => {
               </button>
             </div>
             <div className="p-4 sm:p-6 flex flex-col gap-4 sm:gap-6 flex-1 overflow-y-auto">
-              {/* Búsqueda y tiempo */}
+              {/* Búsqueda */}
               <div className="space-y-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -583,32 +581,6 @@ export const Inspeccion: React.FC = () => {
                     maxLength={24}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs text-gray-600 mb-1">Tiempo de inspección (obligatorio)</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        min={0}
-                        placeholder="Horas"
-                        value={horasInspeccion}
-                        onChange={(e) => setHorasInspeccion(e.target.value.replace(/[^0-9]/g, ''))}
-                        className="w-24 px-3 py-2 border rounded-md text-sm"
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        max={59}
-                        placeholder="Minutos"
-                        value={minutosInspeccion}
-                        onChange={(e) => setMinutosInspeccion(e.target.value.replace(/[^0-9]/g, ''))}
-                        className="w-28 px-3 py-2 border rounded-md text-sm"
-                      />
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-500">Debes ingresar horas y/o minutos para crear el cronómetro de inspección.</div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
@@ -678,8 +650,6 @@ export const Inspeccion: React.FC = () => {
                   setMostrarModalSeleccion(false);
                   setItemsSeleccionadosModal([]);
                   setModalBusqueda('');
-                  setHorasInspeccion('');
-                  setMinutosInspeccion('');
                 }}
                 className="px-4 py-2 text-sm text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
               >
@@ -688,21 +658,15 @@ export const Inspeccion: React.FC = () => {
               <button
                 onClick={async () => {
                   if (itemsSeleccionadosModal.length === 0) return;
-                  const h = parseInt(horasInspeccion || '0', 10);
-                  const m = parseInt(minutosInspeccion || '0', 10);
-                  const totalMin = (Number.isNaN(h) ? 0 : h) * 60 + (Number.isNaN(m) ? 0 : m);
-                  if (totalMin <= 0) { alert('Debes ingresar un tiempo de inspección.'); return; }
                   const nombres: Record<number,string> = {};
                   itemsPreviosElegibles.forEach((i: any) => { if (itemsSeleccionadosModal.includes(i.id)) nombres[i.id] = i.nombre_unidad; });
-                  await pasarItemsAInspeccion(itemsSeleccionadosModal, nombres, totalMin);
+                  await pasarItemsAInspeccion(itemsSeleccionadosModal, nombres); // usa 36h por defecto
                   await cargarItemsParaInspeccion();
                   setMostrarModalSeleccion(false);
                   setItemsSeleccionadosModal([]);
                   setModalBusqueda('');
-                  setHorasInspeccion('');
-                  setMinutosInspeccion('');
                 }}
-                disabled={itemsSeleccionadosModal.length === 0 || ((parseInt(horasInspeccion || '0', 10) * 60 + parseInt(minutosInspeccion || '0', 10)) <= 0)}
+                disabled={itemsSeleccionadosModal.length === 0}
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
                 Pasar a Inspección ({itemsSeleccionadosModal.length})
