@@ -558,28 +558,26 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     };
   }, [isConnected, sendMessage]);
 
-  // Actualizar timers cada segundo de forma determinística (sin depender del reloj local):
-  // Disminuimos 1 segundo por tick sobre el valor sincronizado. El servidor seguirá corrigiendo por WS.
+  // Tick global alineado al segundo del servidor: todos los timers se actualizan en perfecta sincronía
   useEffect(() => {
-    const interval = setInterval(() => {
+    let timeoutId: number | undefined;
+    let intervalId: number | undefined;
+
+    const tickAll = () => {
       setTimers(prevTimers =>
         prevTimers.map(timer => {
           if (!timer.activo || timer.completado) return timer;
-          // Calcular el restante a partir de la fecha fin absoluta sincronizada
           const finMs = (timer.fechaFin instanceof Date ? timer.fechaFin.getTime() : new Date(timer.fechaFin).getTime());
           const restanteCalc = Math.ceil((finMs - nowServerMs()) / 1000);
           const nuevoTiempoRestante = Math.max(0, restanteCalc);
           const seCompletoAhora = nuevoTiempoRestante === 0 && !timer.completado;
 
-          // Si se completó por conteo local, notificar una sola vez (batch + dedup evita duplicados)
           if (seCompletoAhora) {
-            // console.log(`🎯 Timer completado localmente: ${timer.nombre} (${timer.tipoOperacion})`);
             (async () => {
               await mostrarNotificacionCompletado(timer);
               if (onTimerComplete) {
                 onTimerComplete({ ...timer, tiempoRestanteSegundos: 0, completado: true, activo: false });
               }
-              // Marcar como recientemente completado
               try { markRecentlyCompleted({ ...timer, completado: true }); } catch {}
             })();
           }
@@ -592,9 +590,22 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
           };
         })
       );
-    }, 1000);
+    };
 
-    return () => clearInterval(interval);
+    const alignAndStart = () => {
+      const now = nowServerMs();
+      const delay = 1000 - (now % 1000);
+      timeoutId = setTimeout(() => {
+        tickAll();
+        intervalId = setInterval(tickAll, 1000) as unknown as number;
+      }, delay) as unknown as number;
+    };
+
+    alignAndStart();
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [onTimerComplete]);
 
   const mostrarNotificacionCompletado = async (timer: Timer) => {

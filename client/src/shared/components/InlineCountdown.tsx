@@ -63,14 +63,8 @@ const InlineCountdown: React.FC<Props> = ({ endTime, seconds, paused = false, fo
     });
   }, [preferSeconds, paused, seconds]);
 
-  // Tick de 1s propio cuando usamos seconds: garantiza decremento 1x1 estable
-  useEffect(() => {
-    if (!preferSeconds || paused) return;
-    const id = setInterval(() => {
-      setDisplay(prev => Math.max(0, (prev || 0) - 1));
-    }, 1000);
-    return () => clearInterval(id);
-  }, [preferSeconds, paused]);
+  // Nota: cuando 'seconds' viene del padre, NO creamos intervalo propio.
+  // Esto evita que múltiples countdowns tengan ticks desalineados.
 
   // 2) Si no hay seconds, usar endTime y recalcular de ser necesario
   useEffect(() => {
