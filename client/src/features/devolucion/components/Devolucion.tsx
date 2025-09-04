@@ -593,28 +593,53 @@ export const Devolucion: React.FC = () => {
                       {Object.values(seleccionados).filter(Boolean).length} seleccionados
                     </div>
                     {(() => {
-                      const selectedIds = Object.entries(seleccionados).filter(([,v]) => v).map(([k]) => Number(k));
-                      const violates = thresholdSecs > 0 && selectedIds.some(id => {
+                      const selectedIds = Object.entries(seleccionados)
+                        .filter(([, v]) => v)
+                        .map(([k]) => Number(k));
+
+                      // Regla 1: si algún seleccionado está vencido (<= 0s), NO puede regresar a Operación.
+                      const hasExpired = selectedIds.some((id) => {
                         const info = infoPorId.get(id);
-                        if (!info) return false; // sin cronómetro activo, no se aplica restricción
+                        if (!info) return false; // si no hay info, no bloquear desde UI (se valida en backend/hook)
+                        return (info.seconds ?? 0) <= 0;
+                      });
+
+                      // Regla 2: si hay límite configurado, bloquear si el restante es menor al límite
+                      const violatesThreshold = thresholdSecs > 0 && selectedIds.some((id) => {
+                        const info = infoPorId.get(id);
+                        if (!info) return false;
                         return (info.seconds ?? 0) < thresholdSecs;
                       });
+
+                      const disabled = selectedIds.length === 0 || hasExpired || violatesThreshold;
+                      const title = hasExpired
+                        ? 'No se puede regresar a Operación: tiempo de envío vencido. Debe ir a Inspección.'
+                        : violatesThreshold
+                          ? 'Algún item tiene tiempo restante menor al límite; debe ir a Inspección.'
+                          : 'Regresar a Operación';
+
                       return (
                         <div className="flex gap-2">
                           <button
-                            className={`px-3 py-2 text-xs sm:text-sm rounded-md border ${violates ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-blue-300 text-blue-700 hover:bg-blue-50'}`}
-                            title={violates ? 'Algún item supera la restricción: si falta menos que el tiempo límite, debe ir a Inspección' : 'Regresar a Operación'}
-                            disabled={selectedIds.length === 0 || violates}
+                            className={`px-3 py-2 text-xs sm:text-sm rounded-md border ${disabled ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-blue-300 text-blue-700 hover:bg-blue-50'}`}
+                            title={title}
+                            disabled={disabled}
                             onClick={async () => {
                               if (selectedIds.length === 0) return;
-                              if (violates) {
+                              if (hasExpired) {
+                                alert('No se puede regresar a Operación: hay items con tiempo de envío vencido. Envíalos a Inspección.');
+                                return;
+                              }
+                              if (violatesThreshold) {
                                 alert('No se puede regresar a Operación: hay items con tiempo restante menor al límite. Envíalos a Inspección.');
                                 return;
                               }
                               const ok = window.confirm(`¿Regresar ${selectedIds.length} item(s) a Operación?`);
                               if (!ok) return;
-                              const nombres: Record<number,string> = {};
-                              itemsDevueltosDeCategoria.forEach(i => { if (selectedIds.includes(i.id)) nombres[i.id] = i.nombre_unidad; });
+                              const nombres: Record<number, string> = {};
+                              itemsDevueltosDeCategoria.forEach((i) => {
+                                if (selectedIds.includes(i.id)) nombres[i.id] = i.nombre_unidad;
+                              });
                               await regresarItemsAOperacion(selectedIds, nombres);
                               setSeleccionados({});
                             }}
@@ -623,8 +648,10 @@ export const Devolucion: React.FC = () => {
                             className="px-3 py-2 text-xs sm:text-sm rounded-md border border-purple-300 text-purple-700 hover:bg-purple-50"
                             onClick={() => {
                               if (selectedIds.length === 0) return;
-                              const nombres: Record<number,string> = {};
-                              itemsDevueltosDeCategoria.forEach(i => { if (selectedIds.includes(i.id)) nombres[i.id] = i.nombre_unidad; });
+                              const nombres: Record<number, string> = {};
+                              itemsDevueltosDeCategoria.forEach((i) => {
+                                if (selectedIds.includes(i.id)) nombres[i.id] = i.nombre_unidad;
+                              });
                               setIdsParaInspeccion(selectedIds);
                               setNombresParaInspeccion(nombres);
                               setMostrarModalTiempoInspeccion(true);

@@ -316,6 +316,13 @@ export const useDevolucion = () => {
       const nombre = (e as CustomEvent).detail?.nombre as string | undefined;
       if (!id) return;
       try {
+        // Regla dura: si el tiempo está vencido (<= 0), NO permitir regresar a Operación
+        const restanteHard = getTiempoRestanteSegundos(id);
+        if (typeof restanteHard === 'number' && restanteHard <= 0) {
+          alert('Este item no puede regresar a Operación: el tiempo de envío ya venció. Debe ir a Inspección.');
+          return;
+        }
+
         // Validar umbral: si falta menos que el límite, bloquear regreso a Operación
         const threshold = getThresholdSecs();
         if (threshold > 0) {
@@ -393,6 +400,19 @@ export const useDevolucion = () => {
     if (!itemIds || itemIds.length === 0) return;
     try {
       setError(null);
+      // Validación previa dura: bloquear vencidos (<= 0)
+      const exp: number[] = [];
+      for (const id of itemIds) {
+        const restante = getTiempoRestanteSegundos(id);
+        if (typeof restante === 'number' && restante <= 0) {
+          exp.push(id);
+        }
+      }
+      if (exp.length > 0) {
+        alert(`No se puede regresar a Operación: ${exp.length} item(s) tienen el tiempo de envío vencido. Deben ir a Inspección.`);
+        return;
+      }
+
       // Validación previa por umbral: bloquear ids que no cumplen
       const threshold = getThresholdSecs();
       if (threshold > 0) {
