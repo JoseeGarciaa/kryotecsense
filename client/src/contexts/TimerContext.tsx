@@ -22,6 +22,8 @@ interface TimerContextType {
   reanudarTimer: (id: string) => void;
   eliminarTimer: (id: string) => void;
   formatearTiempo: (segundos: number) => string;
+  // Indica si un nombre está en proceso de inicio por lote (para UI)
+  isStartingBatchFor?: (nombre: string) => boolean;
   // Compatibilidad hacia atrás con la API previa
   crearTimer?: (nombre: string, tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => string | undefined;
   crearTimersBatch?: (nombres: string[], tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => void;
@@ -39,6 +41,8 @@ interface TimerProviderProps {
 
 export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
   const [timers, setTimers] = useState<Timer[]>([]);
+  // Batch en progreso para evitar efecto "cascada" al iniciar muchos a la vez
+  const pendingBatchRef = useRef<{ names: Set<string>; expiresAt: number } | null>(null);
   
   // WebSocket para comunicación con el backend
   const timerWsUrl = (() => {
@@ -62,6 +66,14 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
 
   const { isConnected, sendMessage, lastMessage } = useWebSocket(timerWsUrl);
 
+  // Utilidad UI: saber si un nombre está en un batch en curso
+  const isStartingBatchFor = (nombre: string) => {
+    const batch = pendingBatchRef.current;
+    if (!batch) return false;
+    if (Date.now() > batch.expiresAt) return false;
+    return batch.names.has(nombre);
+  };
+
   // Escuchar mensajes del WebSocket
   useEffect(() => {
     if (!lastMessage) return;
@@ -80,6 +92,8 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
           }));
           setTimers(timersActualizados);
           console.log(`🔄 ${timersActualizados.length} timers sincronizados desde servidor`);
+          // Liberar batch en curso: tras un SYNC todos aparecen a la vez
+          pendingBatchRef.current = null;
         }
         break;
 
@@ -98,6 +112,10 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
             }
             return timer;
           }));
+          // Si había un batch en espera, libéralo al primer tick por si SYNC tarda
+          if (pendingBatchRef.current && Date.now() <= pendingBatchRef.current.expiresAt) {
+            pendingBatchRef.current = null;
+          }
         }
         break;
 
@@ -109,9 +127,14 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
             fechaInicio: new Date(lastMessage.data.timer.fechaInicio),
             fechaFin: new Date(lastMessage.data.timer.fechaFin)
           };
+          // Si estamos iniciando un lote, suprime la aparición inmediata
+          const batch = pendingBatchRef.current;
+          const isSuppressed = batch && Date.now() <= batch.expiresAt && batch.names.has(nuevoTimer.nombre);
           setTimers(prev => {
             // Evitar duplicados
             if (prev.find(t => t.id === nuevoTimer.id)) return prev;
+            // Suprimir si es parte del batch en curso, se mostrará tras SYNC/TICK
+            if (isSuppressed) return prev;
             return [...prev, nuevoTimer];
           });
         }
@@ -175,12 +198,25 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
       tiempoInicialMinutos: tiempoMinutos,
     }));
 
+    // Registrar batch en curso por breve ventana para evitar render cascada
+    pendingBatchRef.current = {
+      names: new Set(nombres),
+      expiresAt: Date.now() + 3000, // 3s de margen
+    };
+
     sendMessage({
       type: 'CREATE_TIMERS_BATCH',
       data: {
         timers: timersData
       }
     });
+
+    // Solicitar una sincronización poco después para obtener el conjunto completo
+    setTimeout(() => {
+      if (isConnected) {
+        sendMessage({ type: 'REQUEST_SYNC', data: {} });
+      }
+    }, 120);
   };
 
   const pausarTimer = (id: string) => {
@@ -260,6 +296,7 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     reanudarTimer,
     eliminarTimer,
   formatearTiempo,
+  isStartingBatchFor,
   // Exponer shims de compatibilidad
   crearTimer,
   crearTimersBatch,

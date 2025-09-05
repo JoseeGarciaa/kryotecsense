@@ -144,7 +144,8 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     pausarTimer,
     reanudarTimer,
     eliminarTimer,
-    formatearTiempo,
+  formatearTiempo,
+  isStartingBatchFor,
     isConnected
   } = useTimerContext();
   
@@ -717,6 +718,15 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   
   // Función para renderizar el temporizador de un TIC
   const renderizarTemporizador = (rfid: string, esAtemperamiento: boolean = false) => {
+    // Si está arrancando por lote, mostrar placeholder uniforme
+    if (isStartingBatchFor && isStartingBatchFor(rfid)) {
+      return (
+        <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
+          <span className="font-mono text-xs text-gray-500">--:--</span>
+          <span className="text-[10px] text-gray-400">Iniciando…</span>
+        </div>
+      );
+    }
     // Usar el timer del tipo de la sección; evita arrastrar timers de otra fase
     const timer = esAtemperamiento
       ? obtenerTimerActivoPorTipo(rfid, 'atemperamiento')
