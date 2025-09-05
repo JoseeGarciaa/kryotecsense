@@ -325,11 +325,13 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
               // Si el servidor no envía 'activo', asumir activo mientras no esté completado
               const activoServer = timer.activo !== undefined ? Boolean(timer.activo) : !completado;
 
-              // Preservar decrecimiento local si la diferencia es pequeña (<2s) y no hay incremento grande
+              // Para timers sincronizados, usar siempre el valor del servidor para mantener sincronía
+              // Solo preservar decrecimiento local si no es un timer recién creado con optimistic flag
               let tiempoRestanteSegundos = serverSecs;
-              if (previo && !completado) {
+              if (previo && !completado && !previo.optimistic) {
                 const diff = serverSecs - (previo.tiempoRestanteSegundos ?? 0);
-                if (diff < 2 && Math.abs(diff) < 2) {
+                // Solo preservar decremento si la diferencia es muy pequeña (1s) para mantener suavidad visual
+                if (Math.abs(diff) <= 1) {
                   tiempoRestanteSegundos = previo.tiempoRestanteSegundos;
                 }
               }
@@ -846,6 +848,45 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     return timerId;
   }, []);
 
+  // Crear timer local sincronizado para batch operations
+  const crearTimerLocalSincronizado = useCallback((
+    nombre: string,
+    tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion',
+    tiempoMinutos: number,
+    anchorMs: number,
+    batchTimestamp: number,
+    index: number
+  ): string => {
+    const timerId = `optimistic_${batchTimestamp}_${index}_${Math.random().toString(36).substr(2, 6)}`;
+    const fechaInicio = new Date(anchorMs);
+    const fechaFin = new Date(anchorMs + tiempoMinutos * 60 * 1000);
+    const restante = Math.ceil((fechaFin.getTime() - nowServerMs()) / 1000);
+    
+    const nuevoTimerLocal: Timer = {
+      id: timerId,
+      nombre,
+      tipoOperacion,
+      tiempoInicialMinutos: tiempoMinutos,
+      tiempoRestanteSegundos: Math.max(0, restante),
+      fechaInicio,
+      fechaFin,
+      activo: true,
+      completado: false,
+      optimistic: true
+    };
+    
+    setTimers(prev => {
+      // Evitar duplicados por nombre (si ya existe uno activo para el mismo nombre)
+      if (prev.some(t => t.nombre === nombre && !t.completado)) {
+        return prev;
+      }
+      const nuevos = [...prev, nuevoTimerLocal];
+      try { saveTimersToStorage(nuevos); } catch {}
+      return nuevos;
+    });
+    return timerId;
+  }, []);
+
   // Crear varios timers de forma sincronizada con un ancla común en el reloj del servidor
   const crearTimersBatch = useCallback((
     nombres: string[],
@@ -859,35 +900,57 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     // Si no hay WS, crear localmente como fallback
     if (!isConnected) {
       console.warn('⚠️ WebSocket no conectado, creando timers locales');
+      
+      // Para fallback local, usar también timestamps sincronizados
+      const baseMs = nowServerMs();
+      const anchorMs = opts?.alignToServerSecond 
+        ? (Math.ceil(baseMs / 1000) * 1000) // Redondear al próximo segundo completo
+        : baseMs;
+      const batchTimestamp = Date.now();
+      
       const createdIds: string[] = [];
-      for (const nombre of nombres) {
-        try { createdIds.push(crearTimerLocal(nombre, tipoOperacion, tiempoMinutos)); } catch {}
+      for (let i = 0; i < nombres.length; i++) {
+        const nombre = nombres[i];
+        try { 
+          const id = crearTimerLocalSincronizado(nombre, tipoOperacion, tiempoMinutos, anchorMs, batchTimestamp, i);
+          createdIds.push(id);
+        } catch {}
       }
       return createdIds;
     }
 
     // Con WS: crear optimistas locales alineados y enviar UN solo mensaje batch
     const baseMs = nowServerMs();
-    const anchorMs = opts?.alignToServerSecond ? (baseMs + (1000 - (baseMs % 1000))) : baseMs;
+    // Mejorar alineación: esperar hasta el próximo segundo completo
+    const anchorMs = opts?.alignToServerSecond 
+      ? (Math.ceil(baseMs / 1000) * 1000) // Redondear al próximo segundo completo
+      : baseMs;
     const finMs = anchorMs + tiempoMinutos * 60 * 1000;
+
+    // CLAVE: usar la misma referencia temporal para TODOS los timers del batch
+    const batchTimestamp = Date.now();
+    const fechaInicioBatch = new Date(anchorMs);
+    const fechaFinBatch = new Date(finMs);
+    const restanteBatch = Math.max(0, Math.ceil((finMs - nowServerMs()) / 1000));
+
+    console.log(`🔄 Batch sincronizado: anchorMs=${anchorMs}, finMs=${finMs}, restante=${restanteBatch}s para ${nombres.length} timers (aligned=${!!opts?.alignToServerSecond})`);
 
     const nuevos: Timer[] = [];
     const ids: string[] = [];
     const timersData: Array<{ id: string; nombre: string; tipoOperacion: typeof tipoOperacion; tiempoInicialMinutos: number }> = [];
 
-    for (const nombre of nombres) {
-      const id = `timer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const fechaInicio = new Date(anchorMs);
-      const fechaFin = new Date(finMs);
-      const restante = Math.max(0, Math.ceil((finMs - nowServerMs()) / 1000));
+    for (let i = 0; i < nombres.length; i++) {
+      const nombre = nombres[i];
+      // Usar la misma base temporal + índice para evitar colisiones, pero mantener sincronía
+      const id = `timer_${batchTimestamp}_${i}_${Math.random().toString(36).substr(2, 6)}`;
       nuevos.push({
         id,
         nombre,
         tipoOperacion,
         tiempoInicialMinutos: tiempoMinutos,
-        tiempoRestanteSegundos: restante,
-        fechaInicio,
-        fechaFin,
+        tiempoRestanteSegundos: restanteBatch, // MISMO valor para todos
+        fechaInicio: fechaInicioBatch, // MISMA fecha para todos
+        fechaFin: fechaFinBatch, // MISMA fecha para todos
         activo: true,
         completado: false,
         optimistic: true
@@ -919,7 +982,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     }
 
     return ids;
-  }, [isConnected, sendMessage, crearTimerLocal]);
+  }, [isConnected, sendMessage, crearTimerLocalSincronizado]);
 
 
   const pausarTimer = useCallback((id: string) => {
