@@ -22,6 +22,13 @@ interface TimerContextType {
   reanudarTimer: (id: string) => void;
   eliminarTimer: (id: string) => void;
   formatearTiempo: (segundos: number) => string;
+  // Compatibilidad hacia atrás con la API previa
+  crearTimer?: (nombre: string, tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => string | undefined;
+  crearTimersBatch?: (nombres: string[], tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => void;
+  obtenerTimersCompletados?: () => Timer[];
+  forzarSincronizacion?: () => void;
+  getRecentCompletion?: (nombre: string, tipoOperacion?: string) => null;
+  getRecentCompletionById?: (id: string | number) => null;
 }
 
 const TimerContext = createContext<TimerContextType | undefined>(undefined);
@@ -209,6 +216,41 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     return `${minutos}:${segundosRestantes.toString().padStart(2, '0')}`;
   };
 
+  // ===== Métodos de compatibilidad (API antigua) =====
+  // Nota: crearTimer devuelve undefined porque el ID real lo asigna el servidor.
+  // Los consumidores existentes suelen poder resolver por nombre o por otras heurísticas.
+  const crearTimer = (
+    nombre: string,
+    tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion',
+    tiempoMinutos: number
+  ): string | undefined => {
+    iniciarTimer(nombre, tipoOperacion, tiempoMinutos);
+    return undefined;
+  };
+
+  const crearTimersBatch = (
+    nombres: string[],
+    tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion',
+    tiempoMinutos: number
+  ): void => {
+    iniciarTimers(nombres, tipoOperacion, tiempoMinutos);
+  };
+
+  const obtenerTimersCompletados = (): Timer[] => {
+    return timers.filter(t => t.completado);
+  };
+
+  const forzarSincronizacion = (): void => {
+    if (isConnected) {
+      sendMessage({ type: 'REQUEST_SYNC', data: {} });
+    }
+  };
+
+  // Las funciones de "recent completion" ya no aplican con servidor autoritativo,
+  // devolver null para mantener compatibilidad sin romper llamadas existentes.
+  const getRecentCompletion = (_nombre: string, _tipoOperacion?: string) => null;
+  const getRecentCompletionById = (_id: string | number) => null;
+
   const contextValue: TimerContextType = {
     timers,
     isConnected,
@@ -217,7 +259,14 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     pausarTimer,
     reanudarTimer,
     eliminarTimer,
-    formatearTiempo,
+  formatearTiempo,
+  // Exponer shims de compatibilidad
+  crearTimer,
+  crearTimersBatch,
+  obtenerTimersCompletados,
+  forzarSincronizacion,
+  getRecentCompletion,
+  getRecentCompletionById,
   };
 
   return (
