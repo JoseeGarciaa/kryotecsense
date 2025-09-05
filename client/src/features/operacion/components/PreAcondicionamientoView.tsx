@@ -139,50 +139,19 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   // Hook para manejar timers
   const {
     timers,
-  crearTimer,
-  crearTimersBatch,
-  crearTimerLocal,
+    iniciarTimer,
+    iniciarTimers,
     pausarTimer,
     reanudarTimer,
     eliminarTimer,
-  formatearTiempo,
-  forzarSincronizacion,
-  isConnected,
-  getRecentCompletion
+    formatearTiempo,
+    isConnected
   } = useTimerContext();
-
-  // Nota: No necesitamos un re-render artificial cada segundo aquí.
-  // El contexto de timers ya emite un tick global sincronizado que actualiza el estado y re-renderiza esta vista.
   
   // Efecto para cargar los datos iniciales
   useEffect(() => {
     cargarDatos();
   }, []);
-
-  // Forzar una sincronización cuando el WS conecte y al montar (para evitar casos de "Sin cronómetro" por desfase)
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (isConnected) {
-        try { forzarSincronizacion(); } catch {}
-      }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [isConnected, forzarSincronizacion]);
-
-  // Sincronización periódica cada 30s cuando hay WS, con una inicial a 1s
-  useEffect(() => {
-    if (!isConnected) return;
-    const initial = setTimeout(() => {
-      try { forzarSincronizacion(); } catch {}
-    }, 1000);
-    const interval = setInterval(() => {
-      try { forzarSincronizacion(); } catch {}
-    }, 30000);
-    return () => {
-      clearTimeout(initial);
-      clearInterval(interval);
-    };
-  }, [isConnected, forzarSincronizacion]);
   
   // Efecto para actualizar los datos cuando cambie el inventario
   useEffect(() => {
@@ -440,7 +409,6 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   
   // Función para confirmar con cronómetro
   const confirmarConTemporizador = async (tiempoMinutos: number): Promise<void> => {
-    // Objetivo: cerrar el modal instantáneamente y crear timers en lotes para no bloquear la UI
     setCargandoTemporizador(true);
 
     // Copias locales antes de limpiar estado
@@ -452,98 +420,55 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     setMostrarModalTimer(false);
     setRfidsPendientesTimer([]);
     setRfidSeleccionado('');
-    // Dar un respiro al event loop para pintar el cierre del modal
-    await new Promise(resolve => setTimeout(resolve, 0));
 
     try {
-      // 2) Siempre intentar crear en el servidor primero (persistencia y sincronía)
-      const itemsInventario = operaciones.inventarioCompleto.filter((item: any) => rfidsSeleccionados.includes(item.rfid));
-      let serverOk = false;
-      try {
-        if (itemsInventario.length > 0) {
-          const resp = await apiServiceClient.post('/inventory/iniciar-timers-masivo', {
+      // 2) Iniciar timers usando el nuevo contexto simplificado
+      if (rfidsSeleccionados.length === 1) {
+        iniciarTimer(rfidsSeleccionados[0], tipoSeleccionado, tiempoMinutos);
+      } else {
+        iniciarTimers(rfidsSeleccionados, tipoSeleccionado, tiempoMinutos);
+      }
+
+      // 3) Actualizar estados en el backend en paralelo
+      const itemsInventario = operaciones.inventarioCompleto.filter((item: any) => 
+        rfidsSeleccionados.includes(item.rfid)
+      );
+      
+      if (itemsInventario.length > 0) {
+        try {
+          await apiServiceClient.post('/inventory/iniciar-timers-masivo', {
             items_ids: itemsInventario.map((i: any) => i.id).filter(Boolean),
             tipoOperacion: tipoSeleccionado,
             tiempoMinutos
           });
-          serverOk = Boolean(resp?.data);
-        }
-      } catch (e) {
-        console.warn('⚠️ Error creando timers en servidor, aplicando fallback local:', e);
-      }
-
-      // 3) Si hay WS, reflejar en contexto local para feedback inmediato
-      if (isConnected) {
-        const candidatos = rfidsSeleccionados.filter(r => !obtenerTemporizadorTIC(r));
-        if (candidatos.length > 0) {
-          const CHUNK = 100;
-          for (let i = 0; i < candidatos.length; i += CHUNK) {
-            const grupo = candidatos.slice(i, i + CHUNK);
-            crearTimersBatch(grupo, tipoSeleccionado, tiempoMinutos, { alignToServerSecond: true });
-            if (i === 0) console.log(`🚀 Batch local sincronizado (${grupo.length})`);
-            // eslint-disable-next-line no-await-in-loop
-            await new Promise(r => setTimeout(r, 0));
-          }
-        }
-      } else if (!serverOk) {
-        // 4) Fallback sin WS: crear localmente para no bloquear la operación
-        const crear = crearTimerLocal;
-        const CHUNK = 50;
-        for (let i = 0; i < rfidsSeleccionados.length; i += CHUNK) {
-          const batch = rfidsSeleccionados.slice(i, i + CHUNK);
-          batch.forEach((rfid, idx) => {
-            if (!obtenerTemporizadorTIC(rfid)) {
-              crear(rfid, tipoSeleccionado, tiempoMinutos);
-              if (idx === 0) console.log(`🚀 Timers locales creados lote ${Math.floor(i / CHUNK) + 1}`);
-            }
-          });
-          // eslint-disable-next-line no-await-in-loop
-          await new Promise(resolve => setTimeout(resolve, 0));
+        } catch (e) {
+          console.warn('⚠️ Error al guardar timers en servidor:', e);
         }
       }
 
       setCargandoTemporizador(false);
 
-      // 3) Sincronización en segundo plano (no bloquea la UI)
-      (async () => {
-        let timeoutId: NodeJS.Timeout | undefined;
+      // 4) Asignar lote en segundo plano
+      setTimeout(async () => {
         try {
-          // Tiempo de espera más agresivo (10s)
-          const timeoutPromise = new Promise((_, reject) => {
-            timeoutId = setTimeout(() => reject(new Error('Timeout (10s) en asignación de lote')), 10000);
+          const response = await apiServiceClient.patch('/inventory/inventario/asignar-lote-automatico', {
+            rfids: rfidsSeleccionados,
+            estado: 'Pre-acondicionamiento',
+            sub_estado: subEstadoFinal
           });
 
-          const resultado = await Promise.race([
-            apiServiceClient.patch('/inventory/inventario/asignar-lote-automatico', {
-              rfids: rfidsSeleccionados,
-              estado: 'Pre-acondicionamiento',
-              sub_estado: subEstadoFinal
-            }),
-            timeoutPromise
-          ]);
-
-          if (timeoutId) clearTimeout(timeoutId);
-
-          const response = resultado as any;
           const itemsActualizados = response?.data?.items_actualizados ?? 0;
           const loteGenerado = response?.data?.lote_generado ?? '';
 
-          // Persistencia ya intentada arriba; aquí mantenemos solo la asignación de lote
-
-          // Forzar sync para alinear con otros dispositivos
-          setTimeout(() => {
-            forzarSincronizacion();
-          }, 300);
-
-          // Feedback sutil (no modal bloqueante)
           console.log(`✅ Lote asignado: ${loteGenerado} • Items actualizados: ${itemsActualizados}`);
           await cargarDatos();
         } catch (e) {
-          console.warn('⚠️ Sincronización en background falló:', e);
+          console.warn('⚠️ Error en asignación de lote:', e);
         }
-      })();
+      }, 100);
+
     } catch (err) {
-      console.error('❌ Error al iniciar timers de forma optimista:', err);
+      console.error('❌ Error al iniciar timers:', err);
       setCargandoTemporizador(false);
     }
   };
@@ -673,7 +598,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         return;
       }
       const rfids = timersCongelamiento.map((t: any) => t.nombre);
-  const confirmar = window.confirm(`Completar ${timersCongelamiento.length} TIC(s) en congelamiento y mover a Atemperamiento (sin crear timer automáticamente)?`);
+      const confirmar = window.confirm(`Completar ${timersCongelamiento.length} TIC(s) en congelamiento y mover a Atemperamiento (sin crear timer automáticamente)?`);
       if (!confirmar) return;
 
       // Actualizar estado primero en lote
@@ -682,17 +607,13 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         throw new Error('No se pudieron actualizar los estados.');
       }
 
-  // Eliminar timers completados (no crear nuevos timers por defecto)
+      // Eliminar timers completados
       for (const t of timersCongelamiento) {
         eliminarTimer(t.id);
       }
 
-      // Sincronizar y recargar
-      setTimeout(() => {
-        forzarSincronizacion();
-      }, 300);
       await cargarDatos();
-  alert(`✅ ${timersCongelamiento.length} TIC(s) movidas a Atemperamiento`);
+      alert(`✅ ${timersCongelamiento.length} TIC(s) movidas a Atemperamiento`);
     } catch (e: any) {
       console.error('Error al completar todas (congelamiento):', e);
       alert(`❌ Error al completar todas: ${e.message || e}`);
@@ -716,9 +637,6 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         eliminarTimer(t.id);
       }
 
-      setTimeout(() => {
-        forzarSincronizacion();
-      }, 300);
       await cargarDatos();
       alert(`✅ ${timersAtemp.length} TIC(s) movidas a Acondicionamiento`);
     } catch (e: any) {
@@ -800,7 +718,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
   // Función para renderizar el temporizador de un TIC
   const renderizarTemporizador = (rfid: string, esAtemperamiento: boolean = false) => {
     // Usar el timer del tipo de la sección; evita arrastrar timers de otra fase
-  const timer = esAtemperamiento
+    const timer = esAtemperamiento
       ? obtenerTimerActivoPorTipo(rfid, 'atemperamiento')
       : obtenerTimerActivoPorTipo(rfid, 'congelamiento');
 
@@ -809,17 +727,15 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       ? obtenerTimerCompletadoPorTipo(rfid, 'atemperamiento')
       : obtenerTimerCompletadoPorTipo(rfid, 'congelamiento');
 
-    // Fallback: si el servidor limpió el cronómetro recién completado, usar cache temporal para mostrar "Completo"
     const tipoSeccion = esAtemperamiento ? 'atemperamiento' : 'congelamiento';
-    const reciente = !timerCompletado ? getRecentCompletion(rfid, tipoSeccion) : null;
 
-    // Si el timer activo llegó a 0s, tratar como completado inmediato (unificado)
+    // Si el timer activo llegó a 0s, tratar como completado inmediato
     const ceroAlcanzado = timer && ((timer.tiempoRestanteSegundos ?? 0) <= 0);
 
-    if (timerCompletado || reciente || ceroAlcanzado) {
+    if (timerCompletado || ceroAlcanzado) {
       const minutos = timerCompletado
         ? timerCompletado.tiempoInicialMinutos
-        : (reciente?.minutes ?? (timer ? timer.tiempoInicialMinutos : 0));
+        : (timer ? timer.tiempoInicialMinutos : 0);
       // Timer completado - mostrar estado completado
       return (
         <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
@@ -831,8 +747,8 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             {minutos}min
           </div>
           <div className="flex gap-1">
-            {/* Permitir completar también con fallback reciente o 0s alcanzado en Congelación */}
-            {!esAtemperamiento && (timerCompletado || reciente || ceroAlcanzado) && (
+            {/* Permitir completar también con cero alcanzado en Congelación */}
+            {!esAtemperamiento && (timerCompletado || ceroAlcanzado) && (
               <button
                 onClick={() => completarTIC(rfid, timerCompletado ?? null, tipoSeccion)}
                 className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
@@ -896,9 +812,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         </div>
       );
     }
-  // Mostrar tiempo directamente desde el contexto (sin countdown local)
-  const tiempoFormateado = formatearTiempo(timer.tiempoRestanteSegundos);
-  const esUrgente = timer.tiempoRestanteSegundos < 300; // Menos de 5 minutos
+
+    // Mostrar tiempo directamente desde el contexto (sin countdown local)
+    const tiempoFormateado = formatearTiempo(timer.tiempoRestanteSegundos);
+    const esUrgente = timer.tiempoRestanteSegundos < 300; // Menos de 5 minutos
     
     return (
       <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
@@ -1025,7 +942,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             {/* Botones */}
             <div className="flex flex-col sm:flex-row gap-2">
               {/* Botón para iniciar temporizadores de todos los TICs sin temporizador */}
-        {ticsCongelamiento.filter(tic => !obtenerTimerActivoPorTipo(tic.rfid, 'congelamiento')).length > 0 && (
+              {ticsCongelamiento.filter(tic => !obtenerTimerActivoPorTipo(tic.rfid, 'congelamiento')).length > 0 && (
                 <button
                   onClick={() => {
                     const ticsSinTimer = ticsCongelamiento.filter(tic => !obtenerTimerActivoPorTipo(tic.rfid, 'congelamiento'));
@@ -1034,16 +951,16 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                     setMostrarModalTimer(true);
                   }}
                   className="flex items-center justify-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm transition-colors"
-          title="Iniciar cronómetro para todos los TICs sin cronómetro"
+                  title="Iniciar cronómetro para todos los TICs sin cronómetro"
                 >
                   <Play size={16} />
                   Iniciar Todos ({ticsCongelamiento.filter(tic => !obtenerTimerActivoPorTipo(tic.rfid, 'congelamiento')).length})
                 </button>
               )}
               {/* Limpiar timers completados de congelación */}
-        {timersCongelamientoCompletadosEnSeccion.length > 0 && (
+              {timersCongelamientoCompletadosEnSeccion.length > 0 && (
                 <button
-          onClick={() => limpiarTimersCompletadosPorTipo('congelamiento', timersCongelamientoCompletadosEnSeccion.map((t: any) => t.id))}
+                  onClick={() => limpiarTimersCompletadosPorTipo('congelamiento', timersCongelamientoCompletadosEnSeccion.map((t: any) => t.id))}
                   className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm transition-colors"
                   title="Limpiar cronómetros completados de congelación"
                 >
@@ -1052,7 +969,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 </button>
               )}
               {/* Completar todas: Congelamiento → Atemperamiento */}
-        {timersCongelamientoCompletadosEnSeccion.length > 0 && (
+              {timersCongelamientoCompletadosEnSeccion.length > 0 && (
                 <button
                   onClick={completarTodasCongelamiento}
                   className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm transition-colors"
@@ -1299,7 +1216,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             {/* Botones */}
             <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
               {/* Botón para iniciar temporizadores de todos los TICs sin temporizador */}
-        {ticsAtemperamiento.filter(tic => !obtenerTimerActivoPorTipo(tic.rfid, 'atemperamiento')).length > 0 && (
+              {ticsAtemperamiento.filter(tic => !obtenerTimerActivoPorTipo(tic.rfid, 'atemperamiento')).length > 0 && (
                 <button
                   onClick={() => {
                     const ticsSinTimer = ticsAtemperamiento.filter(tic => !obtenerTimerActivoPorTipo(tic.rfid, 'atemperamiento'));
@@ -1308,16 +1225,16 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                     setMostrarModalTimer(true);
                   }}
                   className="flex items-center justify-center gap-2 px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm transition-colors"
-          title="Iniciar cronómetro para todos los TICs sin cronómetro"
+                  title="Iniciar cronómetro para todos los TICs sin cronómetro"
                 >
                   <Play size={16} />
                   Iniciar Todos ({ticsAtemperamiento.filter(tic => !obtenerTimerActivoPorTipo(tic.rfid, 'atemperamiento')).length})
                 </button>
               )}
               {/* Limpiar timers completados de atemperamiento */}
-        {timersAtemperamientoCompletadosEnSeccion.length > 0 && (
+              {timersAtemperamientoCompletadosEnSeccion.length > 0 && (
                 <button
-          onClick={() => limpiarTimersCompletadosPorTipo('atemperamiento', timersAtemperamientoCompletadosEnSeccion.map((t: any) => t.id))}
+                  onClick={() => limpiarTimersCompletadosPorTipo('atemperamiento', timersAtemperamientoCompletadosEnSeccion.map((t: any) => t.id))}
                   className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm transition-colors"
                   title="Limpiar cronómetros completados de atemperamiento"
                 >
@@ -1326,7 +1243,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
                 </button>
               )}
               {/* Completar todas: Atemperamiento → Acondicionamiento */}
-        {timersAtemperamientoCompletadosEnSeccion.length > 0 && (
+              {timersAtemperamientoCompletadosEnSeccion.length > 0 && (
                 <button
                   onClick={completarTodasAtemperamiento}
                   className="flex items-center justify-center gap-2 px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm transition-colors"
