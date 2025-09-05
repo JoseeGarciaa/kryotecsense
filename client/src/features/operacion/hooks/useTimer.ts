@@ -527,6 +527,60 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
         }
         break;
 
+      case 'TIMER_BATCH_UPDATE': {
+        const updates = Array.isArray(lastMessage.data?.updates) ? lastMessage.data.updates : [];
+        if (updates.length === 0) break;
+        const updatesById = new Map<string, any>();
+        for (const u of updates) {
+          if (u && u.timerId) updatesById.set(u.timerId, u);
+        }
+        setTimers(prev => {
+          let changed = false;
+          const next = prev.map(timer => {
+            const u = updatesById.get(timer.id);
+            if (!u) return timer;
+            const nuevoTiempoRestante = typeof u.tiempoRestanteSegundos === 'number' ? u.tiempoRestanteSegundos : timer.tiempoRestanteSegundos;
+            const completado = Boolean(u.completado) || nuevoTiempoRestante === 0;
+            const activo = u.activo !== undefined ? Boolean(u.activo) : (!completado && timer.activo);
+            const alignedEnd = new Date(nowServerMs() + Math.max(0, nuevoTiempoRestante) * 1000);
+
+            // Notificación si recién se completó
+            if (completado && !timer.completado) {
+              setTimeout(() => {
+                if (onTimerComplete) {
+                  onTimerComplete({ ...timer, tiempoRestanteSegundos: 0, completado: true, activo: false });
+                }
+              }, 0);
+              try { markRecentlyCompleted({ ...timer, completado: true }); } catch {}
+            }
+
+            let tiempoActualizado = timer.tiempoRestanteSegundos;
+            const diff = (nuevoTiempoRestante ?? 0) - (timer.tiempoRestanteSegundos ?? 0);
+            if (completado) {
+              tiempoActualizado = 0;
+            } else if (diff >= 2 || Math.abs(diff) >= 2) {
+              tiempoActualizado = nuevoTiempoRestante ?? timer.tiempoRestanteSegundos;
+            }
+
+            changed = changed || tiempoActualizado !== timer.tiempoRestanteSegundos || timer.completado !== completado || timer.activo !== activo;
+            return {
+              ...timer,
+              tiempoRestanteSegundos: tiempoActualizado,
+              completado: completado || tiempoActualizado === 0,
+              activo,
+              server_timestamp: lastMessage.data?.server_timestamp ?? timer.server_timestamp,
+              optimistic: false,
+              fechaFin: alignedEnd
+            };
+          });
+          if (changed) {
+            try { saveTimersToStorage(next); } catch {}
+          }
+          return next;
+        });
+        break;
+      }
+
       default:
         break;
     }
@@ -758,87 +812,6 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     return timerId;
   }, [isConnected, sendMessage]);
 
-  // Crear varios timers de forma sincronizada con un ancla común en el reloj del servidor
-  const crearTimersBatch = useCallback((
-    nombres: string[],
-    tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion',
-    tiempoMinutos: number,
-    opts?: { alignToServerSecond?: boolean }
-  ): string[] => {
-    if (!Array.isArray(nombres) || nombres.length === 0) return [];
-    const setNorm = new Set(nombres.map(n => (n ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()));
-
-    const baseMs = nowServerMs();
-    const anchorMs = opts?.alignToServerSecond ? (baseMs + (1000 - (baseMs % 1000))) : baseMs;
-    const finMs = anchorMs + tiempoMinutos * 60 * 1000;
-
-    const nuevos: Timer[] = [];
-    const ids: string[] = [];
-    for (const nombre of nombres) {
-      const id = `timer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const fechaInicio = new Date(anchorMs);
-      const fechaFin = new Date(finMs);
-      const restante = Math.max(0, Math.ceil((finMs - nowServerMs()) / 1000));
-      nuevos.push({
-        id,
-        nombre,
-        tipoOperacion,
-        tiempoInicialMinutos: tiempoMinutos,
-        tiempoRestanteSegundos: restante,
-        fechaInicio,
-        fechaFin,
-        activo: true,
-        completado: false,
-        optimistic: true
-      });
-      ids.push(id);
-    }
-
-    setTimers(prev => {
-      // Quitar duplicados activos por nombre antes de añadir
-      const filtrados = prev.filter(t => !setNorm.has((t.nombre ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()) || t.completado);
-      const next = [...filtrados, ...nuevos];
-      try { saveTimersToStorage(next); } catch {}
-      return next;
-    });
-
-    // Enviar WS por cada nuevo timer (el servidor es autoridad)
-    if (isConnected) {
-      for (let i = 0; i < nombres.length; i++) {
-        const id = ids[i];
-        const nombre = nombres[i];
-        try {
-          sendMessage({
-            type: 'CREATE_TIMER',
-            data: {
-              timer: {
-                id,
-                nombre,
-                tipoOperacion,
-                tiempoInicialMinutos: tiempoMinutos,
-                tiempoRestanteSegundos: tiempoMinutos * 60,
-                activo: true,
-                completado: false
-              }
-            }
-          });
-        } catch {}
-      }
-      setTimeout(() => {
-        try {
-          sendMessage({ type: 'REQUEST_SYNC' });
-          sendMessage({ type: 'SYNC_REQUEST' });
-        } catch {}
-      }, 200);
-    }
-
-    if (Notification.permission === 'default') {
-      try { Notification.requestPermission(); } catch {}
-    }
-
-    return ids;
-  }, [isConnected, sendMessage]);
-
   // Crear timer SOLO local (optimista) sin enviar al servidor. Útil cuando el backend ya creó el timer.
   const crearTimerLocal = useCallback((
     nombre: string,
@@ -846,7 +819,7 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     tiempoMinutos: number
   ): string => {
     const timerId = `optimistic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  const ahoraMs = nowServerMs();
+    const ahoraMs = nowServerMs();
     const ahora = new Date(ahoraMs);
     const fin = new Date(ahoraMs + tiempoMinutos * 60 * 1000);
     const nuevoTimerLocal: Timer = {
@@ -872,6 +845,82 @@ export const useTimer = (onTimerComplete?: (timer: Timer) => void) => {
     });
     return timerId;
   }, []);
+
+  // Crear varios timers de forma sincronizada con un ancla común en el reloj del servidor
+  const crearTimersBatch = useCallback((
+    nombres: string[],
+    tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion',
+    tiempoMinutos: number,
+    opts?: { alignToServerSecond?: boolean }
+  ): string[] => {
+    if (!Array.isArray(nombres) || nombres.length === 0) return [];
+    const setNorm = new Set(nombres.map(n => (n ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()));
+
+    // Si no hay WS, crear localmente como fallback
+    if (!isConnected) {
+      console.warn('⚠️ WebSocket no conectado, creando timers locales');
+      const createdIds: string[] = [];
+      for (const nombre of nombres) {
+        try { createdIds.push(crearTimerLocal(nombre, tipoOperacion, tiempoMinutos)); } catch {}
+      }
+      return createdIds;
+    }
+
+    // Con WS: crear optimistas locales alineados y enviar UN solo mensaje batch
+    const baseMs = nowServerMs();
+    const anchorMs = opts?.alignToServerSecond ? (baseMs + (1000 - (baseMs % 1000))) : baseMs;
+    const finMs = anchorMs + tiempoMinutos * 60 * 1000;
+
+    const nuevos: Timer[] = [];
+    const ids: string[] = [];
+    const timersData: Array<{ id: string; nombre: string; tipoOperacion: typeof tipoOperacion; tiempoInicialMinutos: number }> = [];
+
+    for (const nombre of nombres) {
+      const id = `timer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const fechaInicio = new Date(anchorMs);
+      const fechaFin = new Date(finMs);
+      const restante = Math.max(0, Math.ceil((finMs - nowServerMs()) / 1000));
+      nuevos.push({
+        id,
+        nombre,
+        tipoOperacion,
+        tiempoInicialMinutos: tiempoMinutos,
+        tiempoRestanteSegundos: restante,
+        fechaInicio,
+        fechaFin,
+        activo: true,
+        completado: false,
+        optimistic: true
+      });
+      ids.push(id);
+      timersData.push({ id, nombre, tipoOperacion, tiempoInicialMinutos: tiempoMinutos });
+    }
+
+    setTimers(prev => {
+      const filtrados = prev.filter(t => !setNorm.has((t.nombre ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()) || t.completado);
+      const next = [...filtrados, ...nuevos];
+      try { saveTimersToStorage(next); } catch {}
+      return next;
+    });
+
+    try {
+      sendMessage({
+        type: 'CREATE_TIMERS_BATCH',
+        data: { timers: timersData, alignToServerSecond: !!opts?.alignToServerSecond }
+      });
+      setTimeout(() => {
+        try { sendMessage({ type: 'REQUEST_SYNC' }); sendMessage({ type: 'SYNC_REQUEST' }); } catch {}
+      }, 200);
+      console.log(`🚀 Enviando batch de ${nombres.length} timers sincronizados`);
+    } catch {}
+
+    if (Notification.permission === 'default') {
+      try { Notification.requestPermission(); } catch {}
+    }
+
+    return ids;
+  }, [isConnected, sendMessage, crearTimerLocal]);
+
 
   const pausarTimer = useCallback((id: string) => {
     setTimers(prev => {

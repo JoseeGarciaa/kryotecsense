@@ -25,6 +25,22 @@ def get_utc_now():
     """Obtener tiempo UTC actual con zona horaria"""
     return datetime.now(timezone.utc)
 
+def get_aligned_time(base_time: datetime = None) -> datetime:
+    """
+    Obtener tiempo alineado al siguiente segundo completo
+    Esto asegura que todos los timers creados en lote inicien al mismo segundo
+    """
+    if base_time is None:
+        base_time = get_utc_now()
+    
+    # Redondear hacia arriba al siguiente segundo
+    microseconds_to_next = 1000000 - base_time.microsecond
+    if microseconds_to_next < 100000:  # Si estamos muy cerca del siguiente segundo
+        # Saltar al segundo después del siguiente
+        return base_time.replace(microsecond=0) + timedelta(seconds=2)
+    else:
+        return base_time.replace(microsecond=0) + timedelta(seconds=1)
+
 def parse_iso_datetime(iso_string):
     """Parsear string ISO a datetime con zona horaria UTC"""
     try:
@@ -67,7 +83,6 @@ class Timer(BaseModel):
     fechaFin: datetime
     activo: bool = True
     completado: bool = False
-    # Nuevo campo para manejar pausas correctamente
     tiempoPausadoSegundos: Optional[int] = None
     
     def to_dict(self):
@@ -174,8 +189,12 @@ class TimerManager:
         for conn in disconnected:
             await self.remove_connection(conn)
             
-    async def create_timer(self, timer_data: Dict, websocket: Optional[WebSocket] = None):
-        """Crear nuevo temporizador basado en tiempo del servidor"""
+    async def create_timer(self, timer_data: Dict, websocket: Optional[WebSocket] = None, 
+                          aligned_start: Optional[datetime] = None):
+        """
+        Crear nuevo temporizador basado en tiempo del servidor
+        aligned_start: Si se proporciona, usar este tiempo alineado para sincronizar con otros timers
+        """
         timer_id = timer_data.get('id', str(uuid.uuid4()))
         
         if timer_id in self.timers:
@@ -183,7 +202,12 @@ class TimerManager:
             await self.update_timer(timer_id, timer_data, websocket)
             return
         
-        server_now = get_utc_now()
+        # Usar tiempo alineado si se proporciona, sino crear uno nuevo
+        if aligned_start:
+            server_now = aligned_start
+        else:
+            server_now = get_aligned_time()
+            
         duracion_minutos = timer_data.get('tiempoInicialMinutos', 0)
         
         # Asegurar que tenemos todos los campos necesarios
@@ -202,7 +226,7 @@ class TimerManager:
         timer = Timer(**timer_data)
         self.timers[timer.id] = timer
         
-        logger.info(f"Timer creado: {timer.nombre} ({timer.id}) - {duracion_minutos} minutos")
+        logger.info(f"Timer creado: {timer.nombre} ({timer.id}) - {duracion_minutos} minutos - Inicio: {server_now.isoformat()}")
         
         server_timestamp = self.get_server_timestamp()
         await self.broadcast({
@@ -224,6 +248,21 @@ class TimerManager:
             })
         except Exception as e:
             logger.error(f"MQ publish TIMER_CREATED error: {e}")
+            
+    async def create_timers_batch(self, timers_data: List[Dict], websocket: Optional[WebSocket] = None):
+        """
+        Crear múltiples timers sincronizados con el mismo tiempo de inicio
+        """
+        if not timers_data:
+            return
+            
+        # Obtener un tiempo alineado único para todos los timers del lote
+        aligned_start = get_aligned_time()
+        logger.info(f"Creando lote de {len(timers_data)} timers con inicio sincronizado: {aligned_start.isoformat()}")
+        
+        # Crear todos los timers con el mismo tiempo de inicio
+        for timer_data in timers_data:
+            await self.create_timer(timer_data, websocket, aligned_start)
         
     async def update_timer(self, timer_id: str, updates: Dict, websocket: Optional[WebSocket] = None):
         """Actualizar temporizador existente"""
@@ -315,7 +354,8 @@ class TimerManager:
         restante = timer.tiempoPausadoSegundos if timer.tiempoPausadoSegundos is not None else timer.tiempoRestanteSegundos
         restante = max(0, restante)
         
-        new_start = get_utc_now()
+        # Alinear al siguiente segundo para mantener sincronización
+        new_start = get_aligned_time()
         new_end = new_start + timedelta(seconds=restante)
         
         updates = {
@@ -341,6 +381,8 @@ class TimerManager:
                 # Solo procesar timers activos
                 active_timers = [t for t in self.timers.values() if t.activo and not t.completado]
                 
+                updates_to_broadcast = []
+                
                 for timer in active_timers:
                     # Calcular tiempo restante
                     remaining_time = self.calculate_remaining_time(timer)
@@ -356,18 +398,24 @@ class TimerManager:
                         timer.tiempoRestanteSegundos = 0
                         logger.info(f"Timer completado: {timer.nombre} ({timer.id})")
                     
-                    # Enviar actualización solo si cambió el tiempo (debería cambiar cada segundo)
+                    # Agregar a la lista de actualizaciones
                     if old_remaining != remaining_time or timer.completado:
-                        await self.broadcast({
-                            "type": "TIMER_TICK",
-                            "data": {
-                                "timerId": timer.id,
-                                "tiempoRestanteSegundos": remaining_time,
-                                "completado": timer.completado,
-                                "activo": timer.activo,
-                                "server_timestamp": server_timestamp
-                            }
+                        updates_to_broadcast.append({
+                            "timerId": timer.id,
+                            "tiempoRestanteSegundos": remaining_time,
+                            "completado": timer.completado,
+                            "activo": timer.activo
                         })
+                
+                # Enviar todas las actualizaciones en un solo mensaje
+                if updates_to_broadcast:
+                    await self.broadcast({
+                        "type": "TIMER_BATCH_UPDATE",
+                        "data": {
+                            "updates": updates_to_broadcast,
+                            "server_timestamp": server_timestamp
+                        }
+                    })
                 
                 # Log ocasional para debug
                 if len(active_timers) > 0 and int(current_time.timestamp()) % 10 == 0:
@@ -509,6 +557,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 timer_data = message_data.get("timer")
                 if timer_data:
                     await timer_manager.create_timer(timer_data, websocket)
+                    
+            elif message_type == "CREATE_TIMERS_BATCH":
+                # Nuevo mensaje para crear múltiples timers sincronizados
+                timers_data = message_data.get("timers", [])
+                if timers_data:
+                    await timer_manager.create_timers_batch(timers_data, websocket)
                     
             elif message_type == "PAUSE_TIMER":
                 timer_id = message_data.get("timerId")
