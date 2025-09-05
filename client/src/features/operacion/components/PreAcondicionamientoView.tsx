@@ -6,7 +6,6 @@ import LoteSelectionModal from './LoteSelectionModal';
 import TimerModal from './TimerModal';
 import { useTimerContext } from '../../../contexts/TimerContext';
 import { apiServiceClient } from '../../../api/apiClient';
-import InlineCountdown from '../../../shared/components/InlineCountdown';
 import WebSocketStatus from '../../../shared/components/WebSocketStatus';
 
 interface TicItem {
@@ -168,6 +167,21 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       }
     }, 300);
     return () => clearTimeout(t);
+  }, [isConnected, forzarSincronizacion]);
+
+  // Sincronización periódica cada 30s cuando hay WS, con una inicial a 1s
+  useEffect(() => {
+    if (!isConnected) return;
+    const initial = setTimeout(() => {
+      try { forzarSincronizacion(); } catch {}
+    }, 1000);
+    const interval = setInterval(() => {
+      try { forzarSincronizacion(); } catch {}
+    }, 30000);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(interval);
+    };
   }, [isConnected, forzarSincronizacion]);
   
   // Efecto para actualizar los datos cuando cambie el inventario
@@ -442,30 +456,44 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     await new Promise(resolve => setTimeout(resolve, 0));
 
     try {
-      // 2) Crear cronómetros usando batch sincronizado cuando hay WS; si no, fallback local por lotes
+      // 2) Siempre intentar crear en el servidor primero (persistencia y sincronía)
+      const itemsInventario = operaciones.inventarioCompleto.filter((item: any) => rfidsSeleccionados.includes(item.rfid));
+      let serverOk = false;
+      try {
+        if (itemsInventario.length > 0) {
+          const resp = await apiServiceClient.post('/inventory/iniciar-timers-masivo', {
+            items_ids: itemsInventario.map((i: any) => i.id).filter(Boolean),
+            tipoOperacion: tipoSeleccionado,
+            tiempoMinutos
+          });
+          serverOk = Boolean(resp?.data);
+        }
+      } catch (e) {
+        console.warn('⚠️ Error creando timers en servidor, aplicando fallback local:', e);
+      }
+
+      // 3) Si hay WS, reflejar en contexto local para feedback inmediato
       if (isConnected) {
-        // Filtrar duplicados que ya tienen timer activo
         const candidatos = rfidsSeleccionados.filter(r => !obtenerTemporizadorTIC(r));
         if (candidatos.length > 0) {
-          // Usar batch con ancla al segundo del servidor para perfecta sincronía visual
-          const CHUNK = 100; // enviar en grupos grandes, WS maneja múltiples mensajes
+          const CHUNK = 100;
           for (let i = 0; i < candidatos.length; i += CHUNK) {
             const grupo = candidatos.slice(i, i + CHUNK);
             crearTimersBatch(grupo, tipoSeleccionado, tiempoMinutos, { alignToServerSecond: true });
-            if (i === 0) console.log(`🚀 Batch sincronizado enviado (${grupo.length})`);
-            // ceder un frame
+            if (i === 0) console.log(`🚀 Batch local sincronizado (${grupo.length})`);
             // eslint-disable-next-line no-await-in-loop
             await new Promise(r => setTimeout(r, 0));
           }
         }
-      } else {
+      } else if (!serverOk) {
+        // 4) Fallback sin WS: crear localmente para no bloquear la operación
         const crear = crearTimerLocal;
         const CHUNK = 50;
         for (let i = 0; i < rfidsSeleccionados.length; i += CHUNK) {
           const batch = rfidsSeleccionados.slice(i, i + CHUNK);
           batch.forEach((rfid, idx) => {
             if (!obtenerTemporizadorTIC(rfid)) {
-              const id = crear(rfid, tipoSeleccionado, tiempoMinutos);
+              crear(rfid, tipoSeleccionado, tiempoMinutos);
               if (idx === 0) console.log(`🚀 Timers locales creados lote ${Math.floor(i / CHUNK) + 1}`);
             }
           });
@@ -500,21 +528,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
           const itemsActualizados = response?.data?.items_actualizados ?? 0;
           const loteGenerado = response?.data?.lote_generado ?? '';
 
-          // Si no hay WS, crear timers en backend por endpoint masivo para persistencia
-          if (!isConnected) {
-            const itemsInventario = operaciones.inventarioCompleto.filter((item: any) => rfidsSeleccionados.includes(item.rfid));
-            if (itemsInventario.length > 0) {
-              try {
-                await apiServiceClient.post('/inventory/iniciar-timers-masivo', {
-                  items_ids: itemsInventario.map((i: any) => i.id),
-                  tipoOperacion: tipoSeleccionado,
-                  tiempoMinutos
-                });
-              } catch (e) {
-                console.warn('⚠️ Error en iniciar-timers-masivo (offline WS), continuando:', e);
-              }
-            }
-          }
+          // Persistencia ya intentada arriba; aquí mantenemos solo la asignación de lote
 
           // Forzar sync para alinear con otros dispositivos
           setTimeout(() => {
@@ -882,25 +896,21 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         </div>
       );
     }
-  // Mostrar un conteo visual suave 1s/1s, sincronizado con segundos del contexto
-  const tiempoVisual = (
-    <InlineCountdown
-      endTime={timer.fechaFin}
-      seconds={timer.tiempoRestanteSegundos}
-  paused={!timer.activo}
-      format={formatearTiempo}
-    />
-  );
+  // Mostrar tiempo directamente desde el contexto (sin countdown local)
+  const tiempoFormateado = formatearTiempo(timer.tiempoRestanteSegundos);
   const esUrgente = timer.tiempoRestanteSegundos < 300; // Menos de 5 minutos
     
     return (
       <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
         <div className="flex items-center justify-center">
-          <span className={`font-mono text-xs font-medium truncate ${
-            esUrgente ? 'text-red-600' : 
-            timer.tipoOperacion === 'congelamiento' ? 'text-blue-600' : 'text-orange-600'
-          }`}>
-            {tiempoVisual}
+          <span
+            className={`font-mono text-xs font-medium truncate ${
+              esUrgente ? 'text-red-600' :
+              timer.tipoOperacion === 'congelamiento' ? 'text-blue-600' : 'text-orange-600'
+            }`}
+            key={`timer-${timer.id}-${timer.tiempoRestanteSegundos}`}
+          >
+            {tiempoFormateado}
           </span>
         </div>
         {!timer.activo && (

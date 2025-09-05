@@ -21,8 +21,6 @@ from shared.message_queue import message_queue
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Los timers son datos temporales - no requieren persistencia
-
 def get_utc_now():
     """Obtener tiempo UTC actual con zona horaria"""
     return datetime.now(timezone.utc)
@@ -30,13 +28,11 @@ def get_utc_now():
 def parse_iso_datetime(iso_string):
     """Parsear string ISO a datetime con zona horaria UTC"""
     try:
-        # Si ya tiene zona horaria, usarla
         if iso_string.endswith('Z'):
             iso_string = iso_string[:-1] + '+00:00'
         
         dt = datetime.fromisoformat(iso_string)
         
-        # Si no tiene zona horaria, asumir UTC
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         
@@ -71,6 +67,8 @@ class Timer(BaseModel):
     fechaFin: datetime
     activo: bool = True
     completado: bool = False
+    # Nuevo campo para manejar pausas correctamente
+    tiempoPausadoSegundos: Optional[int] = None
     
     def to_dict(self):
         """Convertir a diccionario con fechas en formato ISO string"""
@@ -83,7 +81,8 @@ class Timer(BaseModel):
             "fechaInicio": self.fechaInicio.isoformat() if isinstance(self.fechaInicio, datetime) else self.fechaInicio,
             "fechaFin": self.fechaFin.isoformat() if isinstance(self.fechaFin, datetime) else self.fechaFin,
             "activo": self.activo,
-            "completado": self.completado
+            "completado": self.completado,
+            "tiempoPausadoSegundos": self.tiempoPausadoSegundos
         }
 
 class WebSocketMessage(BaseModel):
@@ -98,44 +97,39 @@ class TimerManager:
         self.running = True
         self.server_start_time = get_utc_now()
         self.instance_id = str(uuid.uuid4())
+        self.last_tick_time = get_utc_now()
         
     def get_server_timestamp(self):
         """Obtener timestamp del servidor en milisegundos"""
         return int(get_utc_now().timestamp() * 1000)
         
     def calculate_remaining_time(self, timer: Timer) -> int:
-        """Calcular tiempo restante. Si está pausado, devolver el valor almacenado."""
+        """Calcular tiempo restante basado en el estado del timer"""
+        # Si está pausado, retornar el tiempo guardado cuando se pausó
         if not timer.activo:
-            try:
-                return max(0, int(timer.tiempoRestanteSegundos))
-            except Exception:
-                return 0
+            if timer.tiempoPausadoSegundos is not None:
+                return max(0, timer.tiempoPausadoSegundos)
+            return max(0, timer.tiempoRestanteSegundos)
+        
+        # Si está activo, calcular basado en fechaFin
         server_now = get_utc_now()
         if timer.fechaFin <= server_now:
             return 0
+        
         remaining_seconds = int((timer.fechaFin - server_now).total_seconds())
         return max(0, remaining_seconds)
-        
-    # MÉTODOS ELIMINADOS - Los timers no se persisten
-    # Los timers son datos temporales que solo existen en memoria
         
     async def add_connection(self, websocket: WebSocket):
         """Agregar nueva conexión WebSocket"""
         self.connections.add(websocket)
         logger.info(f"Nueva conexión WebSocket. Total: {len(self.connections)}")
         
-        # ENVIAR ESTADO ACTUAL CON TIEMPO DEL SERVIDOR
+        # Enviar estado actual con tiempo del servidor
         server_timestamp = self.get_server_timestamp()
         timers_data = []
         
         for timer in self.timers.values():
             remaining_time = self.calculate_remaining_time(timer)
-            
-            # Actualizar el timer con el tiempo calculado por el servidor
-            timer.tiempoRestanteSegundos = remaining_time
-            timer.completado = remaining_time == 0
-            timer.activo = timer.activo and not timer.completado
-            
             timers_data.append({
                 **timer.to_dict(),
                 "server_remaining_time": remaining_time,
@@ -177,38 +171,39 @@ class TimerManager:
                 logger.error(f"Error en broadcast: {e}")
                 disconnected.add(connection)
                 
-        # Remover conexiones desconectadas
         for conn in disconnected:
             await self.remove_connection(conn)
             
     async def create_timer(self, timer_data: Dict, websocket: Optional[WebSocket] = None):
         """Crear nuevo temporizador basado en tiempo del servidor"""
-        timer_id = timer_data.get('id')
-        if timer_id and timer_id in self.timers:
+        timer_id = timer_data.get('id', str(uuid.uuid4()))
+        
+        if timer_id in self.timers:
             logger.info(f"Timer ya existe, actualizando: {timer_id}")
             await self.update_timer(timer_id, timer_data, websocket)
             return
         
-        # Usar tiempo del servidor para crear el timer
         server_now = get_utc_now()
-        
-        # Si vienen fechas del cliente, las ignoramos y usamos las del servidor
         duracion_minutos = timer_data.get('tiempoInicialMinutos', 0)
         
-        # Crear fechas basadas en el servidor
-        fecha_inicio = server_now
-        fecha_fin = server_now + timedelta(minutes=duracion_minutos)
-        
-        timer_data['fechaInicio'] = fecha_inicio
-        timer_data['fechaFin'] = fecha_fin
+        # Asegurar que tenemos todos los campos necesarios
+        timer_data['id'] = timer_id
+        timer_data['fechaInicio'] = server_now
+        timer_data['fechaFin'] = server_now + timedelta(minutes=duracion_minutos)
         timer_data['tiempoRestanteSegundos'] = duracion_minutos * 60
+        timer_data['activo'] = True
+        timer_data['completado'] = False
+        timer_data['tiempoPausadoSegundos'] = None
+        
+        # Asegurar campos requeridos
+        timer_data['nombre'] = timer_data.get('nombre', f'Timer {timer_id[:8]}')
+        timer_data['tipoOperacion'] = timer_data.get('tipoOperacion', 'congelamiento')
         
         timer = Timer(**timer_data)
         self.timers[timer.id] = timer
         
-        logger.info(f"Timer creado con tiempo del servidor: {timer.nombre} ({timer.id}) - {duracion_minutos} minutos")
+        logger.info(f"Timer creado: {timer.nombre} ({timer.id}) - {duracion_minutos} minutos")
         
-        # Broadcast a todos los clientes
         server_timestamp = self.get_server_timestamp()
         await self.broadcast({
             "type": "TIMER_CREATED",
@@ -220,7 +215,6 @@ class TimerManager:
             }
         }, exclude=websocket)
 
-        # Publicar a otras instancias (fanout)
         try:
             await message_queue.publish_fanout("timers.events", {
                 "event": "TIMER_CREATED",
@@ -238,19 +232,21 @@ class TimerManager:
             return False
             
         timer = self.timers[timer_id]
+        
         for key, value in updates.items():
             if hasattr(timer, key):
+                # Convertir fechas si es necesario
+                if key in ['fechaInicio', 'fechaFin'] and isinstance(value, str):
+                    value = parse_iso_datetime(value)
                 setattr(timer, key, value)
                 
         logger.info(f"Timer actualizado: {timer.nombre} ({timer_id})")
         
-        # Broadcast a todos los clientes excepto el que envió
         await self.broadcast({
             "type": "TIMER_UPDATED",
             "data": {"timer": timer.to_dict()}
         }, exclude=websocket)
 
-        # Publicar a otras instancias
         try:
             await message_queue.publish_fanout("timers.events", {
                 "event": "TIMER_UPDATED",
@@ -269,13 +265,11 @@ class TimerManager:
             
             logger.info(f"Timer eliminado: {timer.nombre} ({timer_id})")
             
-            # Broadcast a todos los clientes excepto el que envió
             await self.broadcast({
                 "type": "TIMER_DELETED",
                 "data": {"timerId": timer_id}
             }, exclude=websocket)
 
-            # Publicar a otras instancias
             try:
                 await message_queue.publish_fanout("timers.events", {
                     "event": "TIMER_DELETED",
@@ -289,73 +283,98 @@ class TimerManager:
         return False
         
     async def pause_timer(self, timer_id: str, websocket: Optional[WebSocket] = None):
-        """Pausar temporizador: congelar tiempo restante y detener tick."""
+        """Pausar temporizador: guardar tiempo restante actual"""
         if timer_id not in self.timers:
             return False
-        timer = self.timers[timer_id]
-        remaining = self.calculate_remaining_time(timer)
-        updates = {"activo": False, "tiempoRestanteSegundos": remaining}
-        return await self.update_timer(timer_id, updates, websocket)
-        
-    async def resume_timer(self, timer_id: str, websocket: Optional[WebSocket] = None):
-        """Reanudar temporizador: reestablecer fechaFin a ahora + restante."""
-        if timer_id not in self.timers:
-            return False
+            
         timer = self.timers[timer_id]
         if timer.completado:
             return False
-        # Establecer nueva fechaFin basada en tiempo restante almacenado
-        restante = max(0, int(timer.tiempoRestanteSegundos))
-        new_end = get_utc_now() + timedelta(seconds=restante)
-        updates = {"activo": True, "fechaFin": new_end}
+            
+        # Calcular y guardar el tiempo restante actual
+        remaining = self.calculate_remaining_time(timer)
+        updates = {
+            "activo": False,
+            "tiempoPausadoSegundos": remaining,
+            "tiempoRestanteSegundos": remaining
+        }
+        
+        logger.info(f"Pausando timer {timer_id} con {remaining} segundos restantes")
+        return await self.update_timer(timer_id, updates, websocket)
+        
+    async def resume_timer(self, timer_id: str, websocket: Optional[WebSocket] = None):
+        """Reanudar temporizador: establecer nueva fechaFin basada en tiempo pausado"""
+        if timer_id not in self.timers:
+            return False
+            
+        timer = self.timers[timer_id]
+        if timer.completado:
+            return False
+            
+        # Usar el tiempo pausado si existe, sino usar tiempoRestanteSegundos
+        restante = timer.tiempoPausadoSegundos if timer.tiempoPausadoSegundos is not None else timer.tiempoRestanteSegundos
+        restante = max(0, restante)
+        
+        new_start = get_utc_now()
+        new_end = new_start + timedelta(seconds=restante)
+        
+        updates = {
+            "activo": True,
+            "fechaInicio": new_start,
+            "fechaFin": new_end,
+            "tiempoPausadoSegundos": None,
+            "tiempoRestanteSegundos": restante
+        }
+        
+        logger.info(f"Reanudando timer {timer_id} con {restante} segundos")
         return await self.update_timer(timer_id, updates, websocket)
         
     async def tick_timers(self):
-        """Actualizar todos los timers activos cada segundo - TIEMPO DEL SERVIDOR"""
+        """Actualizar todos los timers activos cada segundo"""
         while self.running:
             try:
-                server_timestamp = self.get_server_timestamp()
-                updates_to_send = []
+                await asyncio.sleep(1)  # Esperar exactamente 1 segundo
                 
-                for timer_id, timer in list(self.timers.items()):
-                    # Calcular tiempo restante basado SOLO en el servidor
+                current_time = get_utc_now()
+                server_timestamp = self.get_server_timestamp()
+                
+                # Solo procesar timers activos
+                active_timers = [t for t in self.timers.values() if t.activo and not t.completado]
+                
+                for timer in active_timers:
+                    # Calcular tiempo restante
                     remaining_time = self.calculate_remaining_time(timer)
                     
-                    # El servidor es la ÚNICA fuente de verdad
+                    # Actualizar el timer
                     old_remaining = timer.tiempoRestanteSegundos
                     timer.tiempoRestanteSegundos = remaining_time
                     
                     # Verificar si se completó
-                    if remaining_time == 0 and not timer.completado:
+                    if remaining_time <= 0:
                         timer.completado = True
                         timer.activo = False
-                        logger.info(f"Timer completado: {timer.nombre} ({timer_id})")
+                        timer.tiempoRestanteSegundos = 0
+                        logger.info(f"Timer completado: {timer.nombre} ({timer.id})")
                     
-                    # SIEMPRE enviar actualización para timers activos O si cambió el estado
-                    if timer.activo or (old_remaining != remaining_time):
-                        updates_to_send.append({
-                            "timerId": timer_id,
-                            "tiempoRestanteSegundos": remaining_time,
-                            "completado": timer.completado,
-                            "activo": timer.activo,
-                            "server_timestamp": server_timestamp
+                    # Enviar actualización solo si cambió el tiempo (debería cambiar cada segundo)
+                    if old_remaining != remaining_time or timer.completado:
+                        await self.broadcast({
+                            "type": "TIMER_TICK",
+                            "data": {
+                                "timerId": timer.id,
+                                "tiempoRestanteSegundos": remaining_time,
+                                "completado": timer.completado,
+                                "activo": timer.activo,
+                                "server_timestamp": server_timestamp
+                            }
                         })
                 
-                # Enviar todas las actualizaciones
-                for update in updates_to_send:
-                    await self.broadcast({
-                        "type": "TIMER_TIME_UPDATE",
-                        "data": update
-                    })
-
-                # Opcional: enviar pulsos de tiempo a otras instancias (solo estado, sin spam)
-                # Aquí no publicamos cada segundo para evitar carga; el cálculo se hará local con fechaFin
-                
-                await asyncio.sleep(1)  # Tick cada segundo exacto
+                # Log ocasional para debug
+                if len(active_timers) > 0 and int(current_time.timestamp()) % 10 == 0:
+                    logger.debug(f"Tick: {len(active_timers)} timers activos")
                 
             except Exception as e:
-                logger.error(f"Error en tick_timers: {e}")
-                await asyncio.sleep(1)
+                logger.error(f"Error en tick_timers: {e}", exc_info=True)
 
 # Instancia global del manager
 timer_manager = TimerManager()
@@ -364,8 +383,8 @@ timer_manager = TimerManager()
 async def startup_event():
     """Iniciar el loop de actualización de timers"""
     asyncio.create_task(timer_manager.tick_timers())
-    logger.info(f"Timer service instance_id: {timer_manager.instance_id}")
-    # Conectar a RabbitMQ y suscribirnos a eventos
+    logger.info(f"Timer service iniciado - instance_id: {timer_manager.instance_id}")
+    
     async def init_mq():
         try:
             await message_queue.connect()
@@ -374,72 +393,75 @@ async def startup_event():
             async def on_event(msg: Dict):
                 try:
                     if msg.get("origin") == timer_manager.instance_id:
-                        return  # ignorar mis propios eventos
+                        return
+                        
                     evt = msg.get("event")
+                    
                     if evt == "TIMER_CREATED":
                         data = msg.get("timer")
                         if data:
-                            # Convertir fechas ISO a datetime
-                            data["fechaInicio"] = parse_iso_datetime(data["fechaInicio"]) if isinstance(data["fechaInicio"], str) else data["fechaInicio"]
-                            data["fechaFin"] = parse_iso_datetime(data["fechaFin"]) if isinstance(data["fechaFin"], str) else data["fechaFin"]
+                            # Convertir fechas
+                            for date_field in ["fechaInicio", "fechaFin"]:
+                                if date_field in data and isinstance(data[date_field], str):
+                                    data[date_field] = parse_iso_datetime(data[date_field])
+                            
+                            # Asegurar campos requeridos
+                            data.setdefault('tiempoPausadoSegundos', None)
+                            
                             t = Timer(**data)
                             timer_manager.timers[t.id] = t
                             logger.info(f"[MQ] TIMER_CREATED replicado: {t.id}")
-                            # Opcional: notificar a clientes locales
+                            
                             await timer_manager.broadcast({
                                 "type": "TIMER_CREATED",
-                                "data": {"timer": {**t.to_dict(), "server_timestamp": msg.get("server_timestamp")}}
+                                "data": {
+                                    "timer": {
+                                        **t.to_dict(),
+                                        "server_timestamp": msg.get("server_timestamp")
+                                    }
+                                }
                             })
+                            
                     elif evt == "TIMER_UPDATED":
                         data = msg.get("timer")
                         if data and data.get("id") in timer_manager.timers:
                             tid = data["id"]
+                            timer = timer_manager.timers[tid]
+                            
                             for k, v in data.items():
                                 if k in ("fechaInicio", "fechaFin") and isinstance(v, str):
                                     v = parse_iso_datetime(v)
-                                setattr(timer_manager.timers[tid], k, v)
+                                if hasattr(timer, k):
+                                    setattr(timer, k, v)
+                                    
                             logger.info(f"[MQ] TIMER_UPDATED replicado: {tid}")
-                            await timer_manager.broadcast({"type": "TIMER_UPDATED", "data": {"timer": timer_manager.timers[tid].to_dict()}})
+                            
+                            await timer_manager.broadcast({
+                                "type": "TIMER_UPDATED",
+                                "data": {"timer": timer.to_dict()}
+                            })
+                            
                     elif evt == "TIMER_DELETED":
                         tid = msg.get("timerId")
                         if tid and tid in timer_manager.timers:
                             timer_manager.timers.pop(tid, None)
                             logger.info(f"[MQ] TIMER_DELETED replicado: {tid}")
-                            await timer_manager.broadcast({"type": "TIMER_DELETED", "data": {"timerId": tid}})
-                    elif evt == "TIMERS_SNAPSHOT":
-                        # Reemplazar o fusionar timers con un snapshot completo
-                        timers = msg.get("timers", [])
-                        new_map = {}
-                        for data in timers:
-                            if isinstance(data.get("fechaInicio"), str):
-                                data["fechaInicio"] = parse_iso_datetime(data["fechaInicio"])
-                            if isinstance(data.get("fechaFin"), str):
-                                data["fechaFin"] = parse_iso_datetime(data["fechaFin"])
-                            t = Timer(**data)
-                            new_map[t.id] = t
-                        timer_manager.timers = new_map
-                        logger.info(f"[MQ] TIMERS_SNAPSHOT aplicado: {len(new_map)} timers")
-                        # Notificar a clientes locales
-                        server_timestamp = timer_manager.get_server_timestamp()
-                        payload = [{**t.to_dict(), "server_timestamp": server_timestamp} for t in timer_manager.timers.values()]
-                        await timer_manager.broadcast({"type": "TIMER_SYNC", "data": {"timers": payload, "server_timestamp": server_timestamp}})
+                            
+                            await timer_manager.broadcast({
+                                "type": "TIMER_DELETED",
+                                "data": {"timerId": tid}
+                            })
+                            
                 except Exception as e:
-                    logger.error(f"Error procesando evento MQ: {e}")
+                    logger.error(f"Error procesando evento MQ: {e}", exc_info=True)
 
             await message_queue.consume_fanout("timers.events", on_event)
             logger.info("Suscrito a fanout timers.events")
-
-            # Publicar snapshot inicial para que otras instancias se sincronicen (optional)
-            await message_queue.publish_fanout("timers.events", {
-                "event": "TIMERS_SNAPSHOT",
-                "origin": timer_manager.instance_id,
-                "timers": [t.to_dict() for t in timer_manager.timers.values()]
-            })
+            
         except Exception as e:
             logger.error(f"No se pudo inicializar MQ: {e}")
 
     asyncio.create_task(init_mq())
-    logger.info("Servicio de timers iniciado")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -455,37 +477,26 @@ async def websocket_endpoint(websocket: WebSocket):
     
     try:
         while True:
-            # Recibir mensaje del cliente
             data = await websocket.receive_text()
             message = json.loads(data)
             
-            # logger.info(f"Mensaje recibido: {message.get('type', 'UNKNOWN')}")
-            
-            # Procesar mensaje según tipo
             message_type = message.get("type")
             message_data = message.get("data", {})
             
-            # Compatibilidad: aceptar tanto REQUEST_SYNC (nuevo) como SYNC_REQUEST (viejo)
             if message_type in ("REQUEST_SYNC", "SYNC_REQUEST"):
-                # Cliente solicita sincronización completa
                 server_timestamp = timer_manager.get_server_timestamp()
                 timers_data = []
                 
                 for timer in timer_manager.timers.values():
                     remaining_time = timer_manager.calculate_remaining_time(timer)
-                    
-                    # Actualizar timer con tiempo del servidor
-                    timer.tiempoRestanteSegundos = remaining_time
-                    timer.completado = remaining_time == 0
-                    timer.activo = timer.activo and not timer.completado
-                    
                     timers_data.append({
                         **timer.to_dict(),
                         "server_remaining_time": remaining_time,
                         "server_timestamp": server_timestamp
                     })
                 
-                logger.info(f"Sincronización solicitada - enviando {len(timers_data)} timers con tiempo del servidor")
+                logger.info(f"Sync solicitado - enviando {len(timers_data)} timers")
+                
                 await timer_manager.send_to_client(websocket, {
                     "type": "TIMER_SYNC",
                     "data": {
@@ -514,35 +525,20 @@ async def websocket_endpoint(websocket: WebSocket):
                 if timer_id:
                     await timer_manager.delete_timer(timer_id, websocket)
                     
-            elif message_type == "FORCE_BROADCAST_SYNC":
-                # Forzar un SYNC global a todos los clientes
-                server_timestamp = timer_manager.get_server_timestamp()
-                timers_data = []
-                for timer in timer_manager.timers.values():
-                    remaining_time = timer_manager.calculate_remaining_time(timer)
-                    timer.tiempoRestanteSegundos = remaining_time
-                    timer.completado = remaining_time == 0
-                    timer.activo = timer.activo and not timer.completado
-                    timers_data.append({
-                        **timer.to_dict(),
-                        "server_remaining_time": remaining_time,
-                        "server_timestamp": server_timestamp
-                    })
-                await timer_manager.broadcast({
-                    "type": "TIMER_SYNC",
-                    "data": {
-                        "timers": timers_data,
-                        "server_timestamp": server_timestamp
-                    }
+            elif message_type == "PING":
+                # Responder al ping para mantener la conexión viva
+                await timer_manager.send_to_client(websocket, {
+                    "type": "PONG",
+                    "data": {"timestamp": timer_manager.get_server_timestamp()}
                 })
-
+                
             else:
                 logger.warning(f"Tipo de mensaje no reconocido: {message_type}")
                 
     except WebSocketDisconnect:
         logger.info("Cliente desconectado")
     except Exception as e:
-        logger.error(f"Error en WebSocket: {e}")
+        logger.error(f"Error en WebSocket: {e}", exc_info=True)
     finally:
         await timer_manager.remove_connection(websocket)
 
@@ -552,28 +548,26 @@ async def health_check():
     return {
         "status": "healthy",
         "timers_count": len(timer_manager.timers),
+        "active_timers": len([t for t in timer_manager.timers.values() if t.activo]),
         "connections_count": len(timer_manager.connections),
-    "timestamp": get_utc_now().isoformat(),
-    "instance_id": timer_manager.instance_id
+        "timestamp": get_utc_now().isoformat(),
+        "instance_id": timer_manager.instance_id
     }
 
 @app.get("/timers")
 async def get_timers():
-    """Obtener todos los timers con tiempos recalculados (REST API)"""
+    """Obtener todos los timers con tiempos recalculados"""
     current_time = get_utc_now()
     timers_actualizados = []
     
     for timer in timer_manager.timers.values():
-        # Recalcular tiempo restante basado en tiempo actual para máxima precisión
-        tiempo_restante_ms = (timer.fechaFin - current_time).total_seconds()
-        nuevo_tiempo_restante = max(0, int(tiempo_restante_ms))
+        tiempo_restante = timer_manager.calculate_remaining_time(timer)
         
-        # Actualizar timer con tiempo preciso
-        timer.tiempoRestanteSegundos = nuevo_tiempo_restante
-        timer.completado = nuevo_tiempo_restante == 0
-        timer.activo = timer.activo and not timer.completado
+        timer_dict = timer.to_dict()
+        timer_dict['tiempoRestanteSegundos'] = tiempo_restante
+        timer_dict['server_time'] = current_time.isoformat()
         
-        timers_actualizados.append(timer.to_dict())
+        timers_actualizados.append(timer_dict)
     
     return {
         "timers": timers_actualizados,
@@ -583,43 +577,38 @@ async def get_timers():
 
 @app.post("/timers/sync")
 async def force_sync():
-    """Forzar sincronización de todos los timers (REST API)"""
+    """Forzar sincronización de todos los timers"""
     current_time = get_utc_now()
+    server_timestamp = timer_manager.get_server_timestamp()
     timers_actualizados = []
     
     for timer in timer_manager.timers.values():
-        # Recalcular tiempo restante basado en tiempo actual para máxima precisión
-        tiempo_restante_ms = (timer.fechaFin - current_time).total_seconds()
-        nuevo_tiempo_restante = max(0, int(tiempo_restante_ms))
+        tiempo_restante = timer_manager.calculate_remaining_time(timer)
         
-        # Actualizar timer con tiempo preciso
-        timer.tiempoRestanteSegundos = nuevo_tiempo_restante
-        timer.completado = nuevo_tiempo_restante == 0
-        timer.activo = timer.activo and not timer.completado
+        timer_dict = timer.to_dict()
+        timer_dict['tiempoRestanteSegundos'] = tiempo_restante
+        timer_dict['server_remaining_time'] = tiempo_restante
+        timer_dict['server_timestamp'] = server_timestamp
         
-        timers_actualizados.append(timer.to_dict())
+        timers_actualizados.append(timer_dict)
     
     # Broadcast a todos los clientes conectados
-    if timers_actualizados:
-        await timer_manager.broadcast({
-            "type": "TIMER_SYNC",
-            "data": {
-                "timers": timers_actualizados,
-                "server_time": current_time.isoformat()
-            }
-        })
+    await timer_manager.broadcast({
+        "type": "TIMER_SYNC",
+        "data": {
+            "timers": timers_actualizados,
+            "server_timestamp": server_timestamp
+        }
+    })
     
     return {
         "message": "Sincronización forzada completada",
-        "timers": timers_actualizados,
-        "count": len(timers_actualizados),
+        "timers_synced": len(timers_actualizados),
         "server_time": current_time.isoformat()
     }
 
 if __name__ == "__main__":
-    # Allow PORT to be provided by the platform (e.g., Railway)
     port = int(os.environ.get("PORT", 8006))
-    # Ejecutar usando el objeto app directamente para evitar problemas de import
     uvicorn.run(
         app,
         host="0.0.0.0",
