@@ -11,6 +11,8 @@ export interface Timer {
   fechaFin: Date;
   activo: boolean;
   completado: boolean;
+  // Campos opcionales para manejo local
+  pendienteSync?: boolean; // creado localmente, aún no confirmado por servidor
 }
 
 interface TimerContextType {
@@ -43,6 +45,21 @@ interface TimerProviderProps {
 
 export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
   const [timers, setTimers] = useState<Timer[]>([]);
+  // Track previo para detectar transiciones a completado
+  const prevTimersRef = useRef<Map<string, boolean>>(new Map());
+  // Completados recientes (clave por nombre normalizado o id)
+  const recentCompletionsRef = useRef<Map<string, { ts: number; minutes: number; tipo: string }>>(new Map());
+  // Intervalo de limpieza de completados recientes
+  useEffect(() => {
+    const id = setInterval(() => {
+      const now = Date.now();
+      const limit = 2 * 60 * 1000; // 2 minutos
+      for (const [k, v] of recentCompletionsRef.current.entries()) {
+        if (now - v.ts > limit) recentCompletionsRef.current.delete(k);
+      }
+    }, 30000);
+    return () => clearInterval(id);
+  }, []);
   // Batch en progreso para evitar efecto "cascada" al iniciar muchos a la vez
   const pendingBatchRef = useRef<{ names: Set<string>; expiresAt: number } | null>(null);
   
@@ -91,7 +108,12 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
             fechaFin: new Date(timer.fechaFin),
             tiempoRestanteSegundos: timer.server_remaining_time || timer.tiempoRestanteSegundos
           }));
-          setTimers(timersActualizados);
+          setTimers(prev => {
+            // Mantener timers locales no confirmados que aún no aparezcan por nombre
+            const serverNames = new Set<string>(timersActualizados.map((t: any) => t.nombre));
+            const localesPendientes = prev.filter(t => t.pendienteSync && !serverNames.has(t.nombre));
+            return [...timersActualizados, ...localesPendientes];
+          });
           // Debug log removed (timers sincronizados)
           // Liberar batch en curso: tras un SYNC todos aparecen a la vez
           pendingBatchRef.current = null;
@@ -132,10 +154,14 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
           const batch = pendingBatchRef.current;
           const isSuppressed = batch && Date.now() <= batch.expiresAt && batch.names.has(nuevoTimer.nombre);
           setTimers(prev => {
-            // Evitar duplicados
-            if (prev.find(t => t.id === nuevoTimer.id)) return prev;
-            // Suprimir si es parte del batch en curso, se mostrará tras SYNC/TICK
-            if (isSuppressed) return prev;
+            // Reemplazar posible timer local pendiente con mismo nombre
+            const existeId = prev.find(t => t.id === nuevoTimer.id);
+            const existeNombreLocal = prev.find(t => t.pendienteSync && t.nombre === nuevoTimer.nombre);
+            if (existeId) return prev.map(t => t.id === nuevoTimer.id ? { ...nuevoTimer } : t);
+            if (existeNombreLocal) {
+              return prev.map(t => (t.pendienteSync && t.nombre === nuevoTimer.nombre) ? { ...nuevoTimer } : t);
+            }
+            if (isSuppressed) return prev; // esperar SYNC
             return [...prev, nuevoTimer];
           });
         }
@@ -164,6 +190,23 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     }
   }, [lastMessage]);
 
+  // Detectar completados nuevos (transición false->true)
+  useEffect(() => {
+    const prevMap = prevTimersRef.current;
+    timers.forEach(t => {
+      const estabaCompletado = prevMap.get(t.id) || false;
+      if (!estabaCompletado && t.completado) {
+        const keyNombre = t.nombre.toLowerCase();
+        recentCompletionsRef.current.set(keyNombre, { ts: Date.now(), minutes: t.tiempoInicialMinutos, tipo: t.tipoOperacion });
+        recentCompletionsRef.current.set(t.id, { ts: Date.now(), minutes: t.tiempoInicialMinutos, tipo: t.tipoOperacion });
+      }
+    });
+    // Actualizar snapshot
+    const nuevo = new Map<string, boolean>();
+    timers.forEach(t => nuevo.set(t.id, t.completado));
+    prevTimersRef.current = nuevo;
+  }, [timers]);
+
   // Solicitar sincronización al conectar
   useEffect(() => {
     if (isConnected) {
@@ -176,75 +219,81 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
 
   // Funciones para interactuar con timers
   const iniciarTimer = (nombre: string, tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => {
-    if (!isConnected) return;
-    
-    sendMessage({
-      type: 'CREATE_TIMER',
-      data: {
-        timer: {
-          nombre,
-          tipoOperacion,
-          tiempoInicialMinutos: tiempoMinutos,
-        }
+    const ahora = new Date();
+    const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    // Optimista local
+    setTimers(prev => [
+      ...prev,
+      {
+        id: localId,
+        nombre,
+        tipoOperacion,
+        tiempoInicialMinutos: tiempoMinutos,
+        tiempoRestanteSegundos: tiempoMinutos * 60,
+        fechaInicio: ahora,
+        fechaFin: new Date(ahora.getTime() + tiempoMinutos * 60000),
+        activo: true,
+        completado: false,
+        pendienteSync: true,
       }
-    });
+    ]);
+    if (isConnected) {
+      sendMessage({
+        type: 'CREATE_TIMER',
+        data: { timer: { nombre, tipoOperacion, tiempoInicialMinutos: tiempoMinutos } }
+      });
+    }
   };
 
   const iniciarTimers = (nombres: string[], tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => {
-    if (!isConnected || nombres.length === 0) return;
-    
-    const timersData = nombres.map(nombre => ({
+    if (nombres.length === 0) return;
+    const ahora = Date.now();
+    const nuevos: Timer[] = nombres.map((nombre, idx) => ({
+      id: `local-${ahora}-${idx}-${Math.random().toString(36).slice(2,6)}`,
       nombre,
       tipoOperacion,
       tiempoInicialMinutos: tiempoMinutos,
+      tiempoRestanteSegundos: tiempoMinutos * 60,
+      fechaInicio: new Date(),
+      fechaFin: new Date(Date.now() + tiempoMinutos * 60000),
+      activo: true,
+      completado: false,
+      pendienteSync: true,
     }));
-
-    // Registrar batch en curso por breve ventana para evitar render cascada
-    pendingBatchRef.current = {
-      names: new Set(nombres),
-      expiresAt: Date.now() + 3000, // 3s de margen
-    };
-
-    sendMessage({
-      type: 'CREATE_TIMERS_BATCH',
-      data: {
-        timers: timersData
-      }
-    });
-
-    // Solicitar una sincronización poco después para obtener el conjunto completo
-    setTimeout(() => {
-      if (isConnected) {
-        sendMessage({ type: 'REQUEST_SYNC', data: {} });
-      }
-    }, 120);
+    setTimers(prev => [...prev, ...nuevos]);
+    if (isConnected) {
+      const timersData = nuevos.map(t => ({
+        nombre: t.nombre,
+        tipoOperacion: t.tipoOperacion,
+        tiempoInicialMinutos: t.tiempoInicialMinutos,
+      }));
+      pendingBatchRef.current = { names: new Set(nombres), expiresAt: Date.now() + 3000 };
+      sendMessage({ type: 'CREATE_TIMERS_BATCH', data: { timers: timersData } });
+      setTimeout(() => {
+        if (isConnected) sendMessage({ type: 'REQUEST_SYNC', data: {} });
+      }, 200);
+    }
   };
 
   const pausarTimer = (id: string) => {
-    if (!isConnected) return;
-    
-    sendMessage({
-      type: 'PAUSE_TIMER',
-      data: { timerId: id }
-    });
+    setTimers(prev => prev.map(t => t.id === id ? { ...t, activo: false } : t));
+    if (isConnected) {
+      sendMessage({ type: 'PAUSE_TIMER', data: { timerId: id } });
+    }
   };
 
   const reanudarTimer = (id: string) => {
-    if (!isConnected) return;
-    
-    sendMessage({
-      type: 'RESUME_TIMER',
-      data: { timerId: id }
-    });
+    setTimers(prev => prev.map(t => t.id === id ? { ...t, activo: true } : t));
+    if (isConnected) {
+      sendMessage({ type: 'RESUME_TIMER', data: { timerId: id } });
+    }
   };
 
   const eliminarTimer = (id: string) => {
-    if (!isConnected) return;
-    
-    sendMessage({
-      type: 'DELETE_TIMER',
-      data: { timerId: id }
-    });
+    setTimers(prev => prev.filter(t => t.id !== id));
+    if (isConnected) {
+      sendMessage({ type: 'DELETE_TIMER', data: { timerId: id } });
+    }
   };
 
   const formatearTiempo = (segundos: number): string => {
@@ -283,10 +332,41 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     }
   };
 
-  // Las funciones de "recent completion" ya no aplican con servidor autoritativo,
-  // devolver null para mantener compatibilidad sin romper llamadas existentes.
-  const getRecentCompletion = (_nombre: string, _tipoOperacion?: string): { minutes: number } | null => null;
-  const getRecentCompletionById = (_id: string | number): { minutes: number } | null => null;
+  const normalizarClave = (s: string) => s.toLowerCase();
+  const getRecentCompletion = (nombre: string, tipoOperacion?: string): { minutes: number } | null => {
+    if (!nombre) return null;
+    const key = normalizarClave(nombre);
+    const entry = recentCompletionsRef.current.get(key);
+    if (!entry) return null;
+    if (tipoOperacion && entry.tipo !== tipoOperacion) return null;
+    // Vigencia la gestiona el limpiador; si existe, es válido
+    return { minutes: entry.minutes };
+  };
+  const getRecentCompletionById = (id: string | number): { minutes: number } | null => {
+    const entry = recentCompletionsRef.current.get(String(id));
+    if (!entry) return null;
+    return { minutes: entry.minutes };
+  };
+
+  // Tick local para timers pendientes de sync
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTimers(prev => prev.map(t => {
+        if (t.pendienteSync && t.activo && !t.completado) {
+          const nuevoRestante = t.tiempoRestanteSegundos - 1;
+          if (nuevoRestante <= 0) {
+            // Marcar completado local y registrar completion
+            recentCompletionsRef.current.set(t.nombre.toLowerCase(), { ts: Date.now(), minutes: t.tiempoInicialMinutos, tipo: t.tipoOperacion });
+            recentCompletionsRef.current.set(t.id, { ts: Date.now(), minutes: t.tiempoInicialMinutos, tipo: t.tipoOperacion });
+            return { ...t, tiempoRestanteSegundos: 0, completado: true, activo: false };
+          }
+          return { ...t, tiempoRestanteSegundos: nuevoRestante };
+        }
+        return t;
+      }));
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const contextValue: TimerContextType = {
     timers,
