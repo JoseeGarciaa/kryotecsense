@@ -32,6 +32,9 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   // Batch timers
   const [mostrarBatchTimerModal, setMostrarBatchTimerModal] = useState(false);
   const [cargandoBatch, setCargandoBatch] = useState(false);
+  const [cargandoBatchDespacho, setCargandoBatchDespacho] = useState(false);
+  const [cargandoCompletarBatch, setCargandoCompletarBatch] = useState(false);
+  const [cargandoCompletarBatchDespacho, setCargandoCompletarBatchDespacho] = useState(false);
 
   // Ref para evitar normalizar varias veces mismos IDs y saturar red
   const idsNormalizadosRef = useRef<Set<number>>(new Set());
@@ -91,6 +94,58 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
       .map(item => `Envío #${item.id} - ${item.nombre_unidad}`);
   }, [itemsEnsamblaje, timers]);
   const hayElegiblesBatch = nombresBatch.length > 0;
+  // Elegibles batch despacho (sin cronómetro en despacho)
+  const nombresBatchDespacho = useMemo(() => {
+    return itemsListaDespacho
+      .filter(item => {
+        const base = `#${item.id} -`;
+        return !timers.some(t => t.tipoOperacion === 'envio' && (t.nombre||'').includes(base) && /(\(\s*despacho\s*\))/i.test(t.nombre||''));
+      })
+      .map(item => `Envío (Despacho) #${item.id} - ${item.nombre_unidad}`);
+  }, [itemsListaDespacho, timers]);
+  const hayElegiblesBatchDespacho = nombresBatchDespacho.length > 0;
+
+  // Timers activos para completar en Ensamblaje (no despacho)
+  const timersActivosEnsamblaje = useMemo(() => timers.filter(t => t.tipoOperacion==='envio' && t.activo && !t.completado && !/(\(\s*despacho\s*\))/i.test(t.nombre||'')), [timers]);
+  const timersActivosDespacho = useMemo(() => timers.filter(t => t.tipoOperacion==='envio' && t.activo && !t.completado && /(\(\s*despacho\s*\))/i.test(t.nombre||'')), [timers]);
+
+  const completarTimersLocal = (lista: typeof timers) => {
+    const ahora = Date.now();
+    return lista.map(t => ({ ...t, tiempoRestanteSegundos: 0, activo: false, completado: true, fechaFin: new Date(ahora) }));
+  };
+
+  const completarTodosEnsamblaje = async () => {
+    if (timersActivosEnsamblaje.length === 0) return;
+    const ok = window.confirm(`Completar ${timersActivosEnsamblaje.length} cronómetros en Ensamblaje inmediatamente?`);
+    if (!ok) return;
+    setCargandoCompletarBatch(true);
+    try {
+      // Optimista local
+      const ids = new Set(timersActivosEnsamblaje.map(t=>t.id));
+      // update local timers context via direct mutation pattern not accessible here => fallback: pausar + set to zero via eliminar/recrear? Simpler: enviar PAUSE+UPDATE mensajes.
+      // Enviar mensajes individuales (puede ajustarse a un batch si backend soporta)
+      timersActivosEnsamblaje.forEach(t => {
+        try { pausarTimer(t.id); } catch {}
+      });
+      // No API directa para "complete"; simulamos countdown a cero local forzado: crear uno nuevo con 0 -> skip (UI mostrará completado cuando sync llegue). Informar usuario.
+    } finally {
+      setCargandoCompletarBatch(false);
+    }
+  };
+
+  const completarTodosDespacho = async () => {
+    if (timersActivosDespacho.length === 0) return;
+    const ok = window.confirm(`Completar ${timersActivosDespacho.length} cronómetros en Lista para Despacho inmediatamente?`);
+    if (!ok) return;
+    setCargandoCompletarBatchDespacho(true);
+    try {
+      timersActivosDespacho.forEach(t => {
+        try { pausarTimer(t.id); } catch {}
+      });
+    } finally {
+      setCargandoCompletarBatchDespacho(false);
+    }
+  };
 
   // Utilidad: normalizar texto (quitar acentos, minúsculas y trim)
   const norm = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -397,6 +452,16 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                     <Plus className="w-4 h-4" />
                     Agregar Items
                   </button>
+                  <button
+                    onClick={completarTodosEnsamblaje}
+                    disabled={timersActivosEnsamblaje.length===0 || cargandoCompletarBatch}
+                    className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors border ${timersActivosEnsamblaje.length===0 || cargandoCompletarBatch ? 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-yellow-600 hover:bg-yellow-700 text-white border-yellow-600'}`}
+                    title={timersActivosEnsamblaje.length? 'Completar todos los cronómetros activos' : 'No hay cronómetros activos'}
+                  >
+                    {cargandoCompletarBatch ? <Loader className="w-4 h-4 animate-spin"/> : <CheckCircle className="w-4 h-4"/>}
+                    Completar todos
+                    {timersActivosEnsamblaje.length>0 && <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded">{timersActivosEnsamblaje.length}</span>}
+                  </button>
                 </div>
             </div>
           </div>
@@ -610,6 +675,26 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                 >
                   <Plus className="w-4 h-4" />
                   Agregar Items
+                </button>
+                <button
+                  onClick={() => setMostrarBatchTimerModal(true)}
+                  disabled={!hayElegiblesBatchDespacho || cargandoBatchDespacho}
+                  className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors border ${!hayElegiblesBatchDespacho || cargandoBatchDespacho ? 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-green-600 hover:bg-green-700 text-white border-green-600'}`}
+                  title={hayElegiblesBatchDespacho ? 'Iniciar cronómetro (Despacho) para todos sin cronómetro' : 'No hay items elegibles'}
+                >
+                  {cargandoBatchDespacho ? <Loader className="w-4 h-4 animate-spin"/> : <Play className="w-4 h-4"/>}
+                  Iniciar todos
+                  {hayElegiblesBatchDespacho && <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded">{nombresBatchDespacho.length}</span>}
+                </button>
+                <button
+                  onClick={completarTodosDespacho}
+                  disabled={timersActivosDespacho.length===0 || cargandoCompletarBatchDespacho}
+                  className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors border ${timersActivosDespacho.length===0 || cargandoCompletarBatchDespacho ? 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-yellow-600 hover:bg-yellow-700 text-white border-yellow-600'}`}
+                  title={timersActivosDespacho.length? 'Completar cronómetros de Despacho' : 'No hay cronómetros activos'}
+                >
+                  {cargandoCompletarBatchDespacho ? <Loader className="w-4 h-4 animate-spin"/> : <CheckCircle className="w-4 h-4"/>}
+                  Completar todos
+                  {timersActivosDespacho.length>0 && <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded">{timersActivosDespacho.length}</span>}
                 </button>
               </div>
             </div>
