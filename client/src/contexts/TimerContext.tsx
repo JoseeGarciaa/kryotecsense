@@ -23,14 +23,16 @@ interface TimerContextType {
   eliminarTimer: (id: string) => void;
   formatearTiempo: (segundos: number) => string;
   // Indica si un nombre está en proceso de inicio por lote (para UI)
-  isStartingBatchFor?: (nombre: string) => boolean;
+  isStartingBatchFor: (nombre: string) => boolean;
   // Compatibilidad hacia atrás con la API previa
-  crearTimer?: (nombre: string, tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => string | undefined;
-  crearTimersBatch?: (nombres: string[], tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => void;
-  obtenerTimersCompletados?: () => Timer[];
-  forzarSincronizacion?: () => void;
-  getRecentCompletion?: (nombre: string, tipoOperacion?: string) => null;
-  getRecentCompletionById?: (id: string | number) => null;
+  crearTimer: (nombre: string, tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => string | undefined;
+  crearTimersBatch: (nombres: string[], tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => void;
+  obtenerTimersCompletados: () => Timer[];
+  forzarSincronizacion: () => void;
+  // Para compatibilidad, devolvemos null cuando no hay registro reciente;
+  // el tipo incluye 'minutes' porque algunos consumidores lo leen.
+  getRecentCompletion: (nombre: string, tipoOperacion?: string) => { minutes: number } | null;
+  getRecentCompletionById: (id: string | number) => { minutes: number } | null;
 }
 
 const TimerContext = createContext<TimerContextType | undefined>(undefined);
@@ -284,8 +286,8 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
 
   // Las funciones de "recent completion" ya no aplican con servidor autoritativo,
   // devolver null para mantener compatibilidad sin romper llamadas existentes.
-  const getRecentCompletion = (_nombre: string, _tipoOperacion?: string) => null;
-  const getRecentCompletionById = (_id: string | number) => null;
+  const getRecentCompletion = (_nombre: string, _tipoOperacion?: string): { minutes: number } | null => null;
+  const getRecentCompletionById = (_id: string | number): { minutes: number } | null => null;
 
   const contextValue: TimerContextType = {
     timers,
