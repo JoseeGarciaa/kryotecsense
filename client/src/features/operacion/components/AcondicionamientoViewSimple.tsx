@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Package, Search, Loader, Scan, Play, Pause, Edit, Trash2, X, CheckCircle } from 'lucide-react';
 import { useOperaciones } from '../hooks/useOperaciones';
 import { apiServiceClient } from '../../../api/apiClient';
@@ -29,6 +29,23 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   const [destinoTimer, setDestinoTimer] = useState<'Ensamblaje' | 'Lista para Despacho' | null>(null);
   const [cargandoTimer, setCargandoTimer] = useState(false);
   // (Eliminado) Toggle 'Solo completados' para Lista para Despacho
+
+  // Ref para evitar normalizar varias veces mismos IDs y saturar red
+  const idsNormalizadosRef = useRef<Set<number>>(new Set());
+
+  // Helper: procesar tareas en lotes para limitar concurrencia (evita ERR_INSUFFICIENT_RESOURCES)
+  const procesarEnLotes = async <T,>(tareas: (() => Promise<T>)[], batchSize = 5): Promise<T[]> => {
+    const resultados: T[] = [];
+    for (let i = 0; i < tareas.length; i += batchSize) {
+      const lote = tareas.slice(i, i + batchSize);
+      const res = await Promise.allSettled(lote.map(fn => fn()));
+      res.forEach(r => {
+        if (r.status === 'fulfilled') resultados.push(r.value);
+        // Si rejected, se ignora a nivel lote (ya se registrará en PUT individual si corresponde)
+      });
+    }
+    return resultados;
+  };
 
   // Acción rápida: completar desde Ensamblaje -> mover a Lista para Despacho
   const completarDesdeEnsamblaje = async (item: any) => {
@@ -200,26 +217,27 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   useEffect(() => {
     const normalizar = async () => {
       try {
-        const conLote = itemsEnsamblaje.filter((it: any) => it.lote);
+        const conLote = itemsEnsamblaje.filter((it: any) => it.lote && !idsNormalizadosRef.current.has(it.id));
         if (conLote.length === 0) return;
         setCargandoActualizacion(true);
-        await Promise.all(
-          conLote.map((item: any) => {
-            const actualizacionItem = {
-              modelo_id: item.modelo_id,
-              nombre_unidad: item.nombre_unidad,
-              rfid: item.rfid,
-              lote: null,
-              estado: item.estado,
-              sub_estado: item.sub_estado,
-              validacion_limpieza: item.validacion_limpieza || null,
-              validacion_goteo: item.validacion_goteo || null,
-              validacion_desinfeccion: item.validacion_desinfeccion || null,
-              categoria: item.categoria || null
-            };
-            return apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionItem);
-          })
-        );
+        const tareas = conLote.map((item: any) => () => {
+          const actualizacionItem = {
+            modelo_id: item.modelo_id,
+            nombre_unidad: item.nombre_unidad,
+            rfid: item.rfid,
+            lote: null,
+            estado: item.estado,
+            sub_estado: item.sub_estado,
+            validacion_limpieza: item.validacion_limpieza || null,
+            validacion_goteo: item.validacion_goteo || null,
+            validacion_desinfeccion: item.validacion_desinfeccion || null,
+            categoria: item.categoria || null
+          };
+          return apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionItem)
+            .then(r => { idsNormalizadosRef.current.add(item.id); return r; })
+            .catch(err => { /* Silenciado: error individual */ return null as any; });
+        });
+        await procesarEnLotes(tareas, 4);
         await actualizarColumnasDesdeBackend();
       } catch (e) {
         console.warn('No se pudo normalizar lotes en Ensamblaje:', e);
@@ -768,8 +786,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               // Cancelar cronómetros de los items que se van a mover
               cancelarCronometrosDeItems(items);
               
-              const promesas = items.map(async (item) => {
-                // Ajuste: al mover a Ensamblaje, los lotes quedan nulos
+              const tareasMovimiento = items.map((item) => () => {
                 const actualizacionItem = {
                   modelo_id: item.modelo_id,
                   nombre_unidad: item.nombre_unidad,
@@ -782,28 +799,23 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                   validacion_desinfeccion: item.validacion_desinfeccion || null,
                   categoria: item.categoria || null
                 };
-                
-                // Usar PUT en lugar de PATCH, igual que el modal de bodega
-                await apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionItem);
-                // Crear cronómetro opcional de Operación sólo si el usuario especificó tiempo
-                if (typeof tiempoOperacionMinutos === 'number' && tiempoOperacionMinutos > 0) {
-                  const existe = timers.some(t =>
-                    t.tipoOperacion === 'envio' &&
-                    /envio\s+#\d+\s+-/i.test((t.nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')) &&
-                    (t.nombre || '').includes(`#${item.id} -`) &&
-                    !t.completado
-                  );
-                  if (!existe) {
-                    try {
-                      crearTimer(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio', tiempoOperacionMinutos);
-                    } catch (err) {
-                      console.warn('No se pudo crear timer de operación para item', item.id, err);
+                return apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionItem)
+                  .then(() => {
+                    if (typeof tiempoOperacionMinutos === 'number' && tiempoOperacionMinutos > 0) {
+                      const existe = timers.some(t =>
+                        t.tipoOperacion === 'envio' &&
+                        /envio\s+#\d+\s+-/i.test((t.nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')) &&
+                        (t.nombre || '').includes(`#${item.id} -`) &&
+                        !t.completado
+                      );
+                      if (!existe) {
+                        try { crearTimer(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio', tiempoOperacionMinutos); } catch {}
+                      }
                     }
-                  }
-                }
+                  })
+                  .catch(() => null as any);
               });
-              
-              await Promise.all(promesas);
+              await procesarEnLotes(tareasMovimiento, 4);
               // Silenciado: movimiento exitoso a Ensamblaje
               
               // Actualizar datos - manejar errores de actualización por separado
@@ -846,8 +858,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               // Cancelar cronómetros de los items que se van a mover
               cancelarCronometrosDeItems(items);
               
-              const promesas = items.map(async (item) => {
-                // Usar la misma lógica que el modal de bodega
+              const tareasDespacho = items.map((item) => () => {
                 const actualizacionItem = {
                   modelo_id: item.modelo_id,
                   nombre_unidad: item.nombre_unidad,
@@ -860,26 +871,19 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                   validacion_desinfeccion: item.validacion_desinfeccion || null,
                   categoria: item.categoria || null
                 };
-                
-                // Usar PUT en lugar de PATCH, igual que el modal de bodega
-                await apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionItem);
-
-                // Crear un cronómetro nuevo e independiente para Lista para Despacho si se indicó tiempo
-                if (typeof tiempoOperacionMinutos === 'number' && tiempoOperacionMinutos > 0) {
-                  // eliminar/ignorar cualquier timer de envío anterior asociado a este item
-                  try {
-                    const existentes = timers.filter(t => t.tipoOperacion === 'envio' && (t.nombre || '').includes(`#${item.id} -`) && !t.completado);
-                    existentes.forEach(t => eliminarTimer(t.id));
-                  } catch {}
-                  try {
-                    crearTimer(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio', tiempoOperacionMinutos);
-                  } catch (err) {
-                    console.warn('No se pudo crear timer de despacho para item', item.id, err);
-                  }
-                }
+                return apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionItem)
+                  .then(() => {
+                    if (typeof tiempoOperacionMinutos === 'number' && tiempoOperacionMinutos > 0) {
+                      try {
+                        const existentes = timers.filter(t => t.tipoOperacion === 'envio' && (t.nombre || '').includes(`#${item.id} -`) && !t.completado);
+                        existentes.forEach(t => eliminarTimer(t.id));
+                      } catch {}
+                      try { crearTimer(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio', tiempoOperacionMinutos); } catch {}
+                    }
+                  })
+                  .catch(() => null as any);
               });
-              
-              await Promise.all(promesas);
+              await procesarEnLotes(tareasDespacho, 4);
               // Silenciado: movimiento exitoso a Lista para Despacho
               
               // Actualizar datos - manejar errores de actualización por separado
