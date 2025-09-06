@@ -54,20 +54,62 @@ export const useAcondicionamiento = () => {
     return grupos;
   };
 
+  // ========= NORMALIZACIÓN (duplicada temporalmente; ideal mover a util compartido) =========
+  const quitarAcentos = (str: string = '') => str
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^a-zA-Z0-9\s-]/g, '');
+
+  const normalizarTexto = (str: string = '') => quitarAcentos(str)
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const normalizarEstado = (estado: string = '') => {
+    const e = normalizarTexto(estado);
+    if (/^acondicionamiento$|^a\s*condicionamiento$/.test(e)) return 'acondicionamiento';
+    return e; // devolver normalizado base para otros casos si se amplía
+  };
+
+  const normalizarSubEstado = (sub: string = '') => {
+    const s = normalizarTexto(sub);
+    if (/^ensamblaje$|^armado$|^ensamblar$/.test(s)) return 'ensamblaje';
+    if (/^listo para despacho$|^listo despacho$|^listo para envio$|^listo para envio$|^listo para envio$|^listo para envio$|^listo para envio$|^listo para envio$/.test(s)) return 'listo para despacho';
+    if (/^listo para envio$|^listo para envio$|^listo envio$|^listo para envio$|^listo para envio$/.test(s)) return 'listo para despacho'; // variantes con/sin tilde (redundancia defensiva)
+    return s;
+  };
+
+  const displaySubEstado = (canon: string) => {
+    switch (canon) {
+      case 'ensamblaje': return 'Ensamblaje';
+      case 'listo para despacho': return 'Listo para despacho';
+      default: return canon.charAt(0).toUpperCase() + canon.slice(1);
+    }
+  };
+
   // Función para crear subgrupos por sub-estado
   const crearSubgruposPorSubEstado = (items: any[]) => {
-    const subgrupos: {[key: string]: any[]} = {};
-    
+    const subgrupos: {[key: string]: { items: any[], rawNames: Set<string> }} = {};
+
     items.forEach(item => {
-      const subEstado = item.sub_estado || 'Sin sub-estado';
-      
-      if (!subgrupos[subEstado]) {
-        subgrupos[subEstado] = [];
+      const subEstadoOriginal = item.sub_estado || 'Sin sub-estado';
+      const canon = normalizarSubEstado(subEstadoOriginal) || 'sin sub-estado';
+      if (!subgrupos[canon]) {
+        subgrupos[canon] = { items: [], rawNames: new Set() };
       }
-      subgrupos[subEstado].push(item);
+      subgrupos[canon].items.push(item);
+      subgrupos[canon].rawNames.add(subEstadoOriginal);
     });
-    
-    return subgrupos;
+
+    // Convertir a forma simple esperada aguas abajo: key => array items, pero conservamos decisión display
+    const resultado: {[key: string]: any[]} = {};
+    Object.entries(subgrupos).forEach(([canon, data]) => {
+      const nombreDisplay = displaySubEstado(canon);
+      // Ajustar sub_estado en copia para uniformidad visual
+      resultado[nombreDisplay] = data.items.map(it => ({ ...it, sub_estado: nombreDisplay }));
+    });
+    return resultado;
   };
 
   // Función para crear cards de grupos principales de acondicionamiento
@@ -77,18 +119,13 @@ export const useAcondicionamiento = () => {
       // Mostrar subgrupos del grupo expandido (sub-estados)
       let itemsFiltrados: any[] = [];
       
-      if (navegacionAcondicionamiento === 'Ensamblaje') {
-        // Filtrar items que están en ensamblaje (armado de cajas completas)
-        itemsFiltrados = items.filter(item => 
-          item.sub_estado === 'Ensamblaje' ||
-          (item.estado === 'Acondicionamiento' && item.sub_estado === 'Ensamblaje')
-        );
-      } else if (navegacionAcondicionamiento === 'Listo para despacho') {
-        // Filtrar items que están listos para despacho (cajas ya armadas)
-        itemsFiltrados = items.filter(item => 
-          item.sub_estado === 'Listo para despacho' ||
-          (item.estado === 'Acondicionamiento' && item.sub_estado === 'Listo para despacho')
-        );
+      const navCanon = normalizarSubEstado(navegacionAcondicionamiento);
+      if (navCanon === 'ensamblaje' || navCanon === 'listo para despacho') {
+        itemsFiltrados = items.filter(item => {
+          const estCanon = normalizarEstado(item.estado);
+          const subCanon = normalizarSubEstado(item.sub_estado);
+            return estCanon === 'acondicionamiento' && subCanon === navCanon;
+        });
       }
       
       const subgrupos = crearSubgruposPorSubEstado(itemsFiltrados);
@@ -124,16 +161,13 @@ export const useAcondicionamiento = () => {
       // Mostrar items individuales del subgrupo
       let itemsFiltrados: any[] = [];
       
-      if (navegacionAcondicionamiento === 'Ensamblaje') {
-        itemsFiltrados = items.filter(item => 
-          item.sub_estado === 'Ensamblaje' ||
-          (item.estado === 'Acondicionamiento' && item.sub_estado === 'Ensamblaje')
-        );
-      } else if (navegacionAcondicionamiento === 'Listo para despacho') {
-        itemsFiltrados = items.filter(item => 
-          item.sub_estado === 'Listo para despacho' ||
-          (item.estado === 'Acondicionamiento' && item.sub_estado === 'Listo para despacho')
-        );
+      const navCanon = normalizarSubEstado(navegacionAcondicionamiento);
+      if (navCanon === 'ensamblaje' || navCanon === 'listo para despacho') {
+        itemsFiltrados = items.filter(item => {
+          const estCanon = normalizarEstado(item.estado);
+          const subCanon = normalizarSubEstado(item.sub_estado);
+          return estCanon === 'acondicionamiento' && subCanon === navCanon;
+        });
       }
       
       const subgrupos = crearSubgruposPorSubEstado(itemsFiltrados);
@@ -171,16 +205,18 @@ export const useAcondicionamiento = () => {
     const cards: any[] = [];
     
     // Filtrar items para Ensamblaje (donde se arman las cajas completas)
-    const itemsEnsamblaje = items.filter(item => 
-      item.sub_estado === 'Ensamblaje' || 
-      (item.estado === 'Acondicionamiento' && item.sub_estado === 'Ensamblaje')
-    );
+    const itemsEnsamblaje = items.filter(item => {
+      const estCanon = normalizarEstado(item.estado);
+      const subCanon = normalizarSubEstado(item.sub_estado);
+      return estCanon === 'acondicionamiento' && subCanon === 'ensamblaje';
+    });
     
     // Filtrar items Listos para despacho (cajas ya armadas completamente)
-    const itemsListoDespacho = items.filter(item => 
-      item.sub_estado === 'Listo para despacho' || 
-      (item.estado === 'Acondicionamiento' && item.sub_estado === 'Listo para despacho')
-    );
+    const itemsListoDespacho = items.filter(item => {
+      const estCanon = normalizarEstado(item.estado);
+      const subCanon = normalizarSubEstado(item.sub_estado);
+      return estCanon === 'acondicionamiento' && subCanon === 'listo para despacho';
+    });
     
     // Card para Ensamblaje (armado de cajas completas)
     cards.push({
@@ -193,7 +229,7 @@ export const useAcondicionamiento = () => {
       nombre_unidad: 'Ensamblaje',
       rfid: 'ENSAMBLAJE-GRUPO',
       estado: 'Acondicionamiento',
-      sub_estado: 'Ensamblaje',
+  sub_estado: 'Ensamblaje', // display canonical
       tipo: 'ENSAMBLAJE',
       tipo_base: 'Ensamblaje',
       items_grupo: itemsEnsamblaje,
@@ -215,7 +251,7 @@ export const useAcondicionamiento = () => {
       nombre_unidad: 'Listo para despacho',
       rfid: 'LISTO-DESPACHO-GRUPO',
       estado: 'Acondicionamiento',
-      sub_estado: 'Listo para despacho',
+  sub_estado: 'Listo para despacho', // display canonical
       tipo: 'LISTO_DESPACHO',
       tipo_base: 'Listo para despacho',
       items_grupo: itemsListoDespacho,
