@@ -26,15 +26,13 @@ export const useWebSocket = (url: string): UseWebSocketReturn => {
     
     try {
       isReconnecting.current = true;
-      console.log(`🔌 Intentando conectar WebSocket a ${url}...`);
+  // Debug log removed: attempting websocket connect
       
       ws.current = new WebSocket(url);
 
       ws.current.onopen = () => {
         // Solo log inicial importante si es la primera conexión
-        if (reconnectAttempts.current === 0) {
-          console.log('✅ WebSocket conectado');
-        }
+  // Debug log removed: websocket connected
         setIsConnected(true);
         reconnectAttempts.current = 0;
         isReconnecting.current = false;
@@ -51,9 +49,7 @@ export const useWebSocket = (url: string): UseWebSocketReturn => {
 
       ws.current.onclose = (event) => {
         // Solo log de desconexión si hay problema real y no es spam
-        if (event.code !== 1000 && reconnectAttempts.current === 0) {
-          console.log('🔌 WebSocket desconectado:', event.code);
-        }
+  // Debug log removed: websocket disconnected
         setIsConnected(false);
         isReconnecting.current = false;
         
@@ -63,9 +59,7 @@ export const useWebSocket = (url: string): UseWebSocketReturn => {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current - 1), 30000);
           
           // Solo log de reconexión cada 5 intentos para reducir aún más spam
-          if (reconnectAttempts.current % 5 === 1) {
-            console.log(`🔄 Intentando reconectar en ${delay}ms (intento ${reconnectAttempts.current}/${maxReconnectAttempts})`);
-          }
+          // Debug log removed: reconnection attempt info
           
           reconnectTimeoutRef.current = setTimeout(() => {
             if (reconnectAttempts.current <= maxReconnectAttempts) {
@@ -114,7 +108,7 @@ export const useWebSocket = (url: string): UseWebSocketReturn => {
       
       // Intentar reconectar si no estamos ya intentándolo
       if (!isReconnecting.current && reconnectAttempts.current < maxReconnectAttempts) {
-        console.log('🔄 Intentando reconectar para enviar mensaje...');
+  // Debug log removed: reconnection attempt to send message
         connect();
       }
     }

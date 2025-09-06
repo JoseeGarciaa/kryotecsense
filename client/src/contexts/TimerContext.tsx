@@ -79,8 +79,7 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
   // Escuchar mensajes del WebSocket
   useEffect(() => {
     if (!lastMessage) return;
-
-    console.log('📨 Mensaje WebSocket recibido:', lastMessage.type);
+  // Debug logs removed (mensaje recibido)
 
     switch (lastMessage.type) {
       case 'TIMER_SYNC':
@@ -93,7 +92,7 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
             tiempoRestanteSegundos: timer.server_remaining_time || timer.tiempoRestanteSegundos
           }));
           setTimers(timersActualizados);
-          console.log(`🔄 ${timersActualizados.length} timers sincronizados desde servidor`);
+          // Debug log removed (timers sincronizados)
           // Liberar batch en curso: tras un SYNC todos aparecen a la vez
           pendingBatchRef.current = null;
         }

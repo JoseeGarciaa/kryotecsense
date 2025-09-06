@@ -26,12 +26,12 @@ export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) =>
       };
       const wsUrl = deriveWsUrl();
       
-      console.log('🔌 Conectando WebSocket:', wsUrl);
+  // Debug log removed: connecting websocket
       
       wsRef.current = new WebSocket(wsUrl);
       
       wsRef.current.onopen = () => {
-        console.log('✅ WebSocket conectado');
+  // Debug log removed: websocket connected
         setIsConnected(true);
         setConnectionError(null);
         reconnectAttempts.current = 0;
@@ -41,9 +41,7 @@ export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) =>
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           // Solo log mensajes importantes
-          if (message.type === 'activity_created' || message.type === 'inventory_updated') {
-            console.log('📨 Mensaje WebSocket:', message.type);
-          }
+          // Debug log removed: incoming message types
           
           if (onMessage) {
             onMessage(message);
@@ -55,18 +53,14 @@ export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) =>
       
       wsRef.current.onclose = (event) => {
         // Solo log si es un cierre inesperado
-        if (event.code !== 1000) {
-          console.log('🔌 WebSocket desconectado:', event.code);
-        }
+  // Debug log removed: websocket disconnected (unexpected)
         setIsConnected(false);
         
         // Intentar reconectar si no fue un cierre intencional
         if (event.code !== 1000 && reconnectAttempts.current < maxReconnectAttempts) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000);
           // Solo log cada 3 intentos para reducir spam
-          if (reconnectAttempts.current % 3 === 0) {
-            console.log(`🔄 Reintentando conexión en ${delay}ms (intento ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
-          }
+          // Debug log removed: reconnection attempt
           
           reconnectTimeoutRef.current = window.setTimeout(() => {
             reconnectAttempts.current++;
@@ -107,7 +101,7 @@ export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) =>
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(message));
       // Solo log mensajes importantes
-      console.log('📤 Mensaje WebSocket enviado:', message.type);
+  // Debug log removed: message sent
     } else {
       console.warn('⚠️ WebSocket no está conectado, no se puede enviar mensaje');
     }
