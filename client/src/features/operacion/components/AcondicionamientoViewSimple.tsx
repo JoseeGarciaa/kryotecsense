@@ -14,7 +14,7 @@ interface AcondicionamientoViewSimpleProps {
 
 const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = ({ isOpen, onClose }) => {
   const { inventarioCompleto, cambiarEstadoItem, actualizarColumnasDesdeBackend } = useOperaciones();
-  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer, getRecentCompletion, getRecentCompletionById } = useTimerContext();
+  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer, getRecentCompletion, getRecentCompletionById, iniciarTimers, isStartingBatchFor } = useTimerContext();
   
   const [mostrarModalTraerEnsamblaje, setMostrarModalTraerEnsamblaje] = useState(false);
   const [mostrarModalTraerDespacho, setMostrarModalTraerDespacho] = useState(false);
@@ -29,6 +29,9 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   const [destinoTimer, setDestinoTimer] = useState<'Ensamblaje' | 'Lista para Despacho' | null>(null);
   const [cargandoTimer, setCargandoTimer] = useState(false);
   // (Eliminado) Toggle 'Solo completados' para Lista para Despacho
+  // Batch timers
+  const [mostrarBatchTimerModal, setMostrarBatchTimerModal] = useState(false);
+  const [cargandoBatch, setCargandoBatch] = useState(false);
 
   // Ref para evitar normalizar varias veces mismos IDs y saturar red
   const idsNormalizadosRef = useRef<Set<number>>(new Set());
@@ -76,6 +79,18 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   const itemsListaDespacho = inventarioCompleto?.filter(item => 
     item.estado === 'Acondicionamiento' && item.sub_estado === 'Lista para Despacho'
   ) || [];
+
+  // Elegibles para batch (sin cronómetro de envío activo/completado en Ensamblaje)
+  const nombresBatch = useMemo(() => {
+    return itemsEnsamblaje
+      .filter(item => {
+        const nombreBase = `#${item.id} -`;
+        const tiene = timers.some(t => t.tipoOperacion === 'envio' && (t.nombre || '').includes(nombreBase) && !/(\(\s*despacho\s*\))/i.test(t.nombre || ''));
+        return !tiene; // solo los que no tienen
+      })
+      .map(item => `Envío #${item.id} - ${item.nombre_unidad}`);
+  }, [itemsEnsamblaje, timers]);
+  const hayElegiblesBatch = nombresBatch.length > 0;
 
   // Utilidad: normalizar texto (quitar acentos, minúsculas y trim)
   const norm = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -352,22 +367,37 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
         {/* Sección Ensamblaje */}
         <div className="bg-white rounded-lg border border-red-200 overflow-hidden">
           <div className="bg-red-50 border-b border-red-200 px-6 py-4">
-            <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-red-800">Items en Ensamblaje</h2>
                 <p className="text-sm text-red-600">({itemsEnsamblaje.length} de {itemsEnsamblaje.length})</p>
               </div>
-              <button
-                onClick={() => {
-                  // Refuerzo: al abrir el modal, forzar una ligera sincronización de timers para evitar vacíos
-                  try { if (isConnected) forzarSincronizacion(); } catch {}
-                  setMostrarModalTraerEnsamblaje(true);
-                }}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Agregar Items
-              </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setMostrarBatchTimerModal(true)}
+                    disabled={!hayElegiblesBatch || cargandoBatch}
+                    className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors border ${!hayElegiblesBatch || cargandoBatch ? 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-green-600 hover:bg-green-700 text-white border-green-600'}`}
+                    title={hayElegiblesBatch ? 'Iniciar cronómetro para todos los items sin cronómetro' : 'No hay items elegibles'}
+                  >
+                    {cargandoBatch ? (
+                      <Loader className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Play className="w-4 h-4" />
+                    )}
+                    Iniciar todos
+                    {hayElegiblesBatch && <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded">{nombresBatch.length}</span>}
+                  </button>
+                  <button
+                    onClick={() => {
+                      try { if (isConnected) forzarSincronizacion(); } catch {}
+                      setMostrarModalTraerEnsamblaje(true);
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Agregar Items
+                  </button>
+                </div>
             </div>
           </div>
 
@@ -920,6 +950,30 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
           descripcion={`Define el tiempo del cronómetro para "${itemParaTemporizador.nombre_unidad}"`}
           tipoOperacion="envio"
           cargando={cargandoTimer}
+        />
+      )}
+
+      {mostrarBatchTimerModal && (
+        <TimerModal
+          mostrarModal={mostrarBatchTimerModal}
+          onCancelar={() => { if (!cargandoBatch) setMostrarBatchTimerModal(false); }}
+          onConfirmar={async (min) => {
+            if (min <= 0 || !hayElegiblesBatch) return;
+            setCargandoBatch(true);
+            try {
+              iniciarTimers(nombresBatch, 'envio', min);
+              try { if (isConnected) forzarSincronizacion(); } catch {}
+              setMostrarBatchTimerModal(false);
+            } catch (e) {
+              console.warn('Error iniciando batch timers:', e);
+            } finally {
+              setCargandoBatch(false);
+            }
+          }}
+          titulo="Configurar Cronómetro • Batch Ensamblaje"
+          descripcion={`Define el tiempo para ${nombresBatch.length} item(s) sin cronómetro en Ensamblaje`}
+          tipoOperacion="envio"
+          cargando={cargandoBatch}
         />
       )}
     </div>
