@@ -266,48 +266,66 @@ export const useOperaciones = () => {
         });
       });
       
+      // ===== Normalización de estados / sub-estados (maneja mayúsculas, acentos, guiones) =====
+      const quitarAcentos = (txt: string) => txt.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const normalizarTexto = (txt?: string) => quitarAcentos((txt || '')
+        .toLowerCase()
+        .replace(/-/g, ' ') // unificar guiones como espacios
+        .replace(/\s+/g, ' ') // colapsar espacios
+        .trim());
+      const normalizarEstado = (estado?: string) => {
+        const e = normalizarTexto(estado);
+        if (!e) return '';
+        if (e.includes('pre acond')) return 'pre-acondicionamiento';
+        if (e.includes('en bodega')) return 'en bodega';
+        if (e.includes('acondicion')) return 'acondicionamiento';
+        if (e.includes('operacion')) return 'operacion';
+        if (e.includes('devolucion')) return 'devolucion';
+        if (e.includes('inspeccion')) return 'inspeccion';
+        return e; // devolver normalizado genérico
+      };
+      const normalizarSubEstado = (sub?: string) => {
+        const s = normalizarTexto(sub);
+        if (s.includes('congel')) return 'congelacion';
+        if (s.includes('atemper')) return 'atemperamiento';
+        if (s.includes('transito')) return 'en transito';
+        if (s.includes('entregado')) return 'entregado';
+        if (s.includes('ensambl')) return 'ensamblaje';
+        if (s.includes('disponible')) return 'disponible';
+        return s;
+      };
+      const categoriaValida = (c?: string) => {
+        const cl = (c || '').toLowerCase();
+        return ['tic','vip','cube','a','b','c'].includes(cl);
+      };
+
       const itemsEnBodega = inventario.filter((item: any) => {
-        const categoria = (item.categoria || '').toLowerCase();
-        const esEnBodega = item.estado === 'En bodega';
-        const categoriaValida = categoria === 'tic' || categoria === 'vip' || categoria === 'cube' || categoria === 'a' || categoria === 'b' || categoria === 'c';
-        
-        return item && item.estado && item.categoria &&
-               esEnBodega && categoriaValida;
+        if (!item || !item.estado || !item.categoria) return false;
+        return normalizarEstado(item.estado) === 'en bodega' && categoriaValida(item.categoria);
       });
       const itemsPreAcondicionamiento = inventario.filter((item: any) => {
-        const categoria = (item.categoria || '').toLowerCase();
-        return item && item.estado && item.categoria &&
-               item.estado === 'Pre-acondicionamiento' &&
-               (categoria === 'tic' || categoria === 'vip' || categoria === 'cube' || categoria === 'a' || categoria === 'b' || categoria === 'c');
+        if (!item || !item.estado || !item.categoria) return false;
+        return normalizarEstado(item.estado) === 'pre-acondicionamiento' && categoriaValida(item.categoria);
       });
       const itemsAcondicionamiento = inventario.filter((item: any) => {
-        const categoria = (item.categoria || '').toLowerCase();
-        return item && item.estado && item.categoria &&
-               item.estado === 'Acondicionamiento' &&
-               (categoria === 'tic' || categoria === 'vip' || categoria === 'cube' || categoria === 'a' || categoria === 'b' || categoria === 'c');
+        if (!item || !item.estado || !item.categoria) return false;
+        return normalizarEstado(item.estado) === 'acondicionamiento' && categoriaValida(item.categoria);
       });
       const itemsOperacion = inventario.filter((item: any) => {
-        const categoria = (item.categoria || '').toLowerCase();
-        return item && item.estado && item.categoria &&
-               (item.estado === 'operación' || item.estado === 'Operación') && 
-               (categoria === 'tic' || categoria === 'vip' || categoria === 'cube' || categoria === 'a' || categoria === 'b' || categoria === 'c');
+        if (!item || !item.estado || !item.categoria) return false;
+        return normalizarEstado(item.estado) === 'operacion' && categoriaValida(item.categoria);
       });
       const itemsDevolucion = inventario.filter((item: any) => {
-        const categoria = (item.categoria || '').toLowerCase();
-        return item && item.estado && item.categoria &&
-               (
-                 // Items ya en devolución
-                 item.estado === 'Devolución' ||
-                 // Items completados en operación (listos para devolver)
-                 (item.estado === 'operación' && item.sub_estado === 'entregado')
-               ) &&
-               (categoria === 'tic' || categoria === 'vip' || categoria === 'cube' || categoria === 'a' || categoria === 'b' || categoria === 'c');
+        if (!item || !item.estado || !item.categoria) return false;
+        const est = normalizarEstado(item.estado);
+        const sub = normalizarSubEstado(item.sub_estado);
+        return (
+          est === 'devolucion' || (est === 'operacion' && sub === 'entregado')
+        ) && categoriaValida(item.categoria);
       });
       const itemsInspeccion = inventario.filter((item: any) => {
-        const categoria = (item.categoria || '').toLowerCase();
-        return item && item.estado && item.categoria &&
-               item.estado === 'Inspección' && 
-               (categoria === 'tic' || categoria === 'vip' || categoria === 'cube' || categoria === 'a' || categoria === 'b' || categoria === 'c');
+        if (!item || !item.estado || !item.categoria) return false;
+        return normalizarEstado(item.estado) === 'inspeccion' && categoriaValida(item.categoria);
       });
       
       // Solo mostrar log si hay cambios significativos

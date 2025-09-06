@@ -83,7 +83,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     if (tipoEscaneoActual === 'atemperamiento') {
       const estadoLower = String(itemEncontrado.estado || '').toLowerCase();
       const subLower = String(itemEncontrado.sub_estado || '').toLowerCase();
-      const estadoOk = estadoLower === 'pre-acondicionamiento' || estadoLower === 'preacondicionamiento';
+  const estadoOk = estadoLower === 'pre-acondicionamiento' || estadoLower === 'preacondicionamiento' || estadoLower.replace(/-/g,'') === 'pre acondicionamiento';
       const vieneDeCongelacion = subLower.includes('congel');
       if (!(estadoOk && vieneDeCongelacion)) {
         alert('⚠️ Solo pueden escanearse para Atemperamiento las TICs cuyo estado actual es Pre-acondicionamiento y su sub-estado es Congelación.');
@@ -206,7 +206,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     
     const filtered = inventario.filter((item: any) => {
       const esTic = item.categoria === 'TIC';
-      const esPreAcond = item.estado === 'Pre-acondicionamiento';
+  const esPreAcond = ['pre-acondicionamiento','preacondicionamiento','Pre-acondicionamiento'].includes((item.estado||'').toLowerCase().replace(/-/g,''));
       // Hacer comparación case-insensitive
       const esCongelacion = item.sub_estado && 
         (item.sub_estado.toLowerCase() === 'congelación' || 
@@ -239,7 +239,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     
     const filtered = inventario.filter((item: any) => {
       const esTic = item.categoria === 'TIC';
-      const esPreAcond = item.estado === 'Pre-acondicionamiento';
+  const esPreAcond = ['pre-acondicionamiento','preacondicionamiento','Pre-acondicionamiento'].includes((item.estado||'').toLowerCase().replace(/-/g,''));
       // Hacer comparación case-insensitive para sub_estado
       const esAtemperamiento = item.sub_estado && item.sub_estado.toLowerCase() === 'atemperamiento';
       
@@ -341,7 +341,7 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     if (tipoEscaneoActual === 'atemperamiento') {
       const estadoLower = String(itemEncontrado.estado || '').toLowerCase();
       const subLower = String(itemEncontrado.sub_estado || '').toLowerCase();
-      const estadoOk = estadoLower === 'pre-acondicionamiento' || estadoLower === 'preacondicionamiento';
+  const estadoOk = estadoLower === 'pre-acondicionamiento' || estadoLower === 'preacondicionamiento' || estadoLower.replace(/-/g,'') === 'pre acondicionamiento';
       const vieneDeCongelacion = subLower.includes('congel');
       if (!(estadoOk && vieneDeCongelacion)) {
         alert('⚠️ Solo pueden agregarse a Atemperamiento las TICs que vienen de Congelación.');

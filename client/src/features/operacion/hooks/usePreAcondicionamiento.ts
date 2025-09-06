@@ -18,19 +18,21 @@ export const usePreAcondicionamiento = () => {
       atemperamiento: [] as any[]
     };
 
+    const norm = (txt?: string) => (txt || '')
+      .toString()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/-/g, ' ');
+
     items.forEach(item => {
-      const nombre = item.nombre_unidad?.toUpperCase() || '';
-      const subEstado = item.sub_estado?.toUpperCase() || '';
-      
-      // Clasificar por sub-estado si existe, sino por nombre
-  if (typeof subEstado === 'string' && (subEstado.includes('CONGELACION') || subEstado.includes('CONGELACIÓN'))) {
+      const subEstadoNorm = norm(item.sub_estado);
+      if (subEstadoNorm.includes('congel')) {
         grupos.congelacion.push(item);
-  } else if (typeof subEstado === 'string' && subEstado.includes('ATEMPERAMIENTO')) {
+      } else if (subEstadoNorm.includes('atemper')) {
         grupos.atemperamiento.push(item);
       } else {
-        // Si no hay sub-estado definido, NO adivinar atemperamiento.
-        // Regla: solo llegan a ATEMPERAMIENTO los que vienen de CONGELACIÓN.
-        // Por defecto, clasificar en congelación hasta que el backend asigne sub_estado.
+        // Default: cae en congelación hasta que reciba sub_estado válido
         grupos.congelacion.push(item);
       }
     });
