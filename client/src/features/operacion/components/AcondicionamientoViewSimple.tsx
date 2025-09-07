@@ -14,7 +14,7 @@ interface AcondicionamientoViewSimpleProps {
 
 const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = ({ isOpen, onClose }) => {
   const { inventarioCompleto, cambiarEstadoItem, actualizarColumnasDesdeBackend } = useOperaciones();
-  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer, getRecentCompletion, getRecentCompletionById, iniciarTimers, isStartingBatchFor } = useTimerContext();
+  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer, getRecentCompletion, getRecentCompletionById, iniciarTimers, isStartingBatchFor, marcarTimersCompletados } = useTimerContext();
   
   const [mostrarModalTraerEnsamblaje, setMostrarModalTraerEnsamblaje] = useState(false);
   const [mostrarModalTraerDespacho, setMostrarModalTraerDespacho] = useState(false);
@@ -120,14 +120,8 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     if (!ok) return;
     setCargandoCompletarBatch(true);
     try {
-      // Optimista local
-      const ids = new Set(timersActivosEnsamblaje.map(t=>t.id));
-      // update local timers context via direct mutation pattern not accessible here => fallback: pausar + set to zero via eliminar/recrear? Simpler: enviar PAUSE+UPDATE mensajes.
-      // Enviar mensajes individuales (puede ajustarse a un batch si backend soporta)
-      timersActivosEnsamblaje.forEach(t => {
-        try { pausarTimer(t.id); } catch {}
-      });
-      // No API directa para "complete"; simulamos countdown a cero local forzado: crear uno nuevo con 0 -> skip (UI mostrará completado cuando sync llegue). Informar usuario.
+      marcarTimersCompletados(timersActivosEnsamblaje.map(t=>t.id));
+      try { if (isConnected) forzarSincronizacion(); } catch {}
     } finally {
       setCargandoCompletarBatch(false);
     }
@@ -139,9 +133,8 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     if (!ok) return;
     setCargandoCompletarBatchDespacho(true);
     try {
-      timersActivosDespacho.forEach(t => {
-        try { pausarTimer(t.id); } catch {}
-      });
+      marcarTimersCompletados(timersActivosDespacho.map(t=>t.id));
+      try { if (isConnected) forzarSincronizacion(); } catch {}
     } finally {
       setCargandoCompletarBatchDespacho(false);
     }

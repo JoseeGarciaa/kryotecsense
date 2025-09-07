@@ -35,6 +35,8 @@ interface TimerContextType {
   // el tipo incluye 'minutes' porque algunos consumidores lo leen.
   getRecentCompletion: (nombre: string, tipoOperacion?: string) => { minutes: number } | null;
   getRecentCompletionById: (id: string | number) => { minutes: number } | null;
+  // Forzar completado inmediato local (batch "Completar todos")
+  marcarTimersCompletados: (ids: string[]) => void;
 }
 
 const TimerContext = createContext<TimerContextType | undefined>(undefined);
@@ -296,6 +298,27 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     }
   };
 
+  // Marcar timers como completados inmediatamente de forma local.
+  // Nota: si el backend no soporta completado anticipado, en el próximo SYNC podrían revertir.
+  // Para minimizar parpadeos, añadimos registro en recentCompletions y los pausamos en el servidor.
+  const marcarTimersCompletados = (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    setTimers(prev => prev.map(t => {
+      if (ids.includes(t.id) && !t.completado) {
+        recentCompletionsRef.current.set(t.nombre.toLowerCase(), { ts: Date.now(), minutes: t.tiempoInicialMinutos, tipo: t.tipoOperacion });
+        recentCompletionsRef.current.set(t.id, { ts: Date.now(), minutes: t.tiempoInicialMinutos, tipo: t.tipoOperacion });
+        return { ...t, tiempoRestanteSegundos: 0, completado: true, activo: false };
+      }
+      return t;
+    }));
+    // Enviar PAUSE_TIMER para cada uno (si el servidor luego decide marcarlos completados al llegar a 0 seguirá su flujo normal)
+    ids.forEach(id => {
+      if (isConnected) {
+        sendMessage({ type: 'PAUSE_TIMER', data: { timerId: id } });
+      }
+    });
+  };
+
   const formatearTiempo = (segundos: number): string => {
     const minutos = Math.floor(segundos / 60);
     const segundosRestantes = segundos % 60;
@@ -385,6 +408,7 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
   forzarSincronizacion,
   getRecentCompletion,
   getRecentCompletionById,
+  marcarTimersCompletados,
   };
 
   return (
