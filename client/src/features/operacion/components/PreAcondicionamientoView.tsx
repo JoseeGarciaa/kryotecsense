@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Scan, Plus, Loader, ChevronDown, Menu, Play, Pause, Edit, Trash2, Search, CheckCircle, X } from 'lucide-react';
+import { Scan, Plus, Loader, ChevronDown, Menu, Play, Pause, Edit, Trash2, Search, CheckCircle, X, Activity } from 'lucide-react';
 import InlineCountdown from '../../../shared/components/InlineCountdown';
 import { useOperaciones } from '../hooks/useOperaciones';
 import RfidScanModal from './RfidScanModal';
@@ -45,6 +45,8 @@ const PreAcondicionamientoView: React.FC = () => {
   const [busquedaCongelamiento, setBusquedaCongelamiento] = useState('');
   const [busquedaAtemperamiento, setBusquedaAtemperamiento] = useState('');
   const itemsPorPagina = 20;
+  // Vista global: 'tabla' o 'lotes'
+  const [vistaGlobal, setVistaGlobal] = useState<'tabla' | 'lotes'>('tabla');
 
   // Dropdown refs y control
   const dropdownRefCongelacion = React.useRef<HTMLDivElement>(null);
@@ -458,11 +460,81 @@ const PreAcondicionamientoView: React.FC = () => {
   const ticsAtemperamientoPaginados = paginar(ticsAtemperamientoFiltrados, paginaActualAtemperamiento);
   const totalPaginasAtemperamiento = totalPaginas(ticsAtemperamientoFiltrados.length);
 
+  // Agrupación por lote para vista 'lotes' (sin paginación, filtrado ya aplicado)
+  interface GrupoLote { lote: string; items: TicItem[]; count: number; }
+  const gruposCongelamiento = useMemo<GrupoLote[]>(() => {
+    if (vistaGlobal !== 'lotes') return [];
+    const map = new Map<string, TicItem[]>();
+    ticsCongelamientoFiltrados.forEach(it => {
+      const key = it.lote || 'SIN LOTE';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(it);
+    });
+    return Array.from(map.entries()).map(([lote, items]) => ({ lote, items, count: items.length }))
+      .sort((a,b)=>a.lote.localeCompare(b.lote));
+  }, [ticsCongelamientoFiltrados, vistaGlobal]);
+  const gruposAtemperamiento = useMemo<GrupoLote[]>(() => {
+    if (vistaGlobal !== 'lotes') return [];
+    const map = new Map<string, TicItem[]>();
+    ticsAtemperamientoFiltrados.forEach(it => {
+      const key = it.lote || 'SIN LOTE';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(it);
+    });
+    return Array.from(map.entries()).map(([lote, items]) => ({ lote, items, count: items.length }))
+      .sort((a,b)=>a.lote.localeCompare(b.lote));
+  }, [ticsAtemperamientoFiltrados, vistaGlobal]);
+
+  const renderGrupoLote = (grupo: GrupoLote, esAtemperamiento=false) => (
+    <div key={grupo.lote} className={`rounded-xl border shadow-sm overflow-hidden ${esAtemperamiento? 'bg-gradient-to-br from-orange-50 to-orange-100/40 border-orange-200':'bg-gradient-to-br from-blue-50 to-blue-100/40 border-blue-200'}`}>
+      <div className={`px-4 py-3 flex items-center justify-between ${esAtemperamiento? 'bg-gradient-to-r from-orange-600 to-amber-500':'bg-gradient-to-r from-blue-600 to-cyan-500'} text-white`}> 
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold">Lote {grupo.lote}</span>
+          <span className="text-[11px] tracking-wide opacity-90">{grupo.count} TIC{grupo.count!==1?'s':''}</span>
+        </div>
+  <Activity className="w-5 h-5 opacity-90" />
+      </div>
+      <div className="divide-y divide-white/60">
+        {grupo.items.map(item => (
+          <div key={item.id} className="flex items-center justify-between px-3 py-2 backdrop-blur-sm bg-white/40 hover:bg-white/70 transition-colors text-xs">
+            <div className="flex flex-col mr-2 min-w-0">
+              <span className="font-medium truncate" title={item.nombre_unidad}>{item.nombre_unidad}</span>
+              <div className="text-[10px] text-gray-600 truncate" title={item.rfid}>{item.rfid}</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-medium ${esAtemperamiento?'bg-orange-100 text-orange-700':'bg-blue-100 text-blue-700'}`}>{esAtemperamiento? 'Atemperamiento':'Congelación'}</span>
+              {renderizarTemporizador(item.rfid, esAtemperamiento)}
+            </div>
+          </div>
+        ))}
+        {grupo.items.length===0 && (
+          <div className="px-4 py-4 text-[11px] text-center text-gray-500">Sin TICs</div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="p-2 sm:p-4 max-w-full">
       <div className="mb-4 sm:mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Registrar Pre Acondicionamiento</h1>
         <WebSocketStatus isConnected={isConnected} className="mt-1" />
+        <div className="mt-3 flex items-center gap-2 justify-end">
+          <button
+            onClick={() => setVistaGlobal('lotes')}
+            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border ${vistaGlobal==='lotes'? 'bg-gray-900 text-white border-gray-900':'bg-white text-gray-700 hover:bg-gray-100 border-gray-300'}`}
+            title="Vista agrupada por lote"
+          >
+            <Menu className="w-4 h-4" /> Lotes
+          </button>
+          <button
+            onClick={() => setVistaGlobal('tabla')}
+            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border ${vistaGlobal==='tabla'? 'bg-gray-900 text-white border-gray-900':'bg-white text-gray-700 hover:bg-gray-100 border-gray-300'}`}
+            title="Vista tabla"
+          >
+            <Menu className="w-4 h-4 rotate-90" /> Tabla
+          </button>
+        </div>
       </div>
 
       {/* Congelamiento */}
@@ -553,41 +625,48 @@ const PreAcondicionamientoView: React.FC = () => {
             />
           </div>
         </div>
-        {/* Tabla */}
-        <div className="hidden sm:block overflow-x-auto">
-          <div className="min-w-[720px]">
-            <table className="w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">RFID</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">NOMBRE</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">LOTE</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">ESTADO</th>
-                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">CRONÓMETRO</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {cargando ? (
-                  <tr><td colSpan={5} className="px-3 py-6 text-center"><div className="flex items-center justify-center gap-2"><Loader className="animate-spin h-4 w-4 text-blue-600" /><span className="text-xs text-gray-500">Cargando...</span></div></td></tr>
-                ) : ticsCongelamientoPaginados.length ? (
-                  ticsCongelamientoPaginados.map(tic => (
-                    <tr key={tic.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 text-xs font-medium text-gray-900" title={tic.rfid}>{tic.rfid}</td>
-                      <td className="px-3 py-2 text-xs text-gray-900" title={tic.nombre_unidad}>{tic.nombre_unidad}</td>
-                      <td className="px-3 py-2 text-xs text-gray-900" title={tic.lote}>{tic.lote}</td>
-                      <td className="px-3 py-2"><span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{tic.sub_estado}</span></td>
-                      <td className="px-3 py-2 text-center"><div className="flex justify-center">{renderizarTemporizador(tic.rfid)}</div></td>
-                    </tr>
-                  ))
-                ) : busquedaCongelamiento ? (
-                  <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-gray-500">No se encontraron TICs</td></tr>
-                ) : (
-                  <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-gray-500">No hay TICs en congelamiento</td></tr>
-                )}
-              </tbody>
-            </table>
+        {vistaGlobal==='tabla' ? (
+          <div className="hidden sm:block overflow-x-auto">
+            <div className="min-w-[720px]">
+              <table className="w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">RFID</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">NOMBRE</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">LOTE</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">ESTADO</th>
+                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">CRONÓMETRO</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {cargando ? (
+                    <tr><td colSpan={5} className="px-3 py-6 text-center"><div className="flex items-center justify-center gap-2"><Loader className="animate-spin h-4 w-4 text-blue-600" /><span className="text-xs text-gray-500">Cargando...</span></div></td></tr>
+                  ) : ticsCongelamientoPaginados.length ? (
+                    ticsCongelamientoPaginados.map(tic => (
+                      <tr key={tic.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 text-xs font-medium text-gray-900" title={tic.rfid}>{tic.rfid}</td>
+                        <td className="px-3 py-2 text-xs text-gray-900" title={tic.nombre_unidad}>{tic.nombre_unidad}</td>
+                        <td className="px-3 py-2 text-xs text-gray-900" title={tic.lote}>{tic.lote}</td>
+                        <td className="px-3 py-2"><span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{tic.sub_estado}</span></td>
+                        <td className="px-3 py-2 text-center"><div className="flex justify-center">{renderizarTemporizador(tic.rfid)}</div></td>
+                      </tr>
+                    ))
+                  ) : busquedaCongelamiento ? (
+                    <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-gray-500">No se encontraron TICs</td></tr>
+                  ) : (
+                    <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-gray-500">No hay TICs en congelamiento</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 p-4">
+            {gruposCongelamiento.length ? gruposCongelamiento.map(g => renderGrupoLote(g,false)) : (
+              <div className="col-span-full text-center text-xs text-gray-500 py-6">{busquedaCongelamiento? 'Sin resultados':'No hay TICs en congelamiento'}</div>
+            )}
+          </div>
+        )}
         {/* Paginación */}
         {ticsCongelamientoFiltrados.length > itemsPorPagina && (
           <div className="px-3 py-2 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-xs">
@@ -694,41 +773,48 @@ const PreAcondicionamientoView: React.FC = () => {
             />
           </div>
         </div>
-        {/* Tabla */}
-        <div className="hidden sm:block overflow-x-auto">
-          <div className="min-w-[720px]">
-            <table className="w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">RFID</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">NOMBRE</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">LOTE</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">ESTADO</th>
-                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">CRONÓMETRO</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {cargando ? (
-                  <tr><td colSpan={5} className="px-3 py-6 text-center"><div className="flex items-center justify-center gap-2"><Loader className="animate-spin h-4 w-4 text-orange-600" /><span className="text-xs text-gray-500">Cargando...</span></div></td></tr>
-                ) : ticsAtemperamientoPaginados.length ? (
-                  ticsAtemperamientoPaginados.map(tic => (
-                    <tr key={tic.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 text-xs font-medium text-gray-900" title={tic.rfid}>{tic.rfid}</td>
-                      <td className="px-3 py-2 text-xs text-gray-900" title={tic.nombre_unidad}>{tic.nombre_unidad}</td>
-                      <td className="px-3 py-2 text-xs text-gray-900" title={tic.lote}>{tic.lote}</td>
-                      <td className="px-3 py-2"><span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">{tic.sub_estado}</span></td>
-                      <td className="px-3 py-2 text-center"><div className="flex justify-center">{renderizarTemporizador(tic.rfid, true)}</div></td>
-                    </tr>
-                  ))
-                ) : busquedaAtemperamiento ? (
-                  <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-gray-500">No se encontraron TICs</td></tr>
-                ) : (
-                  <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-gray-500">No hay TICs en atemperamiento</td></tr>
-                )}
-              </tbody>
-            </table>
+        {vistaGlobal==='tabla' ? (
+          <div className="hidden sm:block overflow-x-auto">
+            <div className="min-w-[720px]">
+              <table className="w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">RFID</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">NOMBRE</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">LOTE</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">ESTADO</th>
+                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">CRONÓMETRO</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {cargando ? (
+                    <tr><td colSpan={5} className="px-3 py-6 text-center"><div className="flex items-center justify-center gap-2"><Loader className="animate-spin h-4 w-4 text-orange-600" /><span className="text-xs text-gray-500">Cargando...</span></div></td></tr>
+                  ) : ticsAtemperamientoPaginados.length ? (
+                    ticsAtemperamientoPaginados.map(tic => (
+                      <tr key={tic.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 text-xs font-medium text-gray-900" title={tic.rfid}>{tic.rfid}</td>
+                        <td className="px-3 py-2 text-xs text-gray-900" title={tic.nombre_unidad}>{tic.nombre_unidad}</td>
+                        <td className="px-3 py-2 text-xs text-gray-900" title={tic.lote}>{tic.lote}</td>
+                        <td className="px-3 py-2"><span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">{tic.sub_estado}</span></td>
+                        <td className="px-3 py-2 text-center"><div className="flex justify-center">{renderizarTemporizador(tic.rfid, true)}</div></td>
+                      </tr>
+                    ))
+                  ) : busquedaAtemperamiento ? (
+                    <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-gray-500">No se encontraron TICs</td></tr>
+                  ) : (
+                    <tr><td colSpan={5} className="px-3 py-6 text-center text-xs text-gray-500">No hay TICs en atemperamiento</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 p-4">
+            {gruposAtemperamiento.length ? gruposAtemperamiento.map(g => renderGrupoLote(g,true)) : (
+              <div className="col-span-full text-center text-xs text-gray-500 py-6">{busquedaAtemperamiento? 'Sin resultados':'No hay TICs en atemperamiento'}</div>
+            )}
+          </div>
+        )}
         {/* Paginación */}
         {ticsAtemperamientoFiltrados.length > itemsPorPagina && (
           <div className="px-3 py-2 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-xs">
