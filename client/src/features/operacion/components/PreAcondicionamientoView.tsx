@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Scan, Plus, Loader, ChevronDown, Menu, Play, Pause, Edit, Trash2, Search, CheckCircle, X, Activity } from 'lucide-react';
 import InlineCountdown from '../../../shared/components/InlineCountdown';
 import { useOperaciones } from '../hooks/useOperaciones';
@@ -127,6 +127,51 @@ const PreAcondicionamientoView: React.FC = () => {
   const cargarDatos = async () => {
     try { setCargando(true); await operaciones.actualizarColumnasDesdeBackend(); } finally { setCargando(false); }
   };
+
+  // Ref para evitar loops de asignación de lote
+  const lotesAutoSolicitadosRef = useRef<Set<string>>(new Set());
+
+  // Asignar automáticamente lotes faltantes (cuando backend aún no los asignó) para Congelación / Atemperamiento
+  useEffect(() => {
+    if (!operaciones.inventarioCompleto?.length) return;
+    // Buscar TICs en pre acondicionamiento (congelación o atemperamiento) sin lote
+    const candidatos = operaciones.inventarioCompleto.filter((i: any) => {
+      if (i.categoria !== 'TIC') return false;
+      const est = norm(i.estado).replace(/[-_\s]/g,'');
+      if (!est.includes('preacondicionamiento')) return false;
+      const sub = norm(i.sub_estado);
+      const esFaseValida = ['congelacion','congelamiento','atemperamiento'].some(v => sub.includes(v));
+      if (!esFaseValida) return false;
+      const sinLote = !i.lote || !String(i.lote).trim();
+      if (!sinLote) return false;
+      if (lotesAutoSolicitadosRef.current.has(i.rfid)) return false;
+      return true;
+    });
+    if (!candidatos.length) return;
+    // Agrupar por sub_estado normalizado (congelacion vs atemperamiento) para enviar el valor correcto al backend
+    const grupos: Record<string, string[]> = {};
+    candidatos.forEach((c:any) => {
+      const sub = norm(c.sub_estado);
+      let clave: string;
+      if (['congelacion','congelamiento'].some(v => sub.includes(v))) clave = 'Congelación'; else clave = 'Atemperamiento';
+      if (!grupos[clave]) grupos[clave] = [];
+      grupos[clave].push(c.rfid);
+      lotesAutoSolicitadosRef.current.add(c.rfid);
+    });
+    // Por cada grupo, solicitar asignación automática y luego refrescar
+    (async () => {
+      try {
+        await Promise.all(Object.entries(grupos).map(([subEstado, rfids]) => apiServiceClient.patch('/inventory/inventario/asignar-lote-automatico', {
+          rfids,
+          estado: 'Pre acondicionamiento',
+          sub_estado: subEstado
+        }).catch(()=>undefined)));
+        // Refrescar para reflejar lotes
+        await cargarDatos();
+      } catch {/* silencioso */}
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operaciones.inventarioCompleto]);
 
   // RFID scan (modal manual / lector)
   const procesarRfid = (rfid: string) => {

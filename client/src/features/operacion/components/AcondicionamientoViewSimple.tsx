@@ -1132,6 +1132,18 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
       if (!rfidsEscaneados.includes(code)) {
         setRfidsEscaneados(prev => [...prev, code]);
         console.log(`✅ RFID ${code} auto-procesado`);
+        // En Ensamblaje agregamos inmediatamente a la selección respetando la composición
+        if (subEstadoDestino === 'Ensamblaje') {
+          setItemsSeleccionados(prev => {
+            if (prev.find(p => p.id === itemEncontrado.id)) return prev;
+            const cat = (itemEncontrado.categoria || '').toUpperCase();
+            const counts = prev.reduce((acc:any, it:any) => { const c = (it.categoria||'').toUpperCase(); acc[c] = (acc[c]||0)+1; return acc; }, {} as Record<string,number>);
+            if (cat === 'TIC' && (counts.TIC||0) >= 6) return prev;
+            if (cat === 'VIP' && (counts.VIP||0) >= 1) return prev;
+            if (cat === 'CUBE' && (counts.CUBE||counts.Cube||0) >= 1) return prev;
+            return [...prev, itemEncontrado];
+          });
+        }
       } else {
         console.log(`ℹ️ RFID ${code} ya está en la lista`);
       }
@@ -1276,37 +1288,88 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
         </div>
 
         <div className="p-3 sm:p-4 border-b bg-gray-50">
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-2 sm:mb-3">
-            <div className="sm:flex-1">
-              <input
-                type="text"
-                placeholder="Buscar por nombre, RFID o lote..."
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                maxLength={24}
-                className="w-full px-3 py-2 border rounded-md text-sm"
-              />
+          {subEstadoDestino === 'Ensamblaje' ? (
+            <div className="flex flex-col gap-3 mb-2 sm:mb-3">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+                <div className="sm:flex-1">
+                  <input
+                    type="text"
+                    placeholder="Escanear RFID (24 caracteres)..."
+                    value={rfidInput}
+                    onChange={(e) => handleRfidChange(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md text-sm font-mono tracking-wide"
+                  />
+                </div>
+                <div className="flex gap-2 items-center">
+                  <select
+                    value={filtroCategoria}
+                    onChange={(e) => setFiltroCategoria(e.target.value)}
+                    className="px-3 py-2 border rounded-md text-sm"
+                  >
+                    <option value="TODOS">Todas</option>
+                    <option value="TIC">TIC</option>
+                    <option value="VIP">VIP</option>
+                    <option value="Cube">Cube</option>
+                  </select>
+                  <button
+                    onClick={() => manejarEscanearRfid()}
+                    disabled={!rfidInput}
+                    className="px-3 py-2 text-sm bg-blue-600 disabled:opacity-50 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors"
+                  >
+                    <Scan className="w-4 h-4" />
+                    Agregar
+                  </button>
+                </div>
+              </div>
+              {rfidsEscaneados.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {rfidsEscaneados.map(r => (
+                    <span key={r} className="px-2 py-1 bg-gray-200 rounded text-[10px] font-mono flex items-center gap-1">
+                      {r.slice(-6)}
+                      <button
+                        onClick={() => setRfidsEscaneados(prev => prev.filter(x => x !== r))}
+                        className="text-gray-600 hover:text-red-600"
+                        title="Quitar"
+                      >×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="text-[11px] text-gray-500">Escanee sucesivamente; cada 24 caracteres se procesa automáticamente y se agrega si hay cupo.</p>
             </div>
-            <div className="flex gap-2">
-              <select
-                value={filtroCategoria}
-                onChange={(e) => setFiltroCategoria(e.target.value)}
-                className="px-3 py-2 border rounded-md text-sm"
-              >
-                <option value="TODOS">Todas las categorías</option>
-                <option value="TIC">TIC</option>
-                <option value="VIP">VIP</option>
-                <option value="Cube">Cube</option>
-              </select>
-              <button
-                onClick={() => setMostrarEscanerRfid(true)}
-                className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors"
-              >
-                <Scan className="w-4 h-4" />
-                Escanear RFID
-              </button>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-2 sm:mb-3">
+              <div className="sm:flex-1">
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre, RFID o lote..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  maxLength={24}
+                  className="w-full px-3 py-2 border rounded-md text-sm"
+                />
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={filtroCategoria}
+                  onChange={(e) => setFiltroCategoria(e.target.value)}
+                  className="px-3 py-2 border rounded-md text-sm"
+                >
+                  <option value="TODOS">Todas las categorías</option>
+                  <option value="TIC">TIC</option>
+                  <option value="VIP">VIP</option>
+                  <option value="Cube">Cube</option>
+                </select>
+                <button
+                  onClick={() => setMostrarEscanerRfid(true)}
+                  className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors"
+                >
+                  <Scan className="w-4 h-4" />
+                  Escanear RFID
+                </button>
+              </div>
             </div>
-          </div>
+          )}
       {(subEstadoDestino === 'Ensamblaje' || subEstadoDestino === 'Lista para Despacho') && (
             <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
               <div className="sm:col-span-2">
