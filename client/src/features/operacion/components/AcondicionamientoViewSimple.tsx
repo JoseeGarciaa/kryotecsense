@@ -1271,7 +1271,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
       <div className="bg-white rounded-lg shadow-xl w-[92vw] max-w-md sm:max-w-2xl md:max-w-4xl max-h-[88vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-3 sm:p-4 border-b">
-          <h2 className="text-base sm:text-lg font-semibold">Agregar Items a {subEstadoDestino}</h2>
+          <h2 className="text-base sm:text-lg font-semibold">{subEstadoDestino==='Ensamblaje' ? 'Armar caja • Ensamblaje' : `Agregar Items a ${subEstadoDestino}`}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-lg leading-none">×</button>
         </div>
 
@@ -1355,44 +1355,45 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 sm:p-4">
-          {itemsFiltrados.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 text-sm">
-              No hay items disponibles para mover a acondicionamiento
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {subEstadoDestino === 'Ensamblaje' && (
-                <div className="mb-3 rounded-lg border bg-gradient-to-br from-gray-50 to-white p-4 shadow-sm">
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-800">Armar caja (1 CUBE · 1 VIP · 6 TIC Atemperadas)</h4>
-                      <p className="text-[11px] text-gray-600 mt-0.5">Seleccione o escanee items. La composición debe ser exacta para crear la caja.</p>
-                    </div>
-                    <div className={`text-[11px] px-2 py-1 rounded-full font-medium self-start ${validComposition ? 'bg-green-100 text-green-700':'bg-orange-100 text-orange-700'}`}>{compositionStatusText()}</div>
+          <div className="space-y-2">
+            {subEstadoDestino === 'Ensamblaje' && (
+              <div className="mb-3 rounded-lg border bg-gradient-to-br from-gray-50 to-white p-4 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-800">Composición requerida: 1 CUBE · 1 VIP · 6 TIC</h4>
+                    <p className="text-[11px] text-gray-600 mt-0.5">Escanee o seleccione items. La caja sólo se puede crear cuando la composición es exacta.</p>
                   </div>
-                  <div className="grid grid-cols-3 gap-3 mt-4">
-                    {[{k:'Cube', label:'CUBE', color:'blue', total:requiredComposition.Cube, val:selectedCounts.Cube||0}, {k:'VIP', label:'VIP', color:'purple', total:requiredComposition.VIP, val:selectedCounts.VIP||0}, {k:'TIC', label:'TIC', color:'green', total:requiredComposition.TIC, val:selectedCounts.TIC||0}].map(card => {
-                      const pct = Math.min(100, (card.val / card.total) * 100);
-                      const full = card.val === card.total;
-                      return (
-                        <div key={card.k} className={`relative rounded-md border p-3 flex flex-col gap-2 ${full? 'bg-'+card.color+'-50 border-'+card.color+'-300':'bg-white'} transition-colors` as any}>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] tracking-wide text-gray-500">{card.label}</span>
-                            <span className={`text-[10px] font-semibold ${full? 'text-green-600':'text-gray-500'}`}>{card.val}/{card.total}</span>
-                          </div>
-                          <div className="h-1.5 w-full bg-gray-200 rounded overflow-hidden">
-                            <div className={`h-full bg-${card.color}-500 transition-all`} style={{width: pct+'%'}} />
-                          </div>
-                          {full && <span className="absolute top-1 right-1 text-[9px] text-green-600 font-medium">OK</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {!validComposition && itemsSeleccionados.length>0 && (
-                    <div className="mt-3 text-[11px] text-red-600 font-medium">Faltan elementos para completar la composición exacta.</div>
-                  )}
+                  <div className={`text-[11px] px-2 py-1 rounded-full font-medium self-start ${validComposition ? 'bg-green-100 text-green-700':'bg-orange-100 text-orange-700'}`}>{compositionStatusText()}</div>
                 </div>
-              )}
+                <div className="grid grid-cols-3 gap-3 mt-4">
+                  {[{k:'Cube', label:'CUBE', color:'blue', total:requiredComposition.Cube, val:selectedCounts.Cube||0}, {k:'VIP', label:'VIP', color:'purple', total:requiredComposition.VIP, val:selectedCounts.VIP||0}, {k:'TIC', label:'TIC', color:'green', total:requiredComposition.TIC, val:selectedCounts.TIC||0}].map(card => {
+                    const pct = Math.min(100, (card.val / card.total) * 100);
+                    const full = card.val === card.total;
+                    return (
+                      <div key={card.k} className={`relative rounded-md border p-3 flex flex-col gap-2 ${full? 'bg-'+card.color+'-50 border-'+card.color+'-300':'bg-white'} transition-colors` as any}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] tracking-wide text-gray-500">{card.label}</span>
+                          <span className={`text-[10px] font-semibold ${full? 'text-green-600':'text-gray-500'}`}>{card.val}/{card.total}</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-gray-200 rounded overflow-hidden">
+                          <div className={`h-full bg-${card.color}-500 transition-all`} style={{width: pct+'%'}} />
+                        </div>
+                        {full && <span className="absolute top-1 right-1 text-[9px] text-green-600 font-medium">OK</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+                {!validComposition && itemsSeleccionados.length>0 && (
+                  <div className="mt-3 text-[11px] text-red-600 font-medium">Faltan elementos para completar la composición exacta.</div>
+                )}
+              </div>
+            )}
+            {itemsFiltrados.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 text-sm">
+                No hay items disponibles para mover a acondicionamiento
+              </div>
+            ) : (
+              <>
               {itemsFiltrados.map((item) => {
                 const isSelected = itemsSeleccionados.find(s => s.id === item.id);
                 const cat = (item.categoria||'').toUpperCase();
@@ -1447,8 +1448,9 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                   </div>
                 );
               })}
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </div>
 
         <div className="p-3 sm:p-4 border-t bg-gray-50 flex flex-col sm:flex-row sm:justify-between gap-2 sm:gap-3 items-stretch sm:items-center">
