@@ -231,14 +231,16 @@ const PreAcondicionamientoView: React.FC = () => {
         try { await apiServiceClient.post('/inventory/iniciar-timers-masivo', { items_ids: items.map((i:any)=>i.id).filter(Boolean), tipoOperacion: tipoSel, tiempoMinutos }); } catch {}
       }
       // Ahora mover a Atemperamiento SOLO después de configurar y arrancar el cronómetro
-      if (tipoSel === 'atemperamiento') {
+    if (tipoSel === 'atemperamiento') {
         try {
           const pendientesMover = rfids.filter(r => {
             const it = operaciones.inventarioCompleto.find(i => i.rfid === r);
             const sub = norm(it?.sub_estado);
             return !sub.includes('atemper');
           });
-            if (pendientesMover.length) await operaciones.confirmarPreAcondicionamiento(pendientesMover, 'Atemperamiento');
+      if (pendientesMover.length) await operaciones.confirmarPreAcondicionamiento(pendientesMover, 'Atemperamiento');
+      // Asignar lote automáticamente si no tienen
+      await asignarLoteAuto(pendientesMover);
         } catch (e) { console.warn('No se pudo mover a Atemperamiento tras iniciar cronómetro:', e); }
       } else if (tipoSel === 'congelamiento') {
         // Mover a Pre acondicionamiento / Congelamiento para que aparezcan de inmediato en la lista
@@ -250,34 +252,65 @@ const PreAcondicionamientoView: React.FC = () => {
             const yaEsta = estado.includes('preacondicionamiento') && (sub.includes('congelacion') || sub.includes('congelamiento'));
             return !yaEsta;
           });
-          if (pendientesMover.length) await operaciones.confirmarPreAcondicionamiento(pendientesMover, 'Congelamiento');
+      if (pendientesMover.length) await operaciones.confirmarPreAcondicionamiento(pendientesMover, 'Congelamiento');
+      // Asignar lote automáticamente (nuevo lote o reutilizar existente del día) para los recién pasados a congelamiento
+      await asignarLoteAuto(pendientesMover);
         } catch (e) { console.warn('No se pudo mover a Congelamiento tras iniciar cronómetro:', e); }
       }
       setCargandoTemporizador(false);
-      // Asignación de lote controlada (local): derivar índice diario escaneando inventario existente.
-      setTimeout(async () => {
-        try {
-          const today = new Date();
-          const fechaBase = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
-          // Buscar lotes existentes con el prefijo de hoy para calcular siguiente índice
-          let maxIndice = 0;
-          try {
-            operaciones.inventarioCompleto.forEach((item:any) => {
-              const lote = String(item.lote || '');
-              if (lote.startsWith(fechaBase) && lote.length >= fechaBase.length + 3) {
-                const suf = lote.slice(fechaBase.length, fechaBase.length + 3);
-                const val = parseInt(suf, 10);
-                if (!isNaN(val) && val > maxIndice) maxIndice = val;
-              }
-            });
-          } catch {}
-          // Índice calculado localmente (sin registrar en backend porque endpoint no soportado / 405)
-          const indice = String(maxIndice + 1).padStart(3, '0');
-          (window as any).__loteIndiceLocalUltimo = indice; // opcional tracking
-          await cargarDatos();
-        } catch {}
-      }, 120);
+      // Actualizar vista rápidamente tras movimientos / asignación de lotes
+      setTimeout(() => cargarDatos(), 250);
     } catch { setCargandoTemporizador(false); }
+  };
+
+  // Asignación automática de lote: agrupa RFIDs recién movidos que no tengan lote, usando lotes existentes del día o creando uno nuevo
+  const asignarLoteAuto = async (rfids: string[]) => {
+    if (!rfids.length) return;
+    try {
+      const hoy = new Date();
+      const base = `${hoy.getFullYear()}${String(hoy.getMonth()+1).padStart(2,'0')}${String(hoy.getDate()).padStart(2,'0')}`;
+      // Detectar lotes del día y mayor índice
+      let maxIndice = 0;
+      const sinLoteItems: any[] = [];
+      operaciones.inventarioCompleto.forEach((it:any) => {
+        const lote = String(it.lote || '');
+        if (lote.startsWith(base) && lote.length >= base.length + 3) {
+          const suf = lote.slice(base.length, base.length + 3);
+          const val = parseInt(suf, 10); if (!isNaN(val) && val > maxIndice) maxIndice = val;
+        }
+      });
+      rfids.forEach(r => {
+        const it = operaciones.inventarioCompleto.find(i => i.rfid === r);
+        if (it && !it.lote) sinLoteItems.push(it);
+      });
+      if (!sinLoteItems.length) return;
+      const nuevoIndice = String(maxIndice + 1).padStart(3,'0');
+      const loteAsignar = `${base}${nuevoIndice}`;
+      // Paralelizar updates (PATCH estado sólo para lote) si endpoint soporta; fallback a PUT mínimo si no.
+      await Promise.all(sinLoteItems.map(async (it:any) => {
+        try {
+          // Intentar endpoint parcial primero
+          await apiServiceClient.patch(`/inventory/inventario/${it.id}/estado`, { lote: loteAsignar });
+        } catch {
+          try {
+            await apiServiceClient.put(`/inventory/inventario/${it.id}`, {
+              modelo_id: it.modelo_id,
+              nombre_unidad: it.nombre_unidad,
+              rfid: it.rfid,
+              lote: loteAsignar,
+              estado: it.estado,
+              sub_estado: it.sub_estado,
+              validacion_limpieza: it.validacion_limpieza || null,
+              validacion_goteo: it.validacion_goteo || null,
+              validacion_desinfeccion: it.validacion_desinfeccion || null,
+              categoria: it.categoria || null,
+              ultima_actualizacion: new Date().toISOString()
+            });
+          } catch (e2) { console.warn('No se pudo asignar lote a', it.rfid, e2); }
+        }
+      }));
+      (window as any).__ultimoLoteAsignadoAuto = loteAsignar;
+    } catch (e) { console.warn('Fallo asignación automática de lote', e); }
   };
 
   // Timers helpers
