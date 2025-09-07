@@ -1188,9 +1188,17 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
       if (!candidato) {
         candidato = inventarioCompleto.find(it => it.rfid === code && ['VIP','Cube'].includes(it.categoria) && /(bodega)/i.test((it.estado||'')));
       }
-      // 2. TIC con sub_estado Atemperado aunque no haya pasado el filtro estricto (ej. timer ya limpiado)
+      // 2. TIC con sub_estado EXACTO 'Atemperado' (no 'Atemperamiento') aunque no esté listada
       if (!candidato) {
-    candidato = inventarioCompleto.find(it => it.rfid === code && (it.categoria||'').toUpperCase()==='TIC' && /(atemperado|atemperamient)/i.test((it.sub_estado||'')) && /(pre).*(acond)/i.test((it.estado||'')));
+        candidato = inventarioCompleto.find(it => {
+          if (it.rfid !== code) return false;
+          if ((it.categoria||'').toUpperCase() !== 'TIC') return false;
+          const sub = (it.sub_estado||'').toLowerCase();
+          if (!sub.includes('atemperado')) return false; // excluye 'atemperamiento'
+          if (sub.includes('atemperamiento')) return false;
+          const est = (it.estado||'').toLowerCase();
+          return est.includes('pre') && est.includes('acond');
+        });
       }
     }
     if (!candidato) {
