@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Clock, Pause, Play, X } from 'lucide-react';
 import { Timer } from '../../../contexts/TimerContext';
 
@@ -17,6 +17,13 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   onEliminar,
   formatearTiempo
 }) => {
+  // Tick local cada segundo para timers activos (evita depender de updates por WebSocket cada segundo)
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const timersActivos = timers.filter(timer => !timer.completado);
   
   if (timersActivos.length === 0) {
@@ -82,7 +89,11 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
                     ? 'text-blue-600'
                     : 'text-orange-600'
                 }`}>
-                  {formatearTiempo(timer.tiempoRestanteSegundos)}
+                  {(() => {
+                    if (timer.completado) return formatearTiempo(0);
+                    const remaining = (!timer.activo ? timer.tiempoRestanteSegundos : Math.max(0, Math.ceil((timer.fechaFin.getTime() - now) / 1000)));
+                    return formatearTiempo(remaining);
+                  })()}
                 </div>
                 
                 {/* Controles */}
@@ -115,7 +126,11 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
                       timer.tipoOperacion === 'congelamiento' ? 'bg-blue-500' : 'bg-orange-500'
                     }`}
                     style={{
-                      width: `${Math.max(0, (timer.tiempoRestanteSegundos / (timer.tiempoInicialMinutos * 60)) * 100)}%`
+                      width: `${(() => {
+                        const total = timer.tiempoInicialMinutos * 60;
+                        const remaining = timer.completado ? 0 : (!timer.activo ? timer.tiempoRestanteSegundos : Math.max(0, Math.ceil((timer.fechaFin.getTime() - now) / 1000)));
+                        return Math.max(0, (remaining / total) * 100);
+                      })()}%`
                     }}
                   />
                 </div>
