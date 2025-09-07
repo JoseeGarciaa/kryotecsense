@@ -14,7 +14,7 @@ interface AcondicionamientoViewSimpleProps {
 
 const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = ({ isOpen, onClose }) => {
   const { inventarioCompleto: inventarioCompletoData, cambiarEstadoItem, actualizarColumnasDesdeBackend } = useOperaciones(); // renombrado para claridad
-  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer } = useTimerContext();
+  const { timers, eliminarTimer, crearTimer, crearTimersBatch, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer } = useTimerContext();
   
   const [mostrarModalTraerEnsamblaje, setMostrarModalTraerEnsamblaje] = useState(false);
   const [mostrarModalTraerDespacho, setMostrarModalTraerDespacho] = useState(false);
@@ -29,9 +29,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   const [destinoTimer, setDestinoTimer] = useState<'Ensamblaje' | 'Despacho' | null>(null);
   const [cargandoTimer, setCargandoTimer] = useState(false);
   // (Eliminado) Toggle 'Solo completados' para Lista para Despacho
-  // Batch timers
-  const [mostrarBatchTimerModal, setMostrarBatchTimerModal] = useState(false);
-  const [batchModoDespacho, setBatchModoDespacho] = useState(false); // false = Ensamblaje, true = Despacho
+  // Batch timers (modal eliminado) – sólo flags de carga para feedback
   const [cargandoBatch, setCargandoBatch] = useState(false);
   const [cargandoBatchDespacho, setCargandoBatchDespacho] = useState(false);
   const [cargandoCompletarBatch, setCargandoCompletarBatch] = useState(false);
@@ -643,7 +641,14 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => { setBatchModoDespacho(false); setMostrarBatchTimerModal(true); }}
+                    onClick={() => {
+                      if (!hayElegiblesBatch || cargandoBatch) return;
+                      const input = window.prompt('Minutos para todos los cronómetros de Ensamblaje:', '15');
+                      if (input === null) return; // cancelado
+                      const minutos = parseInt(input, 10);
+                      if (!Number.isFinite(minutos) || minutos <= 0) { alert('Debes ingresar un número válido (>0).'); return; }
+                      try { setCargandoBatch(true); crearTimersBatch(nombresBatch, 'envio', minutos); setTimeout(()=>{ try { forzarSincronizacion(); } catch {} }, 350); } finally { setTimeout(()=>setCargandoBatch(false), 600); }
+                    }}
                     disabled={!hayElegiblesBatch || cargandoBatch}
                     className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors border ${!hayElegiblesBatch || cargandoBatch ? 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-green-600 hover:bg-green-700 text-white border-green-600'}`}
                     title={hayElegiblesBatch ? 'Iniciar cronómetro para todos los items sin cronómetro' : 'No hay items elegibles'}
@@ -757,7 +762,14 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => { setBatchModoDespacho(true); setMostrarBatchTimerModal(true); }}
+                  onClick={() => {
+                    if (!hayElegiblesBatchDespacho || cargandoBatchDespacho) return;
+                    const input = window.prompt('Minutos para todos los cronómetros de Despacho:', '10');
+                    if (input === null) return;
+                    const minutos = parseInt(input, 10);
+                    if (!Number.isFinite(minutos) || minutos <= 0) { alert('Debes ingresar un número válido (>0).'); return; }
+                    try { setCargandoBatchDespacho(true); crearTimersBatch(nombresBatchDespacho, 'envio', minutos); setTimeout(()=>{ try { forzarSincronizacion(); } catch {} }, 350); } finally { setTimeout(()=>setCargandoBatchDespacho(false), 600); }
+                  }}
                   disabled={!hayElegiblesBatchDespacho || cargandoBatchDespacho}
                   className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors border ${!hayElegiblesBatchDespacho || cargandoBatchDespacho ? 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-green-600 hover:bg-green-700 text-white border-green-600'}`}
                   title={hayElegiblesBatchDespacho ? 'Iniciar cronómetro para todos los items sin cronómetro (Despacho)' : 'No hay items elegibles'}
