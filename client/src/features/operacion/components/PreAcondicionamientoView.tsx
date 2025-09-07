@@ -319,25 +319,21 @@ const PreAcondicionamientoView: React.FC = () => {
       // Paralelizar updates (PATCH estado sólo para lote) si endpoint soporta; fallback a PUT mínimo si no.
       await Promise.all(sinLoteItems.map(async (it:any) => {
         try {
-          // Intentar endpoint parcial primero
-          await apiServiceClient.patch(`/inventory/inventario/${it.id}/estado`, { lote: loteAsignar });
-        } catch {
-          try {
-            await apiServiceClient.put(`/inventory/inventario/${it.id}`, {
-              modelo_id: it.modelo_id,
-              nombre_unidad: it.nombre_unidad,
-              rfid: it.rfid,
-              lote: loteAsignar,
-              estado: it.estado,
-              sub_estado: it.sub_estado,
-              validacion_limpieza: it.validacion_limpieza || null,
-              validacion_goteo: it.validacion_goteo || null,
-              validacion_desinfeccion: it.validacion_desinfeccion || null,
-              categoria: it.categoria || null,
-              ultima_actualizacion: new Date().toISOString()
-            });
-          } catch (e2) { console.warn('No se pudo asignar lote a', it.rfid, e2); }
-        }
+          // El endpoint /estado NO permite actualizar solo lote; usar PUT directo.
+          await apiServiceClient.put(`/inventory/inventario/${it.id}`, {
+            modelo_id: it.modelo_id,
+            nombre_unidad: it.nombre_unidad,
+            rfid: it.rfid,
+            lote: loteAsignar,
+            estado: it.estado,
+            sub_estado: it.sub_estado,
+            validacion_limpieza: it.validacion_limpieza || null,
+            validacion_goteo: it.validacion_goteo || null,
+            validacion_desinfeccion: it.validacion_desinfeccion || null,
+            categoria: it.categoria || null,
+            ultima_actualizacion: new Date().toISOString()
+          });
+        } catch (e2) { console.warn('No se pudo asignar lote a', it.rfid, e2); }
       }));
       (window as any).__ultimoLoteAsignadoAuto = loteAsignar;
     } catch (e) { console.warn('Fallo asignación automática de lote', e); }
@@ -386,8 +382,12 @@ const PreAcondicionamientoView: React.FC = () => {
         rfidsAtemperadosPersistidosRef.current.add(tic.rfid);
         return;
       }
-      // PATCH rápido sólo de sub_estado (mantiene estado actual 'Pre acondicionamiento')
-      apiServiceClient.patch(`/inventory/inventario/${tic.id}/estado`, { sub_estado: 'Atemperado' })
+      // PATCH rápido de estado + sub_estado (backend exige 'estado' obligatorio en EstadoUpdate)
+      // Conserva el estado actual (ej: 'Pre acondicionamiento') y sólo promueve sub_estado a 'Atemperado'
+      apiServiceClient.patch(`/inventory/inventario/${tic.id}/estado`, { 
+        estado: tic.estado || 'Pre acondicionamiento',
+        sub_estado: 'Atemperado'
+      })
         .then(() => {
           rfidsAtemperadosPersistidosRef.current.add(tic.rfid);
           // Disparar recarga asincrónica (sin bloquear UI)
