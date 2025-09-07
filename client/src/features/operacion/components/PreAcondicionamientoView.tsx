@@ -240,6 +240,18 @@ const PreAcondicionamientoView: React.FC = () => {
           });
             if (pendientesMover.length) await operaciones.confirmarPreAcondicionamiento(pendientesMover, 'Atemperamiento');
         } catch (e) { console.warn('No se pudo mover a Atemperamiento tras iniciar cronómetro:', e); }
+      } else if (tipoSel === 'congelamiento') {
+        // Mover a Pre acondicionamiento / Congelamiento para que aparezcan de inmediato en la lista
+        try {
+          const pendientesMover = rfids.filter(r => {
+            const it = operaciones.inventarioCompleto.find(i => i.rfid === r);
+            const estado = norm(it?.estado);
+            const sub = norm(it?.sub_estado);
+            const yaEsta = estado.includes('preacondicionamiento') && (sub.includes('congelacion') || sub.includes('congelamiento'));
+            return !yaEsta;
+          });
+          if (pendientesMover.length) await operaciones.confirmarPreAcondicionamiento(pendientesMover, 'Congelamiento');
+        } catch (e) { console.warn('No se pudo mover a Congelamiento tras iniciar cronómetro:', e); }
       }
       setCargandoTemporizador(false);
       // Asignación de lote controlada (local): derivar índice diario escaneando inventario existente.
