@@ -225,14 +225,21 @@ const PreAcondicionamientoView: React.FC = () => {
           .filter(t => norm(t.nombre) === norm(r) && t.tipoOperacion === tipoSel)
           .forEach(t => eliminarTimer(t.id));
       });
-      if (rfids.length === 1) {
-        iniciarTimer(rfids[0], tipoSel, tiempoMinutos);
-      } else {
-        iniciarTimers(rfids, tipoSel, tiempoMinutos);
-      }
+      if (rfids.length === 1) iniciarTimer(rfids[0], tipoSel, tiempoMinutos); else iniciarTimers(rfids, tipoSel, tiempoMinutos);
       const items = operaciones.inventarioCompleto.filter(i => rfids.includes(i.rfid));
       if (items.length) {
         try { await apiServiceClient.post('/inventory/iniciar-timers-masivo', { items_ids: items.map((i:any)=>i.id).filter(Boolean), tipoOperacion: tipoSel, tiempoMinutos }); } catch {}
+      }
+      // Ahora mover a Atemperamiento SOLO después de configurar y arrancar el cronómetro
+      if (tipoSel === 'atemperamiento') {
+        try {
+          const pendientesMover = rfids.filter(r => {
+            const it = operaciones.inventarioCompleto.find(i => i.rfid === r);
+            const sub = norm(it?.sub_estado);
+            return !sub.includes('atemper');
+          });
+            if (pendientesMover.length) await operaciones.confirmarPreAcondicionamiento(pendientesMover, 'Atemperamiento');
+        } catch (e) { console.warn('No se pudo mover a Atemperamiento tras iniciar cronómetro:', e); }
       }
       setCargandoTemporizador(false);
       // Asignación de lote controlada (local): derivar índice diario escaneando inventario existente.
@@ -475,31 +482,13 @@ const PreAcondicionamientoView: React.FC = () => {
   };
 
   // Lote selection
-  const manejarSeleccionLote = async (tics: string[]) => {
-    // Al seleccionar lotes para atemperamiento debemos asegurar que el backend actualice el sub_estado a 'Atemperamiento'
-    // antes (o en paralelo) de iniciar el cronómetro; antes lo hacía el flujo con escaneo / confirmación.
+  const manejarSeleccionLote = (tics: string[]) => {
+    // Ahora solo abrimos el modal de tiempo; el movimiento a Atemperamiento ocurre después de confirmar el cronómetro.
     setMostrarModalLotes(false);
     setRfidsEscaneados([]);
     setUltimosRfidsEscaneados({});
-    const esAtemperamiento = tipoEscaneoActual === 'atemperamiento';
-    if (esAtemperamiento && tics.length) {
-      try {
-        // Filtrar sólo aquellos que no estén ya marcados en atemperamiento para evitar alertas redundantes
-        const pendientes = tics.filter(r => {
-          const item = operaciones.inventarioCompleto.find(i => i.rfid === r);
-          const sub = norm(item?.sub_estado);
-          return !(sub.includes('atemper'));
-        });
-        if (pendientes.length) {
-          // Esto mostrará el alert de éxito existente dentro de confirmarPreAcondicionamiento
-          await operaciones.confirmarPreAcondicionamiento(pendientes, 'Atemperamiento');
-        }
-      } catch (e) {
-        console.warn('No se pudo actualizar sub_estado a Atemperamiento antes de iniciar cronómetro:', e);
-      }
-    }
     setRfidsPendientesTimer(tics);
-    setTipoOperacionTimer(esAtemperamiento ? 'atemperamiento' : 'congelamiento');
+    setTipoOperacionTimer(tipoEscaneoActual === 'atemperamiento' ? 'atemperamiento' : 'congelamiento');
     setMostrarModalEscaneo(false);
     setMostrarModalTimer(true);
   };
