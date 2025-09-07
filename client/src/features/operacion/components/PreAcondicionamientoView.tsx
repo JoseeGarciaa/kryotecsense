@@ -129,12 +129,15 @@ const PreAcondicionamientoView: React.FC = () => {
     });
   };
 
+  // Mostrar en la sección "Atemperamiento" solamente los TICs que ya quedaron en sub-estado "Congelado"
+  // (excluyendo los que siguen en "Congelamiento").
   const filtrarTicsAtemperamiento = (inventario: any[]) => {
     return inventario.filter(item => {
       if (item.categoria !== 'TIC') return false;
       const estado = norm(item.estado).replace(/[-_\s]/g, '');
       const sub = norm(item.sub_estado);
-      return estado.includes('preacondicionamiento') && sub.includes('atemperamiento');
+      // Debe estar en Pre Acondicionamiento y sub estado contener 'congelado' pero NO 'congelamiento'.
+      return estado.includes('preacondicionamiento') && sub.includes('congelado') && !sub.includes('congelamiento');
     });
   };
 
