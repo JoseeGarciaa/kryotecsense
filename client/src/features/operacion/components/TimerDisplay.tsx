@@ -1,20 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Clock, Pause, Play, X } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { Timer } from '../../../contexts/TimerContext';
 
 interface TimerDisplayProps {
   timers: Timer[];
-  onPausar: (id: string) => void;
-  onReanudar: (id: string) => void;
-  onEliminar: (id: string) => void;
   formatearTiempo: (segundos: number) => string;
 }
 
 const TimerDisplay: React.FC<TimerDisplayProps> = ({
   timers,
-  onPausar,
-  onReanudar,
-  onEliminar,
   formatearTiempo
 }) => {
   // Tick local cada segundo para timers activos (evita depender de updates por WebSocket cada segundo)
@@ -64,13 +58,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
                     {timer.tipoOperacion === 'congelamiento' ? 'Congelamiento' : 'Atemperamiento'}
                   </span>
                 </div>
-                <button
-                  onClick={() => onEliminar(timer.id)}
-                  className="text-gray-400 hover:text-red-500 transition-colors"
-                  title="Eliminar cronómetro"
-                >
-                  <X size={14} />
-                </button>
+                {/* Botón eliminar removido */}
               </div>
 
               {/* Nombre del TIC */}
@@ -96,26 +84,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
                   })()}
                 </div>
                 
-                {/* Controles */}
-                <div className="flex gap-1">
-                  {timer.activo ? (
-                    <button
-                      onClick={() => onPausar(timer.id)}
-                      className="p-1 text-gray-600 hover:text-gray-800 transition-colors"
-                      title="Pausar"
-                    >
-                      <Pause size={16} />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => onReanudar(timer.id)}
-                      className="p-1 text-green-600 hover:text-green-800 transition-colors"
-                      title="Reanudar"
-                    >
-                      <Play size={16} />
-                    </button>
-                  )}
-                </div>
+                {/* Controles de pausa/reanudar removidos */}
               </div>
 
               {/* Barra de progreso */}
@@ -137,12 +106,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
               </div>
 
               {/* Estado */}
-              {!timer.activo && !timer.completado && (
-                <div className="mt-1 text-xs text-gray-500 flex items-center gap-1">
-                  <Pause size={12} />
-                  Pausado
-                </div>
-              )}
+              {/* Indicador de pausa removido */}
             </div>
           ))}
         </div>

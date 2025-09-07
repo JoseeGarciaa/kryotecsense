@@ -104,12 +104,14 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
 
   const { isConnected, sendMessage, lastMessage } = useWebSocket(timerWsUrl);
 
+  // Normalización consistente de nombre
+  const normalizeName = (n: string) => (n || '').toLowerCase().trim();
   // Utilidad UI: saber si un nombre está en un batch en curso
   const isStartingBatchFor = (nombre: string) => {
     const batch = pendingBatchRef.current;
     if (!batch) return false;
     if (Date.now() > batch.expiresAt) return false;
-    return batch.names.has(nombre.toLowerCase());
+    return batch.names.has(normalizeName(nombre));
   };
 
   // Escuchar mensajes del WebSocket
@@ -154,8 +156,7 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
             return [...timersActualizados, ...localesPendientes];
           });
           // Debug log removed (timers sincronizados)
-          // Liberar batch en curso: tras un SYNC todos aparecen a la vez
-          pendingBatchRef.current = null;
+          // No liberamos batch inmediatamente; se mantiene hasta expirar para normalizar timers tardíos
         }
         break;
 
@@ -183,9 +184,7 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
               activo: update.activo ?? timer.activo
             };
           }));
-          if (pendingBatchRef.current && Date.now() <= pendingBatchRef.current.expiresAt) {
-            pendingBatchRef.current = null;
-          }
+          // No limpiamos pendingBatchRef aquí: permite seguir normalizando mientras dura la ventana
         }
         break;
 
@@ -198,20 +197,20 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
             fechaFin: new Date(lastMessage.data.timer.fechaFin)
           };
           // Suprimir si el usuario lo limpió manualmente hace muy poco (servidor tardío)
-          const clearedExpiry = clearedNamesRef.current.get(String(nuevoTimer.nombre).toLowerCase());
+          const clearedExpiry = clearedNamesRef.current.get(normalizeName(String(nuevoTimer.nombre)));
           if (clearedExpiry && Date.now() <= clearedExpiry) {
             break; // ignorar evento
           }
           // Si estamos iniciando un lote, normalizar fechaInicio/fin y opcionalmente suprimir hasta SYNC
           const batch = pendingBatchRef.current;
-          const isBatchMember = batch && Date.now() <= batch.expiresAt && batch.names.has(String(nuevoTimer.nombre).toLowerCase());
+          const isBatchMember = batch && Date.now() <= batch.expiresAt && batch.names.has(normalizeName(String(nuevoTimer.nombre)));
           if (isBatchMember && batch) {
             const fechaInicio = new Date(batch.startAt);
             const fechaFin = new Date(batch.startAt + batch.durationSec * 1000);
             const restante = Math.max(0, Math.ceil((fechaFin.getTime() - Date.now()) / 1000));
             nuevoTimer = { ...nuevoTimer, fechaInicio, fechaFin, tiempoRestanteSegundos: restante } as any;
           }
-          const isSuppressed = !!(batch && Date.now() <= batch.expiresAt && batch.names.has(String(nuevoTimer.nombre).toLowerCase()));
+          const isSuppressed = !!(batch && Date.now() <= batch.expiresAt && batch.names.has(normalizeName(String(nuevoTimer.nombre))));
           setTimers(prev => {
             // Reemplazar placeholder local si existe
             const existeId = prev.find(t => t.id === nuevoTimer.id);
@@ -309,14 +308,14 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
   const iniciarTimers = (nombres: string[], tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => {
     if (!nombres.length) return;
     if (isConnected) {
-      const startAt = Date.now();
-      pendingBatchRef.current = { names: new Set(nombres.map(n => n.toLowerCase())), expiresAt: startAt + 5000, startAt, durationSec: tiempoMinutos * 60 };
+  const startAt = Date.now();
+  pendingBatchRef.current = { names: new Set(nombres.map(n => normalizeName(n))), expiresAt: startAt + 2500, startAt, durationSec: tiempoMinutos * 60 };
       // Placeholders uniformes
       setTimers(prev => {
-        const existentes = new Set(prev.map(t => t.nombre.toLowerCase()));
+  const existentes = new Set(prev.map(t => normalizeName(t.nombre)));
         const fechaInicio = new Date(startAt);
         const fechaFin = new Date(startAt + tiempoMinutos * 60000);
-        const nuevos: Timer[] = nombres.filter(n => !existentes.has(n.toLowerCase())).map((nombre, idx) => ({
+  const nuevos: Timer[] = nombres.filter(n => !existentes.has(normalizeName(n))).map((nombre, idx) => ({
           id: `batch-local-${startAt}-${idx}-${Math.random().toString(36).slice(2,6)}`,
           nombre,
           tipoOperacion,

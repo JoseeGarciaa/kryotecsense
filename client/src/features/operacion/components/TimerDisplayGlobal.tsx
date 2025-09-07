@@ -1,6 +1,7 @@
 import React from 'react';
-import { Clock, Play, Pause, Trash2, CheckCircle } from 'lucide-react';
+import { Clock, CheckCircle } from 'lucide-react';
 import { useTimer } from '../hooks/useTimer';
+import type { Timer } from '../../../contexts/TimerContext';
 
 interface TimerDisplayGlobalProps {
   tipoFase: 'congelamiento' | 'atemperamiento' | 'envio';
@@ -8,16 +9,16 @@ interface TimerDisplayGlobalProps {
 }
 
 const TimerDisplayGlobal: React.FC<TimerDisplayGlobalProps> = ({ tipoFase, titulo }) => {
-  const { timers, formatearTiempo, pausarTimer, reanudarTimer, eliminarTimer } = useTimer();
+  const { timers, formatearTiempo } = useTimer();
 
   // Filtrar timers por tipo de fase (incluir activos y completados)
-  const timersFiltrados = timers.filter(timer => 
+  const timersFiltrados = timers.filter((timer: Timer) => 
     timer.tipoOperacion === tipoFase
   );
 
   // Separar activos y completados
-  const timersActivos = timersFiltrados.filter(timer => !timer.completado);
-  const timersCompletados = timersFiltrados.filter(timer => timer.completado);
+  const timersActivos = timersFiltrados.filter((timer: Timer) => !timer.completado);
+  const timersCompletados = timersFiltrados.filter((timer: Timer) => timer.completado);
 
   if (timersFiltrados.length === 0) {
     return null;
@@ -35,7 +36,7 @@ const TimerDisplayGlobal: React.FC<TimerDisplayGlobalProps> = ({ tipoFase, titul
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {/* Renderizar timers activos primero */}
-        {timersActivos.map((timer) => {
+  {timersActivos.map((timer: Timer) => {
           const tiempoFormateado = formatearTiempo(timer.tiempoRestanteSegundos);
           const esUrgente = timer.tiempoRestanteSegundos < 300; // 5 minutos
           
@@ -86,26 +87,7 @@ const TimerDisplayGlobal: React.FC<TimerDisplayGlobalProps> = ({ tipoFase, titul
                   {tiempoFormateado}
                 </span>
                 
-                <div className="flex items-center space-x-1">
-                  <button
-                    onClick={() => timer.activo ? pausarTimer(timer.id) : reanudarTimer(timer.id)}
-                    className="p-1 rounded-md hover:bg-white hover:bg-opacity-50 transition-colors"
-                    title={timer.activo ? "Pausar" : "Reanudar"}
-                  >
-                    {timer.activo ? (
-                      <Pause className="w-4 h-4 text-yellow-600" />
-                    ) : (
-                      <Play className="w-4 h-4 text-green-600" />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => eliminarTimer(timer.id)}
-                    className="p-1 rounded-md hover:bg-white hover:bg-opacity-50 transition-colors"
-                    title="Eliminar"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-600" />
-                  </button>
-                </div>
+                {/* Controles por cronómetro removidos */}
               </div>
               
               {esUrgente && (
@@ -118,7 +100,7 @@ const TimerDisplayGlobal: React.FC<TimerDisplayGlobalProps> = ({ tipoFase, titul
         })}
 
         {/* Renderizar timers completados después */}
-        {timersCompletados.map((timer) => (
+  {timersCompletados.map((timer: Timer) => (
           <div
             key={timer.id}
             className="p-3 rounded-lg border border-green-200 bg-green-50 opacity-75"
@@ -138,15 +120,7 @@ const TimerDisplayGlobal: React.FC<TimerDisplayGlobalProps> = ({ tipoFase, titul
                 ✅ {timer.tiempoInicialMinutos}min
               </span>
               
-              <div className="flex items-center space-x-1">
-                <button
-                  onClick={() => eliminarTimer(timer.id)}
-                  className="p-1 rounded-md hover:bg-white hover:bg-opacity-50 transition-colors"
-                  title="Eliminar registro"
-                >
-                  <Trash2 className="w-4 h-4 text-red-600" />
-                </button>
-              </div>
+              {/* Botón eliminar removido */}
             </div>
             
             <div className="mt-2 text-xs text-green-600">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Scan, Plus, Loader, ChevronDown, Menu, Play, Pause, Edit, Trash2, Search, CheckCircle, X, Activity } from 'lucide-react';
+import { Scan, Plus, Loader, ChevronDown, Menu, Play, Search, CheckCircle, X, Activity } from 'lucide-react';
 import InlineCountdown from '../../../shared/components/InlineCountdown';
 import { useOperaciones } from '../hooks/useOperaciones';
 import RfidScanModal from './RfidScanModal';
@@ -445,24 +445,6 @@ const PreAcondicionamientoView: React.FC = () => {
             <span className="truncate">Completo</span>
           </span>
           <div className="text-xs text-gray-500 truncate">{minutos}min</div>
-          <div className="flex gap-1">
-            <button
-              onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (!window.confirm(`¿Limpiar cronómetro de ${rfid}?`)) return; forceClearTimer(rfid, timerCompletado?.tipoOperacion || (esAtemperamiento ? 'atemperamiento' : 'congelamiento')); }}
-              className={`p-1.5 rounded text-xs transition-colors bg-gray-100 hover:bg-gray-200 text-gray-600`}
-              title="Limpiar"
-            >
-              <X className="w-3 h-3" />
-            </button>
-            {!esAtemperamiento && (
-              <button
-                onClick={() => completarTIC(rfid, timerCompletado ?? null, tipoSeccion)}
-                className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
-                title="Completar"
-              >
-                <CheckCircle className="w-3 h-3" />
-              </button>
-            )}
-          </div>
         </div>
       );
     }
@@ -470,18 +452,7 @@ const PreAcondicionamientoView: React.FC = () => {
       return (
         <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
           <span className="text-gray-400 text-xs">Sin cronómetro</span>
-          <button
-            onClick={() => {
-              setRfidsPendientesTimer([rfid]);
-              if (ticsCongelamiento.find(t => t.rfid === rfid)) setTipoOperacionTimer('congelamiento');
-              else if (ticsAtemperamiento.find(t => t.rfid === rfid)) setTipoOperacionTimer('atemperamiento');
-              setMostrarModalTimer(true);
-            }}
-            className="p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs"
-            title="Iniciar cronómetro"
-          >
-            <Play className="w-3 h-3" />
-          </button>
+          {/* Botón iniciar individual removido */}
         </div>
       );
     }
@@ -489,34 +460,11 @@ const PreAcondicionamientoView: React.FC = () => {
     return (
       <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
         <div className="flex items-center justify-center">
-          <span className={`font-mono text-xs font-medium truncate ${esUrgente ? 'text-red-600' : (timer.tipoOperacion === 'congelamiento' ? 'text-blue-600' : 'text-orange-600')}`}> 
+          <span className={`font-mono text-xs font-medium truncate ${esUrgente ? 'text-red-600' : (timer.tipoOperacion === 'congelamiento' ? 'text-blue-600' : 'text-orange-600')}`}>
             <InlineCountdown endTime={timer.fechaFin} paused={!timer.activo} format={formatearTiempo} />
           </span>
         </div>
         {!timer.activo && <span className="text-xs text-gray-500">Pausado</span>}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => timer.activo ? pausarTimer(timer.id) : reanudarTimer(timer.id)}
-            className={`p-1.5 rounded text-xs transition-colors ${timer.activo ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700' : 'bg-green-100 hover:bg-green-200 text-green-700'}`}
-            title={timer.activo ? 'Pausar' : 'Reanudar'}
-          >
-            {timer.activo ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-          </button>
-          <button
-            onClick={() => { setRfidsPendientesTimer([rfid]); setTipoOperacionTimer(timer.tipoOperacion); setMostrarModalTimer(true); }}
-            className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs"
-            title="Editar"
-          >
-            <Edit className="w-3 h-3" />
-          </button>
-          <button
-            onClick={() => eliminarTimer(timer.id)}
-            className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs"
-            title="Eliminar"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-        </div>
       </div>
     );
   };
