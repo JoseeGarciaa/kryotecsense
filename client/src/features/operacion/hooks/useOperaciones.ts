@@ -276,8 +276,9 @@ export const useOperaciones = () => {
       const normalizarEstado = (estado?: string) => {
         const e = normalizarTexto(estado);
         if (!e) return '';
+        // Unificar cualquier variante que contenga "bodega" ("en bodega", "bodega", "bodega - disponible", etc.)
+        if (e.includes('bodega')) return 'en bodega';
         if (e.includes('pre acond')) return 'pre-acondicionamiento';
-        if (e.includes('en bodega')) return 'en bodega';
         if (e.includes('acondicion')) return 'acondicionamiento';
         if (e.includes('operacion')) return 'operacion';
         if (e.includes('devolucion')) return 'devolucion';
@@ -303,6 +304,15 @@ export const useOperaciones = () => {
         if (!item || !item.estado || !item.categoria) return false;
         return normalizarEstado(item.estado) === 'en bodega' && categoriaValida(item.categoria);
       });
+      if (itemsEnBodega.length === 0) {
+        // Diagnóstico: ver si hay estados que contienen 'bodega' pero fueron descartados por categoría
+        const candidatosBodega = inventario.filter((it: any) => normalizarTexto(it.estado).includes('bodega'));
+        if (candidatosBodega.length > 0) {
+          console.log('🔎 DEBUG BODEGA: Detectados estados con "bodega" pero no se muestran. Ejemplos:', candidatosBodega.slice(0,5).map((it:any)=>({id: it.id, estado: it.estado, categoria: it.categoria})));        
+        } else {
+          console.log('🔎 DEBUG BODEGA: No se detectaron estados que contengan la palabra "bodega" en los datos recibidos.');
+        }
+      }
       const itemsPreAcondicionamiento = inventario.filter((item: any) => {
         if (!item || !item.estado || !item.categoria) return false;
         return normalizarEstado(item.estado) === 'pre-acondicionamiento' && categoriaValida(item.categoria);
