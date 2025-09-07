@@ -171,6 +171,47 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     }
   };
 
+  // Ref para no repetir actualizaciones a 'Ensamblado'
+  const idsMarcadosEnsambladoRef = useRef<Set<number>>(new Set());
+
+  // Efecto: cuando un cronómetro de Ensamblaje (no Despacho) se completa, mover sub_estado a 'Ensamblado'
+  useEffect(() => {
+    const candidatos = timers.filter(t => t.tipoOperacion === 'envio' && t.completado && !/\(\s*despacho\s*\)/i.test(t.nombre||''));
+    if (!candidatos.length) return;
+    candidatos.forEach(t => {
+      const match = /#(\d+)\s*-/.exec(t.nombre || '');
+      if (!match) return;
+      const id = parseInt(match[1], 10);
+      if (!id || idsMarcadosEnsambladoRef.current.has(id)) return;
+      const item = (inventarioCompletoData || []).find((it:any) => it.id === id);
+      if (!item) return;
+      if (item.sub_estado !== 'Ensamblaje') return; // sólo si aún está en Ensamblaje
+      idsMarcadosEnsambladoRef.current.add(id);
+      // Actualizar backend
+      const payload = {
+        modelo_id: item.modelo_id,
+        nombre_unidad: item.nombre_unidad,
+        rfid: item.rfid,
+        lote: item.lote || null,
+        estado: 'Acondicionamiento',
+        sub_estado: 'Ensamblado',
+        validacion_limpieza: item.validacion_limpieza || null,
+        validacion_goteo: item.validacion_goteo || null,
+        validacion_desinfeccion: item.validacion_desinfeccion || null,
+        categoria: item.categoria || null
+      };
+      apiServiceClient.put(`/inventory/inventario/${item.id}`, payload)
+        .then(() => {
+          // Refrescar datos después de un pequeño delay para batch
+          setTimeout(() => { try { actualizarColumnasDesdeBackend(); } catch {} }, 150);
+        })
+        .catch(() => {
+          // Si falla, permitir reintento en el próximo efecto
+          idsMarcadosEnsambladoRef.current.delete(id);
+        });
+    });
+  }, [timers, inventarioCompletoData, actualizarColumnasDesdeBackend]);
+
   // Utilidad: normalizar texto (quitar acentos, minúsculas y trim)
   const norm = (s: string | null | undefined) => (s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
@@ -1164,11 +1205,18 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
     // Ya escaneado
     if (rfidsEscaneados.includes(code)) return;
 
-    // Buscar primero en visibles (TIC atemperados)
+    // Buscar primero en visibles (TIC listadas)
     let candidato: any = itemsDisponibles.find(i => i.rfid === code);
-    // Si no está y es Ensamblaje, buscar VIP/Cube en bodega (ocultos)
-    if (!candidato && subEstadoDestino === 'Ensamblaje') {
-      candidato = inventarioCompleto.find(it => it.rfid === code && ['VIP','Cube'].includes(it.categoria) && /(bodega)/i.test((it.estado||'')));
+    if (subEstadoDestino === 'Ensamblaje') {
+      // Si no está en visibles, permitir:
+      // 1. VIP / Cube desde Bodega (ya implementado)
+      if (!candidato) {
+        candidato = inventarioCompleto.find(it => it.rfid === code && ['VIP','Cube'].includes(it.categoria) && /(bodega)/i.test((it.estado||'')));
+      }
+      // 2. TIC con sub_estado Atemperado aunque no haya pasado el filtro estricto (ej. timer ya limpiado)
+      if (!candidato) {
+        candidato = inventarioCompleto.find(it => it.rfid === code && (it.categoria||'').toUpperCase()==='TIC' && /(atemperado)/i.test(it.sub_estado||''));
+      }
     }
     if (!candidato) {
       console.warn(`RFID ${code} no elegible (no encontrado en criterios)`);

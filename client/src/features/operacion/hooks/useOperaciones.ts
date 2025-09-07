@@ -789,6 +789,15 @@ export const useOperaciones = () => {
         console.warn('Omitidas:', invalidas);
       }
 
+      // Confirmación manual sólo cuando vienen de Bodega/Disponible y destino es Congelamiento (petición del usuario)
+      if (subEstado === 'Congelamiento') {
+        const necesitanConfirm = candidatas.filter(c => !c.estado || ['disponible','En bodega'].includes(c.estado));
+        if (necesitanConfirm.length > 0) {
+          const msg = `Mover ${necesitanConfirm.length} TIC(s) a Congelamiento?`;
+          if (!window.confirm(msg)) { notify('Operación cancelada', 'warning'); return false; }
+        }
+      }
+
       // 2. Actualización optimista inmediata (percepción instantánea <100ms)
       const ahoraUTC = createUtcTimestamp();
       setInventarioCompleto(prev => prev.map((it: any) => {
