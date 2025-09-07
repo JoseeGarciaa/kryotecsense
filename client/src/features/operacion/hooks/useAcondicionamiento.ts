@@ -316,25 +316,29 @@ export const useAcondicionamiento = () => {
   * Debe estar atemperada Y haber completado su cronómetro
    */
   const validarTicParaAcondicionamiento = (tic: any, timersGlobales?: any[]) => {
-    // Debe estar en estado atemperado
-    if (tic.estado !== 'Atemperamiento' && tic.sub_estado !== 'Atemperado') {
-      return { valida: false, razon: 'TIC no está atemperada' };
+    // Regla actual: basta con que el SUB_ESTADO sea exactamente 'Atemperado'
+    if (tic.sub_estado !== 'Atemperado') {
+      return { valida: false, razon: 'TIC no está atemperada (sub_estado distinto de Atemperado)' };
     }
 
-  // Verificar que no tenga cronómetros activos
+    // Verificar que no tenga cronómetros activos (ignorar completados o pausados)
     if (timersGlobales) {
-      const tieneTimerActivo = timersGlobales.some(timer => 
-        timer.nombre === tic.nombre_unidad || 
-        timer.nombre === tic.id?.toString() ||
-        timer.nombre.includes(tic.nombre_unidad?.replace('TIC', '') || '')
-      );
-      
+      const tieneTimerActivo = timersGlobales.some(timer => {
+        if (!timer) return false;
+        const nombre = String(timer.nombre || '').toLowerCase();
+        const matchNombre = nombre === String(tic.nombre_unidad || '').toLowerCase();
+        const matchId = nombre === String(tic.id || '').toLowerCase();
+        const matchParcial = nombre.includes(String(tic.nombre_unidad || '').replace(/tic/i, '').trim().toLowerCase());
+        // Considerar activo sólo si no está completado y está marcado activo
+        if ((matchNombre || matchId || matchParcial) && !timer.completado && timer.activo) return true;
+        return false;
+      });
       if (tieneTimerActivo) {
-        return { valida: false, razon: 'TIC tiene cronómetro activo' };
+        return { valida: false, razon: 'TIC tiene un cronómetro activo' };
       }
     }
 
-    return { valida: true, razon: 'TIC lista para acondicionamiento' };
+    return { valida: true, razon: 'TIC lista para acondicionamiento (Atemperado)' };
   };
 
   /**

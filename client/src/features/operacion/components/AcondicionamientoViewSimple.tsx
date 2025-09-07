@@ -1194,10 +1194,12 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
           if (it.rfid !== code) return false;
           if ((it.categoria||'').toUpperCase() !== 'TIC') return false;
           const sub = (it.sub_estado||'').toLowerCase();
-          if (!sub.includes('atemperado')) return false; // excluye 'atemperamiento'
-          if (sub.includes('atemperamiento')) return false;
+          if (sub !== 'atemperado') return false; // estrictamente Atemperado
           const est = (it.estado||'').toLowerCase();
-          return est.includes('pre') && est.includes('acond');
+          // Aceptar si viene de Pre Acondicionamiento o si aún está marcado como Atemperamiento (estado principal) pero ya con sub_estado final Atemperado
+          const esPreAcond = est.includes('pre') && est.includes('acond');
+          const esEstadoAtemperamiento = est === 'atemperamiento';
+          return esPreAcond || esEstadoAtemperamiento;
         });
       }
     }
