@@ -136,8 +136,15 @@ const PreAcondicionamientoView: React.FC = () => {
       if (item.categoria !== 'TIC') return false;
       const estado = norm(item.estado).replace(/[-_\s]/g, '');
       const sub = norm(item.sub_estado);
-      // Debe estar en Pre Acondicionamiento y sub estado contener 'congelado' pero NO 'congelamiento'.
-      return estado.includes('preacondicionamiento') && sub.includes('congelado') && !sub.includes('congelamiento');
+      // Mostrar TICs que:
+      //  - Están en Pre Acondicionamiento
+      //  - Están congeladas (sub incluye 'congelado' pero NO 'congelamiento') => listas para iniciar atemperamiento
+      //  - O ya están en proceso de atemperamiento (sub incluye 'atemper')
+      const esPre = estado.includes('preacondicionamiento');
+      if (!esPre) return false;
+      const esCongeladoListo = sub.includes('congelado') && !sub.includes('congelamiento');
+      const enAtemperamiento = sub.includes('atemper');
+      return esCongeladoListo || enAtemperamiento;
     });
   };
 
@@ -468,13 +475,31 @@ const PreAcondicionamientoView: React.FC = () => {
   };
 
   // Lote selection
-  const manejarSeleccionLote = (tics: string[]) => {
-    // Saltar modal de escaneo: pasar directamente a configurar cronómetro.
+  const manejarSeleccionLote = async (tics: string[]) => {
+    // Al seleccionar lotes para atemperamiento debemos asegurar que el backend actualice el sub_estado a 'Atemperamiento'
+    // antes (o en paralelo) de iniciar el cronómetro; antes lo hacía el flujo con escaneo / confirmación.
     setMostrarModalLotes(false);
     setRfidsEscaneados([]);
     setUltimosRfidsEscaneados({});
+    const esAtemperamiento = tipoEscaneoActual === 'atemperamiento';
+    if (esAtemperamiento && tics.length) {
+      try {
+        // Filtrar sólo aquellos que no estén ya marcados en atemperamiento para evitar alertas redundantes
+        const pendientes = tics.filter(r => {
+          const item = operaciones.inventarioCompleto.find(i => i.rfid === r);
+          const sub = norm(item?.sub_estado);
+          return !(sub.includes('atemper'));
+        });
+        if (pendientes.length) {
+          // Esto mostrará el alert de éxito existente dentro de confirmarPreAcondicionamiento
+          await operaciones.confirmarPreAcondicionamiento(pendientes, 'Atemperamiento');
+        }
+      } catch (e) {
+        console.warn('No se pudo actualizar sub_estado a Atemperamiento antes de iniciar cronómetro:', e);
+      }
+    }
     setRfidsPendientesTimer(tics);
-    setTipoOperacionTimer(tipoEscaneoActual === 'congelamiento' ? 'congelamiento' : 'atemperamiento');
+    setTipoOperacionTimer(esAtemperamiento ? 'atemperamiento' : 'congelamiento');
     setMostrarModalEscaneo(false);
     setMostrarModalTimer(true);
   };
@@ -940,7 +965,13 @@ const PreAcondicionamientoView: React.FC = () => {
                           <td className="px-3 py-2 text-xs font-medium text-gray-900" title={tic.rfid}>{tic.rfid}</td>
                           <td className="px-3 py-2 text-xs text-gray-900" title={tic.nombre_unidad}>{tic.nombre_unidad}</td>
                           <td className="px-3 py-2 text-xs text-gray-900" title={tic.lote}>{tic.lote}</td>
-                          <td className="px-3 py-2"><span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">{esTicAtemperadoVisual(tic.rfid) ? 'Atemperado' : 'Atemperamiento'}</span></td>
+                          <td className="px-3 py-2"><span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">{(() => {
+                            const sub = norm(tic.sub_estado);
+                            if (esTicAtemperadoVisual(tic.rfid)) return 'Atemperado';
+                            const timerAtempActivo = obtenerTimerActivoPorTipo(tic.rfid, 'atemperamiento');
+                            if (!timerAtempActivo && sub.includes('congelado') && !sub.includes('congelamiento')) return 'Congelado';
+                            return 'Atemperamiento';
+                          })()}</span></td>
                           <td className="px-3 py-2 text-center"><div className="flex justify-center">{renderizarTemporizador(tic.rfid, true)}</div></td>
                         </tr>
                       ))
