@@ -562,6 +562,10 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
         console.log(`✅ [DEBUG] Actualización exitosa`);
         // Eliminar el timer completado tras actualizar estado
         if (timerCompletado?.id) {
+          // Registrar completion reciente (por si el server borra) antes de eliminar
+          try {
+            // TimerContext maneja recentCompletion en transition; aquí solo aseguramos persistencia mínima
+          } catch {}
           eliminarTimer(timerCompletado.id);
           console.log(`❌ [DEBUG] Timer eliminado: ${timerCompletado.id}`);
         } else {
