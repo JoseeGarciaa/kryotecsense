@@ -261,10 +261,54 @@ class TimerManager:
         # Obtener un tiempo alineado único para todos los timers del lote
         aligned_start = get_aligned_time()
         logger.info(f"Creando lote de {len(timers_data)} timers con inicio sincronizado: {aligned_start.isoformat()}")
-        
-        # Crear todos los timers con el mismo tiempo de inicio
+        nuevos: List[Dict] = []
+        server_timestamp = self.get_server_timestamp()
+
+        # Construir todos los timers primero (evita múltiples broadcasts secuenciales)
         for timer_data in timers_data:
-            await self.create_timer(timer_data, websocket, aligned_start)
+            try:
+                timer_id = timer_data.get('id', str(uuid.uuid4()))
+                if timer_id in self.timers:
+                    logger.info(f"Timer ya existía en batch (omitido): {timer_id}")
+                    continue
+                duracion_minutos = timer_data.get('tiempoInicialMinutos', 0)
+                data = {
+                    **timer_data,
+                    'id': timer_id,
+                    'fechaInicio': aligned_start,
+                    'fechaFin': aligned_start + timedelta(minutes=duracion_minutos),
+                    'tiempoRestanteSegundos': duracion_minutos * 60,
+                    'activo': True,
+                    'completado': False,
+                    'tiempoPausadoSegundos': None,
+                    'nombre': timer_data.get('nombre', f'Timer {timer_id[:8]}'),
+                    'tipoOperacion': timer_data.get('tipoOperacion', 'congelamiento')
+                }
+                t = Timer(**data)
+                self.timers[t.id] = t
+                nuevos.append({ **t.to_dict(), 'server_timestamp': server_timestamp })
+            except Exception as e:
+                logger.error(f"Error creando timer en batch: {e}")
+
+        if nuevos:
+            # Broadcast único con todos los timers creados
+            await self.broadcast({
+                'type': 'TIMERS_CREATED_BATCH',
+                'data': { 'timers': nuevos, 'server_timestamp': server_timestamp }
+            })
+
+            # Publicar cada evento en MQ (para replicación entre instancias)
+            for t in nuevos:
+                try:
+                    base = {k: v for k, v in t.items() if k != 'server_timestamp'}
+                    await message_queue.publish_fanout('timers.events', {
+                        'event': 'TIMER_CREATED',
+                        'origin': self.instance_id,
+                        'timer': base,
+                        'server_timestamp': server_timestamp
+                    })
+                except Exception as e:
+                    logger.error(f"MQ publish TIMER_CREATED (batch) error: {e}")
         
     async def update_timer(self, timer_id: str, updates: Dict, websocket: Optional[WebSocket] = None):
         """Actualizar temporizador existente"""

@@ -104,6 +104,20 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
           setTimers(prev => prev.find(x => x.id === nuevo.id) ? prev.map(x => x.id === nuevo.id ? nuevo : x) : [...prev, nuevo]);
         }
         break;
+      case 'TIMERS_CREATED_BATCH':
+        if (Array.isArray(lastMessage.data.timers)) {
+          const nuevos: Timer[] = lastMessage.data.timers.map((t: any) => ({
+            ...t,
+            fechaInicio: new Date(t.fechaInicio),
+            fechaFin: new Date(t.fechaFin)
+          }));
+          setTimers(prev => {
+            const mapa = new Map(prev.map(p => [p.id, p]));
+            nuevos.forEach(n => mapa.set(n.id, n));
+            return Array.from(mapa.values());
+          });
+        }
+        break;
 
       case 'TIMER_UPDATED':
         if (lastMessage.data.timer) {
