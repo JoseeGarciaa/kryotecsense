@@ -245,20 +245,9 @@ const PreAcondicionamientoView: React.FC = () => {
               }
             });
           } catch {}
+          // Índice calculado localmente (sin registrar en backend porque endpoint no soportado / 405)
           const indice = String(maxIndice + 1).padStart(3, '0');
-          // Intentar registrar lote en backend (si endpoint existe). Silenciar fallos.
-          // Intentar registrar lote sólo si el endpoint está soportado (detectar una vez)
-          let canRegistrar = (window as any).__endpointRegistrarLoteBatch !== false;
-          if (canRegistrar) {
-            try {
-              await apiServiceClient.post('/inventory/inventario/registrar-lote-batch', { rfids, indice, fecha: fechaBase, sub_estado: subEstadoFinal });
-            } catch (e:any) {
-              // Si recibimos 404/405 marcar como no soportado para suprimir futuros intentos
-              if (e?.response?.status === 404 || e?.response?.status === 405) {
-                (window as any).__endpointRegistrarLoteBatch = false;
-              }
-            }
-          }
+          (window as any).__loteIndiceLocalUltimo = indice; // opcional tracking
           await cargarDatos();
         } catch {}
       }, 120);
@@ -480,9 +469,14 @@ const PreAcondicionamientoView: React.FC = () => {
 
   // Lote selection
   const manejarSeleccionLote = (tics: string[]) => {
-    setRfidsEscaneados(tics);
+    // Saltar modal de escaneo: pasar directamente a configurar cronómetro.
     setMostrarModalLotes(false);
-    setMostrarModalEscaneo(true);
+    setRfidsEscaneados([]);
+    setUltimosRfidsEscaneados({});
+    setRfidsPendientesTimer(tics);
+    setTipoOperacionTimer(tipoEscaneoActual === 'congelamiento' ? 'congelamiento' : 'atemperamiento');
+    setMostrarModalEscaneo(false);
+    setMostrarModalTimer(true);
   };
 
   // Filtrado / paginación
