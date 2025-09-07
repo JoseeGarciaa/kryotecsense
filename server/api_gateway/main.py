@@ -1636,7 +1636,7 @@ def api_inventory_update_estado(
         if estado_update.estado and estado_update.sub_estado:
             est = estado_update.estado.strip().lower()
             sub = estado_update.sub_estado.strip().lower() if estado_update.sub_estado else ""
-            if est in ["Pre acondicionamiento", "preacondicionamiento"] and sub in ["congelación", "congelacion", "atemperamiento"]:
+            if est in ["Pre acondicionamiento", "preacondicionamiento"] and sub in ["Congelamiento", "congelacion", "atemperamiento"]:
                 # Si no tiene lote, asignar automático
                 lote_row = db.execute(
                     text(f"SELECT lote FROM {tenant_schema}.inventario_credocubes WHERE id = :id"),

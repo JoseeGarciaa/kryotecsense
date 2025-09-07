@@ -153,7 +153,7 @@ export class OptimizedBulkOperations {
         if (newSubState) return newSubState;
         switch (newState) {
           case 'Pre acondicionamiento':
-            return 'Congelación';
+            return 'Congelamiento';
           case 'Acondicionamiento':
             return 'Ensamblaje';
           case 'Operación':
@@ -181,7 +181,7 @@ export class OptimizedBulkOperations {
             if (newSubState) return newSubState;
             switch (newState) {
               case 'Pre acondicionamiento':
-                return 'Congelación';
+                return 'Congelamiento';
               case 'Acondicionamiento':
                 return 'Ensamblaje';
               case 'Operación':
@@ -241,7 +241,7 @@ export class OptimizedBulkOperations {
    */
   async optimizedMoveToPreAcondicionamiento(
     items: any[],
-    subEstado: 'Congelación' | 'Atemperamiento' = 'Congelación'
+    subEstado: 'Congelamiento' | 'Atemperamiento' = 'Congelamiento'
   ): Promise<{ success: number; errors: string[] }> {
     console.log(`❄️ Optimizando movimiento a Pre acondicionamiento (${subEstado}) para ${items.length} items`);
     

@@ -27,8 +27,8 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showAllPhases, setShowAllPhases] = useState(fase === 'all' || !fase);
   
-  // Estado para el sub-estado seleccionado (Congelación o Atemperamiento)
-  const [subEstadoSeleccionado, setSubEstadoSeleccionado] = useState<'Congelación' | 'Atemperamiento'>('Congelación');
+  // Estado para el sub-estado seleccionado (Congelamiento o Atemperamiento)
+  const [subEstadoSeleccionado, setSubEstadoSeleccionado] = useState<'Congelamiento' | 'Atemperamiento'>('Congelamiento');
   
   // Estado para controlar el modal de selección de lotes
   const [mostrarModalLotes, setMostrarModalLotes] = useState(false);
@@ -800,7 +800,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
                   {(() => {
                     // Filtrar los items de Pre acondicionamiento por tipo
                     const itemsCongelacion = column.items.filter(item => 
-                      item.tipo === 'CONGELACION' || item.sub_estado === 'Congelación' || item.sub_estado === 'Congelamiento'
+                      item.tipo === 'CONGELACION' || item.sub_estado === 'Congelamiento' || item.sub_estado === 'Congelamiento'
                     );
                     const itemsAtemperamiento = column.items.filter(item => 
                       item.tipo === 'ATEMPERAMIENTO' || item.sub_estado === 'Atemperamiento'
@@ -828,7 +828,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
                             <span className="text-xs text-blue-600">{totalCongelacion} items</span>
                           </div>
                           <div className="p-3">
-                            {/* Resumen de temporizadores por tiempo para Congelación */}
+                            {/* Resumen de temporizadores por tiempo para Congelamiento */}
                             {(() => {
                               const resumenCongelacion = obtenerResumenTemporizadoresPorTipo('congelacion');
                               return resumenCongelacion.length > 0 ? (

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Clock, Pause, Play, X } from 'lucide-react';
-import { Timer } from '../hooks/useTimer';
+import { Timer } from '../../../contexts/TimerContext';
 
 interface TimerDisplayProps {
   timers: Timer[];
@@ -54,7 +54,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
                   <span className={`text-xs font-medium ${
                     timer.tipoOperacion === 'congelamiento' ? 'text-blue-800' : 'text-orange-800'
                   }`}>
-                    {timer.tipoOperacion === 'congelamiento' ? 'Congelación' : 'Atemperamiento'}
+                    {timer.tipoOperacion === 'congelamiento' ? 'Congelamiento' : 'Atemperamiento'}
                   </span>
                 </div>
                 <button

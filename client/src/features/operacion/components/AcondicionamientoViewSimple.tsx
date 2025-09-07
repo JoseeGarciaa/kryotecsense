@@ -150,7 +150,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   // Reglas actualizadas:
   //  - Incluir TICs en Pre acondicionamiento con sub_estado Atemperamiento (independiente del estado del timer)
   //  - También incluir si están en Bodega (fallback)
-  //  - Excluir cualquier estado relacionado con congelación
+  //  - Excluir cualquier estado relacionado con Congelamiento
   const itemsDisponibles = (inventarioCompleto || []).filter(item => {
     const e = norm(item.estado);
     const s = norm((item as any).sub_estado);
@@ -170,7 +170,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
       return vieneDeFaseAnterior && tieneAtempCompletado;
     }
 
-    // VIP y Cube NO requieren tiempo; permitir llevar a Ensamblaje siempre que no estén en congelación
+    // VIP y Cube NO requieren tiempo; permitir llevar a Ensamblaje siempre que no estén en Congelamiento
     if (categoria === 'vip' || categoria === 'cube') {
       return enBodega || esPreAcond; // permitir desde bodega o pre-acondición
     }
@@ -589,13 +589,13 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   const gruposEnsamblaje = useMemo<GrupoLote[]>(() => {
     if (vistaGlobal !== 'lotes') return [];
     const map = new Map<string, any[]>();
-    itemsEnsamblajeFiltrados.forEach(it => { const k = it.lote || 'SIN LOTE'; if (!map.has(k)) map.set(k, []); map.get(k)!.push(it); });
+    itemsEnsamblajeFiltrados.forEach(it => { const k = it.lote || 'SIN CAJA'; if (!map.has(k)) map.set(k, []); map.get(k)!.push(it); });
     return Array.from(map.entries()).map(([lote, items]) => ({ lote, items, count: items.length })).sort((a,b)=>a.lote.localeCompare(b.lote));
   }, [vistaGlobal, itemsEnsamblajeFiltrados]);
   const gruposDespacho = useMemo<GrupoLote[]>(() => {
     if (vistaGlobal !== 'lotes') return [];
     const map = new Map<string, any[]>();
-    itemsListaDespachoFiltrados.forEach(it => { const k = it.lote || 'SIN LOTE'; if (!map.has(k)) map.set(k, []); map.get(k)!.push(it); });
+    itemsListaDespachoFiltrados.forEach(it => { const k = it.lote || 'SIN CAJA'; if (!map.has(k)) map.set(k, []); map.get(k)!.push(it); });
     return Array.from(map.entries()).map(([lote, items]) => ({ lote, items, count: items.length })).sort((a,b)=>a.lote.localeCompare(b.lote));
   }, [vistaGlobal, itemsListaDespachoFiltrados]);
 
@@ -603,7 +603,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     <div key={(despacho?'D-':'E-')+grupo.lote} className={`rounded-xl border shadow-sm overflow-hidden ${despacho? 'bg-gradient-to-br from-green-50 to-green-100/40 border-green-200':'bg-gradient-to-br from-red-50 to-red-100/40 border-red-200'}`}>
       <div className={`px-4 py-3 flex items-center justify-between ${despacho? 'bg-green-600':'bg-red-600'} text-white`}> 
         <div className="flex flex-col">
-          <span className="text-sm font-semibold">Lote {grupo.lote}</span>
+          <span className="text-sm font-semibold">Caja {grupo.lote}</span>
           <span className="text-[11px] tracking-wide opacity-90">{grupo.count} Item{grupo.count!==1?'s':''}</span>
         </div>
         <Activity className="w-5 h-5 opacity-90" />
@@ -645,9 +645,9 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
           <button
             onClick={()=>setVistaGlobal('lotes')}
             className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border ${vistaGlobal==='lotes'? 'bg-gray-900 text-white border-gray-900':'bg-white text-gray-700 hover:bg-gray-100 border-gray-300'}`}
-            title="Vista agrupada por lote"
+            title="Vista agrupada por caja"
           >
-            <Menu className="w-4 h-4" /> Lotes
+            <Menu className="w-4 h-4" /> Cajas
           </button>
           <button
             onClick={()=>setVistaGlobal('tabla')}
@@ -715,7 +715,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Buscar por RFID, nombre o lote..."
+                placeholder="Buscar por RFID, nombre o caja..."
                 value={busquedaEnsamblaje}
                 onChange={(e) => setBusquedaEnsamblaje(e.target.value)}
                 maxLength={24}
@@ -731,7 +731,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RFID</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NOMBRE</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LOTE</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CAJA</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ESTADO</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CRONÓMETRO</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CATEGORÍA</th>
@@ -835,7 +835,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Buscar por RFID, nombre o lote..."
+                placeholder="Buscar por RFID, nombre o caja..."
                 value={busquedaListaDespacho}
                 onChange={(e) => setBusquedaListaDespacho(e.target.value)}
                 maxLength={24}
@@ -850,7 +850,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RFID</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NOMBRE</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LOTE</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CAJA</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ESTADO</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CRONÓMETRO</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CATEGORÍA</th>
@@ -910,24 +910,26 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
         <AgregarItemsModal
           isOpen={mostrarModalTraerEnsamblaje}
           onClose={() => setMostrarModalTraerEnsamblaje(false)}
-          itemsDisponibles={itemsDisponibles} // Bodega o Pre-acond → Atemperamiento (sin Congelación)
+          itemsDisponibles={itemsDisponibles} // Bodega o Pre-acond → Atemperamiento (sin Congelamiento)
           subEstadoDestino="Ensamblaje"
           cargando={cargandoEnsamblaje}
-          onConfirm={async (items, subEstado, tiempoOperacionMinutos) => {
+      onConfirm={async (items, subEstado, tiempoOperacionMinutos) => {
             try {
               setCargandoEnsamblaje(true);
               setCargandoActualizacion(true);
               // Silenciado: log de movimiento a Ensamblaje
+        // Generar ID único de CAJA compartida
+        const cajaId = `CJ-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
               
               // Cancelar cronómetros de los items que se van a mover
               cancelarCronometrosDeItems(items);
               
-              const tareasMovimiento = items.map((item) => () => {
+        const tareasMovimiento = items.map((item) => () => {
                 const actualizacionItem = {
                   modelo_id: item.modelo_id,
                   nombre_unidad: item.nombre_unidad,
                   rfid: item.rfid,
-                  lote: null,
+          lote: cajaId,
                   estado: 'Acondicionamiento',
                   sub_estado: subEstado,
                   validacion_limpieza: item.validacion_limpieza || null,
@@ -1342,7 +1344,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
               <div className="sm:flex-1">
                 <input
                   type="text"
-                  placeholder="Buscar por nombre, RFID o lote..."
+                  placeholder="Buscar por nombre, RFID o caja..."
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
                   maxLength={24}
@@ -1504,7 +1506,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                         </div>
                         <div className="text-xs text-gray-600 mt-1 break-words">
                           <span className="mr-2">RFID: {item.rfid}</span>
-                          {item.lote && <span className="mr-2">Lote: {item.lote}</span>}
+                          {item.lote && <span className="mr-2">Caja: {item.lote}</span>}
                         </div>
                       </div>
                     </div>

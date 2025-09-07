@@ -19,7 +19,7 @@ export const createDragDropHandlers = (
       // Usar operaciones optimizadas en lote
       const result = await bulkOperations.optimizedMoveToPreAcondicionamiento(
         grupoTics.items_grupo,
-        'Congelación'
+        'Congelamiento'
       );
       
       // Actualizar las columnas una sola vez al final
@@ -275,7 +275,7 @@ export const createDragDropHandlers = (
         usuario_id: 1, // Usuario actual
         descripcion: `TIC movido de vuelta a Pre acondicionamiento - ${item.nombre_unidad}`,
         estado_nuevo: 'Pre acondicionamiento',
-  sub_estado_nuevo: 'Congelación'
+  sub_estado_nuevo: 'Congelamiento'
       };
       
       await apiServiceClient.post('/activities/actividades/', nuevaActividad);
@@ -325,7 +325,7 @@ export const createDragDropHandlers = (
       // Mapear columnas a estados
       const estadosPorColumna: { [key: string]: { estado: string; subEstado: string } } = {
         'en-bodega': { estado: 'En bodega', subEstado: 'Disponible' },
-        'Pre acondicionamiento': { estado: 'Pre acondicionamiento', subEstado: 'Congelación' },
+        'Pre acondicionamiento': { estado: 'Pre acondicionamiento', subEstado: 'Congelamiento' },
         'acondicionamiento': { estado: 'Acondicionamiento', subEstado: 'Ensamblaje' },
         'operacion': { estado: 'Operación', subEstado: 'En transito' },
         'devolucion': { estado: 'Devolución', subEstado: 'Pendiente' },

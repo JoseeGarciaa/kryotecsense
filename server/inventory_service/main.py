@@ -483,7 +483,7 @@ async def update_inventario_estado(
         if (estado_update.estado and 
             estado_update.estado.lower() in ['Pre acondicionamiento', 'preacondicionamiento'] and
             estado_update.sub_estado and 
-            estado_update.sub_estado.lower() in ['congelación', 'congelacion', 'atemperamiento']):
+            estado_update.sub_estado.lower() in ['Congelamiento', 'congelacion', 'atemperamiento']):
             
             # Verificar si el item ya tiene lote
             check_lote_query = text(f"SELECT lote FROM {tenant_schema}.inventario_credocubes WHERE id = :id")

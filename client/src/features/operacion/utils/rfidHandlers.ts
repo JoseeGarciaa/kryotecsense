@@ -92,7 +92,7 @@ export const createRfidHandlers = (
             usuario_id: 1, // Usuario actual
             descripcion: `TIC movido a Pre acondicionamiento - ${item.nombre_unidad}`,
             estado_nuevo: 'Pre acondicionamiento',
-            sub_estado_nuevo: 'Congelación'
+            sub_estado_nuevo: 'Congelamiento'
           };
           
           await apiServiceClient.post('/activities/actividades/', nuevaActividad);

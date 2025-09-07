@@ -755,7 +755,7 @@ export const useOperaciones = () => {
   };
 
   // Función para confirmar Pre acondicionamiento
-  const confirmarPreAcondicionamiento = async (rfids: string[], subEstado: string = 'Congelación') => {
+  const confirmarPreAcondicionamiento = async (rfids: string[], subEstado: string = 'Congelamiento') => {
     try {
       console.log(`🔄 [DEBUG-HOOK] Confirmando Pre acondicionamiento para ${rfids.length} TICs con sub-estado: ${subEstado}`);
       console.log(`📋 [DEBUG-HOOK] RFIDs recibidos:`, rfids);
@@ -946,10 +946,10 @@ export const useOperaciones = () => {
     }
   };
 
-  // Función para mover TIC de congelación a atemperamiento
+  // Función para mover TIC de Congelamiento a atemperamiento
   const moverTicAAtempermiento = async (itemId: string) => {
     try {
-      console.log(`🔄 Moviendo TIC ${itemId} de congelación a atemperamiento (OPTIMIZADO)`);
+      console.log(`🔄 Moviendo TIC ${itemId} de Congelamiento a atemperamiento (OPTIMIZADO)`);
       
       // Buscar el item en el inventario
       const item = inventarioCompleto.find(i => i.rfid === itemId || i.nombre_unidad === itemId);
@@ -959,10 +959,10 @@ export const useOperaciones = () => {
         return;
       }
 
-      // Regla de negocio: Solo permitir mover a Atemperamiento si el sub_estado anterior es Congelación
+      // Regla de negocio: Solo permitir mover a Atemperamiento si el sub_estado anterior es Congelamiento
       const subAnterior = (item.sub_estado || '').toString().toLowerCase();
-      if (!(subAnterior.includes('congelacion') || subAnterior.includes('congelación'))) {
-        alert('⚠️ Solo se pueden mover a Atemperamiento las TICs que vienen de Congelación.');
+      if (!(subAnterior.includes('congelacion') || subAnterior.includes('Congelamiento'))) {
+        alert('⚠️ Solo se pueden mover a Atemperamiento las TICs que vienen de Congelamiento.');
         return;
       }
       
@@ -993,7 +993,7 @@ export const useOperaciones = () => {
           return newTiempos;
         });
 
-        // Eliminar cualquier timer global (congelación) asociado a este RFID para que no aparezca en Atemperamiento
+        // Eliminar cualquier timer global (Congelamiento) asociado a este RFID para que no aparezca en Atemperamiento
         try {
           const timersDeEsteItem = timersGlobales.filter(t => t.nombre === itemId);
           if (timersDeEsteItem.length > 0) {
@@ -1085,11 +1085,11 @@ export const useOperaciones = () => {
     // Crear timer para notificación
       const timerId = window.setTimeout(() => {
       const confirmar = window.confirm(
-        `⏰ ¡TIC ${itemId} ha completado la congelación!\n\n¿Desea mover este TIC a ATEMPERAMIENTO ahora?`
+        `⏰ ¡TIC ${itemId} ha completado la Congelamiento!\n\n¿Desea mover este TIC a ATEMPERAMIENTO ahora?`
       );
       
       if (confirmar) {
-        // Mover TIC de congelación a atemperamiento
+        // Mover TIC de Congelamiento a atemperamiento
         moverTicAAtempermiento(itemId);
 
           // Intentar eliminar cualquier timer global existente para evitar que aparezca "Completo" en Atemperamiento
@@ -1225,7 +1225,7 @@ export const useOperaciones = () => {
         
         if (timerLocalActivo || timerGlobalActivo) {
           const tipoTimer = timerGlobalActivo ? 
-            (timerGlobalActivo.tipoOperacion === 'congelamiento' ? 'congelación' : 'atemperamiento') : 
+            (timerGlobalActivo.tipoOperacion === 'congelamiento' ? 'Congelamiento' : 'atemperamiento') : 
             'proceso';
             
           itemsConTimers.push({
@@ -1449,7 +1449,7 @@ export const useOperaciones = () => {
       if (timerLocalActivo || timerGlobalActivo) {
         const nombreItem = item.nombre_unidad || item.title;
         const tipoTimer = timerGlobalActivo ? 
-          (timerGlobalActivo.tipoOperacion === 'congelamiento' ? 'congelación' : 'atemperamiento') : 
+          (timerGlobalActivo.tipoOperacion === 'congelamiento' ? 'Congelamiento' : 'atemperamiento') : 
           'proceso';
           
         const tiempoRestante = timerGlobalActivo ? 

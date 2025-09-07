@@ -26,7 +26,7 @@ const RfidScanModal: React.FC<RfidScanModalProps> = ({
   titulo = 'Escanear TICs para Congelamiento',
   descripcion = '⚠️ IMPORTANTE: Solo se permiten TICs en Pre acondicionamiento. Los VIPs y CUBEs serán rechazados automáticamente.',
   onEliminarRfid,
-  subEstado = 'Congelación',
+  subEstado = 'Congelamiento',
   onProcesarRfidIndividual
 }) => {
   // Early return después de las props

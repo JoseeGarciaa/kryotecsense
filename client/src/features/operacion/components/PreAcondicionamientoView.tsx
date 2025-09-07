@@ -131,10 +131,10 @@ const PreAcondicionamientoView: React.FC = () => {
   // Ref para evitar loops de asignación de lote
   const lotesAutoSolicitadosRef = useRef<Set<string>>(new Set());
 
-  // Asignar automáticamente lotes faltantes (cuando backend aún no los asignó) para Congelación / Atemperamiento
+  // Asignar automáticamente lotes faltantes (cuando backend aún no los asignó) para Congelamiento / Atemperamiento
   useEffect(() => {
     if (!operaciones.inventarioCompleto?.length) return;
-    // Buscar TICs en pre acondicionamiento (congelación o atemperamiento) sin lote
+    // Buscar TICs en pre acondicionamiento (Congelamiento o atemperamiento) sin lote
     const candidatos = operaciones.inventarioCompleto.filter((i: any) => {
       if (i.categoria !== 'TIC') return false;
       const est = norm(i.estado).replace(/[-_\s]/g,'');
@@ -153,7 +153,7 @@ const PreAcondicionamientoView: React.FC = () => {
     candidatos.forEach((c:any) => {
       const sub = norm(c.sub_estado);
       let clave: string;
-      if (['congelacion','congelamiento'].some(v => sub.includes(v))) clave = 'Congelación'; else clave = 'Atemperamiento';
+      if (['congelacion','congelamiento'].some(v => sub.includes(v))) clave = 'Congelamiento'; else clave = 'Atemperamiento';
       if (!grupos[clave]) grupos[clave] = [];
       grupos[clave].push(c.rfid);
       lotesAutoSolicitadosRef.current.add(c.rfid);
@@ -188,7 +188,7 @@ const PreAcondicionamientoView: React.FC = () => {
       const estadoLower = norm(item.estado);
       const subLower = norm(item.sub_estado);
       const esPre = estadoLower.replace(/[-_\s]/g,'').includes('preacondicionamiento');
-      if (!(esPre && subLower.includes('congel'))) { alert('Debe provenir de Congelación en Pre acondicionamiento.'); return; }
+      if (!(esPre && subLower.includes('congel'))) { alert('Debe provenir de Congelamiento en Pre acondicionamiento.'); return; }
     }
     if (!rfidsEscaneados.includes(limpio)) setRfidsEscaneados(p => [...p, limpio]);
   };
@@ -234,7 +234,7 @@ const PreAcondicionamientoView: React.FC = () => {
     setCargandoTemporizador(true);
     const rfids = [...rfidsPendientesTimer];
     const tipoSel = tipoOperacionTimer;
-    const subEstadoFinal = tipoSel === 'congelamiento' ? 'Congelación' : 'Atemperamiento';
+    const subEstadoFinal = tipoSel === 'congelamiento' ? 'Congelamiento' : 'Atemperamiento';
     setMostrarModalTimer(false);
     setRfidsPendientesTimer([]);
     try {
@@ -272,7 +272,7 @@ const PreAcondicionamientoView: React.FC = () => {
     const n = norm(rfid); return timers.find(t => norm(t.nombre) === n && t.completado && t.tipoOperacion === tipo);
   };
   const tieneTimerActivo = (rfid: string) => { const t = obtenerTemporizadorTIC(rfid); return t ? t.activo && !t.completado : false; };
-  // Estado visual: si el cronómetro de congelación terminó o se limpió recientemente, mostrar "Congelado" sin cambiar todavía el sub_estado real (hasta confirmación).
+  // Estado visual: si el cronómetro de Congelamiento terminó o se limpió recientemente, mostrar "Congelado" sin cambiar todavía el sub_estado real (hasta confirmación).
   const esTicCongeladoVisual = (rfid: string) => {
     const timerActivo = obtenerTimerActivoPorTipo(rfid, 'congelamiento');
     const timerCompletado = obtenerTimerCompletadoPorTipo(rfid, 'congelamiento');
@@ -563,7 +563,7 @@ const PreAcondicionamientoView: React.FC = () => {
               <div className="text-[10px] text-gray-600 truncate" title={item.rfid}>{item.rfid}</div>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-medium ${esAtemperamiento?'bg-orange-100 text-orange-700':'bg-blue-100 text-blue-700'}`}>{esAtemperamiento? (esTicAtemperadoVisual(item.rfid) ? 'Atemperado' : 'Atemperamiento') : (esTicCongeladoVisual(item.rfid) ? 'Congelado' : 'Congelación')}</span>
+              <span className={`hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-medium ${esAtemperamiento?'bg-orange-100 text-orange-700':'bg-blue-100 text-blue-700'}`}>{esAtemperamiento? (esTicAtemperadoVisual(item.rfid) ? 'Atemperado' : 'Atemperamiento') : (esTicCongeladoVisual(item.rfid) ? 'Congelado' : 'Congelamiento')}</span>
               {renderizarTemporizador(item.rfid, esAtemperamiento)}
             </div>
           </div>
@@ -629,13 +629,13 @@ const PreAcondicionamientoView: React.FC = () => {
                     onClick={() => limpiarTimersCompletadosPorTipo('congelamiento', timersCongelamientoCompletadosEnSeccion.map(t => t.id))}
                     className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm"
                   >
-                    <X size={16} /> Limpiar (Congelación)
+                    <X size={16} /> Limpiar (Congelamiento)
                   </button>
                   <button
                     onClick={completarTodasCongelamiento}
                     className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm"
                   >
-                    <CheckCircle size={16} /> Completar todas (Congelación)
+                    <CheckCircle size={16} /> Completar todas (Congelamiento)
                   </button>
                 </>
               )}
@@ -899,9 +899,9 @@ const PreAcondicionamientoView: React.FC = () => {
         onConfirmar={confirmarAdicion}
         onCancelar={() => { setMostrarModalEscaneo(false); setRfidsEscaneados([]); setUltimosRfidsEscaneados({}); setRfidInput(''); }}
         titulo={`Escanear TICs para ${tipoEscaneoActual === 'congelamiento' ? 'Congelamiento' : 'Atemperamiento'}`}
-        descripcion={tipoEscaneoActual === 'atemperamiento' ? 'Solo TICs provenientes de Congelación.' : 'Solo TICs en Pre acondicionamiento.'}
+        descripcion={tipoEscaneoActual === 'atemperamiento' ? 'Solo TICs provenientes de Congelamiento.' : 'Solo TICs en Pre acondicionamiento.'}
         onEliminarRfid={rfid => setRfidsEscaneados(prev => prev.filter(r => r !== rfid))}
-        subEstado={tipoEscaneoActual === 'congelamiento' ? 'Congelación' : 'Atemperamiento'}
+        subEstado={tipoEscaneoActual === 'congelamiento' ? 'Congelamiento' : 'Atemperamiento'}
         onProcesarRfidIndividual={procesarRfid}
       />
 
@@ -910,7 +910,7 @@ const PreAcondicionamientoView: React.FC = () => {
         mostrarModal={mostrarModalLotes}
         onCancelar={() => setMostrarModalLotes(false)}
         onSeleccionarLote={manejarSeleccionLote}
-        subEstado={tipoEscaneoActual === 'congelamiento' ? 'Congelación' : 'Atemperamiento'}
+        subEstado={tipoEscaneoActual === 'congelamiento' ? 'Congelamiento' : 'Atemperamiento'}
       />
 
       {/* Modal cronómetro */}
@@ -918,8 +918,8 @@ const PreAcondicionamientoView: React.FC = () => {
         mostrarModal={mostrarModalTimer}
         onCancelar={() => { if (!cargandoTemporizador) { setMostrarModalTimer(false); setRfidsPendientesTimer([]); } }}
         onConfirmar={confirmarConTemporizador}
-        titulo={`Configurar Cronómetro - ${tipoOperacionTimer === 'congelamiento' ? 'Congelación' : tipoOperacionTimer === 'atemperamiento' ? 'Atemperamiento' : tipoOperacionTimer === 'envio' ? 'Envío' : 'Inspección'}`}
-        descripcion={`Configure el tiempo de ${tipoOperacionTimer === 'congelamiento' ? 'congelación' : tipoOperacionTimer === 'atemperamiento' ? 'atemperamiento' : tipoOperacionTimer === 'envio' ? 'envío' : 'inspección'} para ${rfidsPendientesTimer.length} TIC(s).`}
+        titulo={`Configurar Cronómetro - ${tipoOperacionTimer === 'congelamiento' ? 'Congelamiento' : tipoOperacionTimer === 'atemperamiento' ? 'Atemperamiento' : tipoOperacionTimer === 'envio' ? 'Envío' : 'Inspección'}`}
+        descripcion={`Configure el tiempo de ${tipoOperacionTimer === 'congelamiento' ? 'Congelamiento' : tipoOperacionTimer === 'atemperamiento' ? 'atemperamiento' : tipoOperacionTimer === 'envio' ? 'envío' : 'inspección'} para ${rfidsPendientesTimer.length} TIC(s).`}
         tipoOperacion={tipoOperacionTimer}
         cargando={cargandoTemporizador}
       />

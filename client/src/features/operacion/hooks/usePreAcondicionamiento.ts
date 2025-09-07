@@ -32,7 +32,7 @@ export const usePreAcondicionamiento = () => {
       } else if (subEstadoNorm.includes('atemper')) {
         grupos.atemperamiento.push(item);
       } else {
-        // Default: cae en congelación hasta que reciba sub_estado válido
+        // Default: cae en Congelamiento hasta que reciba sub_estado válido
         grupos.congelacion.push(item);
       }
     });
@@ -71,23 +71,23 @@ export const usePreAcondicionamiento = () => {
       itemsDetalle: items.map(i => ({ rfid: i.rfid, nombre: i.nombre_unidad, estado: i.estado, sub_estado: i.sub_estado }))
     });
     
-    // NIVEL 1: Vista principal - mostrar CONGELACIÓN y ATEMPERAMIENTO
+    // NIVEL 1: Vista principal - mostrar Congelamiento y ATEMPERAMIENTO
     if (!navegacionPreAcondicionamiento) {
       const grupos = crearGruposPreAcondicionamiento(items);
       const cards: any[] = [];
       
-      // Card para Congelación (siempre visible)
+      // Card para Congelamiento (siempre visible)
       cards.push({
         id: 'congelacion-grupo-principal',
         category: 'TIC',
-        title: 'CONGELACIÓN',
-        description: `${grupos.congelacion.length} items en congelación`,
+        title: 'Congelamiento',
+        description: `${grupos.congelacion.length} items en Congelamiento`,
         assignee: [{name: 'Sistema', avatar: 'sistema'}],
         date: formatDateForDisplay(new Date().toISOString()),
-        nombre_unidad: 'Congelación',
+        nombre_unidad: 'Congelamiento',
         rfid: 'CONGELACION-PRINCIPAL',
         estado: 'Pre acondicionamiento',
-        sub_estado: 'Congelación',
+        sub_estado: 'Congelamiento',
         tipo: 'CONGELACION',
         tipo_base: 'CONGELACION',
         items_grupo: grupos.congelacion,
@@ -135,13 +135,13 @@ export const usePreAcondicionamiento = () => {
             id: `congelacion-lote-${lote.replace(/\s+/g, '-').toLowerCase()}`,
             category: 'TIC',
             title: lote,
-            description: `${(itemsLote as any[]).length} TICs en congelación`,
+            description: `${(itemsLote as any[]).length} TICs en Congelamiento`,
             assignee: [{name: 'Sistema', avatar: 'sistema'}],
             date: formatDateForDisplay(new Date().toISOString()),
-            nombre_unidad: `Congelación ${lote}`,
+            nombre_unidad: `Congelamiento ${lote}`,
             rfid: `CONGELACION-${lote}`,
             estado: 'Pre acondicionamiento',
-            sub_estado: 'Congelación',
+            sub_estado: 'Congelamiento',
             tipo: 'CONGELACION_LOTE',
             tipo_base: 'CONGELACION',
             items_grupo: itemsLote,
@@ -226,10 +226,10 @@ export const usePreAcondicionamiento = () => {
     return [];
   };
 
-  // Función para mover TIC de congelación a atemperamiento
+  // Función para mover TIC de Congelamiento a atemperamiento
   const moverTicAAtempermiento = async (itemId: string, inventarioCompleto: any[], actualizarColumnas: () => Promise<void>) => {
     try {
-      console.log(`🔄 Moviendo TIC ${itemId} de congelación a atemperamiento`);
+      console.log(`🔄 Moviendo TIC ${itemId} de Congelamiento a atemperamiento`);
       
       // Buscar el item en el inventario
       const item = inventarioCompleto.find(i => i.rfid === itemId || i.nombre_unidad === itemId);
@@ -239,10 +239,10 @@ export const usePreAcondicionamiento = () => {
         return;
       }
 
-      // Regla: Solo mover a ATEMPERAMIENTO si viene de CONGELACIÓN
+      // Regla: Solo mover a ATEMPERAMIENTO si viene de Congelamiento
       const subAnterior = (item.sub_estado || '').toString().toUpperCase();
-      if (!(subAnterior.includes('CONGELACION') || subAnterior.includes('CONGELACIÓN'))) {
-        alert('⚠️ Solo pueden llegar a ATEMPERAMIENTO las TICs cuyo estado anterior fue CONGELACIÓN.');
+      if (!(subAnterior.includes('CONGELACION') || subAnterior.includes('Congelamiento'))) {
+        alert('⚠️ Solo pueden llegar a ATEMPERAMIENTO las TICs cuyo estado anterior fue Congelamiento.');
         return;
       }
       
@@ -250,9 +250,9 @@ export const usePreAcondicionamiento = () => {
       const nuevaActividad = {
         rfid: item.rfid,
         actividad: 'Cambio de sub-estado',
-        descripcion: `Movido de congelación a atemperamiento - cronómetro completado`,
+        descripcion: `Movido de Congelamiento a atemperamiento - cronómetro completado`,
         estado_anterior: item.estado || 'Pre acondicionamiento',
-        sub_estado_anterior: 'Congelación',
+        sub_estado_anterior: 'Congelamiento',
         estado_nuevo: 'Pre acondicionamiento',
         sub_estado_nuevo: 'Atemperamiento'
       };
@@ -291,11 +291,11 @@ export const usePreAcondicionamiento = () => {
     // Crear timer para notificación
     const timerId = window.setTimeout(() => {
       const confirmar = window.confirm(
-        `⏰ ¡TIC ${itemId} ha completado la congelación!\n\n¿Desea mover este TIC a ATEMPERAMIENTO ahora?`
+        `⏰ ¡TIC ${itemId} ha completado la Congelamiento!\n\n¿Desea mover este TIC a ATEMPERAMIENTO ahora?`
       );
       
       if (confirmar) {
-        // Mover TIC de congelación a atemperamiento
+        // Mover TIC de Congelamiento a atemperamiento
         moverTicAAtempermiento(itemId, inventarioCompleto, actualizarColumnas);
       }
       
@@ -371,7 +371,7 @@ export const usePreAcondicionamiento = () => {
       return;
     }
 
-    // NIVEL 1 → NIVEL 2: Click en proceso principal (CONGELACIÓN/ATEMPERAMIENTO)
+    // NIVEL 1 → NIVEL 2: Click en proceso principal (Congelamiento/ATEMPERAMIENTO)
     if (item.es_proceso_principal) {
       console.log('🔄 Expandiendo proceso principal:', item.tipo);
       setNavegacionPreAcondicionamiento(item.tipo);
