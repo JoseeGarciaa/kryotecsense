@@ -71,6 +71,7 @@ const PreAcondicionamientoView: React.FC = () => {
     getRecentCompletion,
   clearRecentCompletion,
   forceClearTimer
+  , forceClearTimers
   } = useTimerContext();
 
   // Carga inicial
@@ -650,9 +651,14 @@ const PreAcondicionamientoView: React.FC = () => {
                 );
               })()}
               <button
-                disabled={!timersCongelamientoCompletadosEnSeccion.length}
-                onClick={() => timersCongelamientoCompletadosEnSeccion.length && limpiarTimersCompletadosPorTipo('congelamiento', timersCongelamientoCompletadosEnSeccion.map(t => t.id))}
-                className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm ${timersCongelamientoCompletadosEnSeccion.length? 'bg-yellow-600 hover:bg-yellow-700 text-white':'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                disabled={!timersCongelamientoCompletadosEnSeccion.length && !ticsCongelamiento.some(t => obtenerTimerActivoPorTipo(t.rfid,'congelamiento'))}
+                onClick={() => {
+                  const nombres = ticsCongelamiento.map(t => t.rfid);
+                  if (!nombres.length) return;
+                  if (!window.confirm(`¿Limpiar TODOS los cronómetros (activos/completados) de Congelamiento (${nombres.length})?`)) return;
+                  forceClearTimers(nombres, 'congelamiento');
+                }}
+                className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm ${(timersCongelamientoCompletadosEnSeccion.length || ticsCongelamiento.some(t => obtenerTimerActivoPorTipo(t.rfid,'congelamiento')))? 'bg-yellow-600 hover:bg-yellow-700 text-white':'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
               >
                 <X size={16} /> Limpiar (Congelamiento)
               </button>
@@ -822,9 +828,14 @@ const PreAcondicionamientoView: React.FC = () => {
                 );
               })()}
               <button
-                disabled={!timersAtemperamientoCompletadosEnSeccion.length}
-                onClick={() => timersAtemperamientoCompletadosEnSeccion.length && limpiarTimersCompletadosPorTipo('atemperamiento', timersAtemperamientoCompletadosEnSeccion.map(t => t.id))}
-                className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm ${timersAtemperamientoCompletadosEnSeccion.length? 'bg-yellow-600 hover:bg-yellow-700 text-white':'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                disabled={!timersAtemperamientoCompletadosEnSeccion.length && !ticsAtemperamiento.some(t => obtenerTimerActivoPorTipo(t.rfid,'atemperamiento'))}
+                onClick={() => {
+                  const nombres = ticsAtemperamiento.map(t => t.rfid);
+                  if (!nombres.length) return;
+                  if (!window.confirm(`¿Limpiar TODOS los cronómetros (activos/completados) de Atemperamiento (${nombres.length})?`)) return;
+                  forceClearTimers(nombres, 'atemperamiento');
+                }}
+                className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm ${(timersAtemperamientoCompletadosEnSeccion.length || ticsAtemperamiento.some(t => obtenerTimerActivoPorTipo(t.rfid,'atemperamiento')))? 'bg-yellow-600 hover:bg-yellow-700 text-white':'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
               >
                 <X size={16} /> Limpiar (Atemperamiento)
               </button>

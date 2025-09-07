@@ -41,6 +41,8 @@ interface TimerContextType {
   clearRecentCompletion: (nombre: string) => void;
   // Limpieza robusta: elimina todos los timers (activos o completados) asociados a un nombre y borra registros recientes.
   forceClearTimer: (nombre: string, tipoOperacion?: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion') => void;
+  // Limpieza masiva (una sola pasada) por lista de nombres
+  forceClearTimers: (nombres: string[], tipoOperacion?: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion') => void;
 }
 
 const TimerContext = createContext<TimerContextType | undefined>(undefined);
@@ -400,6 +402,8 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
 
   // Elimina cualquier timer (activo, completado o pendiente) que coincida con el nombre (y opcionalmente tipoOperacion)
   // y limpia registros de completado recientes para evitar que reaparezca el estado "Completo" visual.
+  const SUPPRESS_MS = 12000; // ventana para evitar reaparición desde SYNC
+
   const forceClearTimer = (nombre: string, tipoOperacion?: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion') => {
     if (!nombre) return;
     const claveNorm = nombre.toLowerCase();
@@ -424,7 +428,32 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
       recentCompletionsRef.current.delete(claveNorm);
       aEliminar.forEach(id => recentCompletionsRef.current.delete(id));
   // Bloquear recreación durante unos segundos
-  clearedNamesRef.current.set(claveNorm, Date.now() + 5000);
+      clearedNamesRef.current.set(claveNorm, Date.now() + SUPPRESS_MS);
+      return restantes;
+    });
+  };
+
+  const forceClearTimers = (nombres: string[], tipoOperacion?: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion') => {
+    if (!nombres?.length) return;
+    const claves = new Set(nombres.map(n => n.toLowerCase()));
+    setTimers(prev => {
+      const aEliminarIds: string[] = [];
+      const restantes = prev.filter(t => {
+        const cn = t.nombre.toLowerCase();
+        if (!claves.has(cn)) return true;
+        if (tipoOperacion && t.tipoOperacion !== tipoOperacion) return true;
+        aEliminarIds.push(t.id);
+        return false;
+      });
+      if (isConnected && aEliminarIds.length) {
+        aEliminarIds.forEach(id => { try { sendMessage({ type: 'DELETE_TIMER', data: { timerId: id } }); } catch {} });
+      }
+      // limpiar registros recientes y marcar supresión
+      claves.forEach(c => {
+        recentCompletionsRef.current.delete(c);
+        clearedNamesRef.current.set(c, Date.now() + SUPPRESS_MS);
+      });
+      aEliminarIds.forEach(id => recentCompletionsRef.current.delete(id));
       return restantes;
     });
   };
@@ -521,6 +550,7 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
   marcarTimersCompletados,
   clearRecentCompletion,
   forceClearTimer,
+  forceClearTimers,
   };
 
   return (
