@@ -184,26 +184,30 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     const s = norm((item as any).sub_estado);
     const categoria = norm((item as any).categoria);
     const esPreAcond = e.includes('pre') && e.includes('acond');
-    const esAtemperamiento = s.includes('atemper'); // 'atemperamiento' o 'atemperado'
+    const esAtemperadoFinal = s.includes('atemperado'); // SOLO cuando ya está atemperado (no 'atemperamiento')
+    const esEnAtemperamiento = s.includes('atemperamiento');
     const esCongelacion = e.includes('congel') || s.includes('congel');
     const enBodega = e.includes('bodega');
     if (esCongelacion) return false;
 
     if (categoria === 'tic') {
-      // Solo TICs requieren que el tiempo de atemperamiento haya sido completado
+      // Requisito solicitado: mostrar únicamente TICs cuyo sub_estado ya sea Atemperado.
+      // No deben listarse TICs todavía en atemperamiento (proceso en curso).
+      if (!esAtemperadoFinal) return false;
+      // Además reforzamos que tengan un timer de atemperamiento completado (defensa extra, por si sub_estado ya cambió).
       const tieneAtempCompletado = timers.some(
         t => norm(t.nombre) === norm(item.rfid) && t.tipoOperacion === 'atemperamiento' && t.completado
       );
-      const vieneDeFaseAnterior = (esPreAcond && esAtemperamiento) || enBodega;
-      return vieneDeFaseAnterior && tieneAtempCompletado;
+      if (!tieneAtempCompletado) return false;
+      // Aceptar si viene de Pre Acondicionamiento (fase correcta) o estuvo en bodega (fallback permitido antes).
+      const origenValido = esPreAcond || enBodega || esEnAtemperamiento; // mantener pequeñas tolerancias si se marcó timer justo antes del switch de sub_estado
+      return origenValido;
     }
 
-    // VIP y Cube NO requieren tiempo; permitir llevar a Ensamblaje siempre que no estén en Congelamiento
+    // VIP y Cube se mantienen igual: pueden venir de bodega o pre acondicionamiento.
     if (categoria === 'vip' || categoria === 'cube') {
-      return enBodega || esPreAcond; // permitir desde bodega o pre-acondición
+      return enBodega || esPreAcond;
     }
-
-    // Otras categorías no se listan por ahora
     return false;
   });
 
