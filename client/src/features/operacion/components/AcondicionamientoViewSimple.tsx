@@ -1360,16 +1360,6 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                     className="w-full px-3 py-2 border rounded-md text-sm font-mono tracking-wide"
                   />
                 </div>
-                <div className="flex items-center">
-                  <button
-                    onClick={() => manejarEscanearRfid()}
-                    disabled={!rfidInput}
-                    className="px-3 py-2 text-sm bg-blue-600 disabled:opacity-50 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors"
-                  >
-                    <Scan className="w-4 h-4" />
-                    Agregar
-                  </button>
-                </div>
               </div>
               {rfidsEscaneados.length > 0 && (
                 <div className="flex flex-wrap gap-1">
@@ -1430,20 +1420,10 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
             </div>
           )}
           
-          <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-            <button
-              onClick={() => setItemsSeleccionados(itemsFiltrados)}
-              className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded"
-            >
-              Seleccionar todos ({itemsFiltrados.length})
-            </button>
-            <button
-              onClick={() => setItemsSeleccionados([])}
-              className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded"
-            >
-              Limpiar selección
-            </button>
-            <span className="text-gray-600">{itemsSeleccionados.length} seleccionado(s)</span>
+          <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm min-h-[22px]">
+            {itemsSeleccionados.length > 0 && (
+              <span className="text-gray-600">{itemsSeleccionados.length} seleccionado(s)</span>
+            )}
           </div>
         </div>
 
@@ -1481,13 +1461,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                 )}
               </div>
             )}
-            {itemsFiltrados.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 text-sm">
-                No hay items disponibles para mover a acondicionamiento
-              </div>
-            ) : (
-              <>
-              {itemsFiltrados.map((item) => {
+            {itemsFiltrados.map((item) => {
                 const isSelected = itemsSeleccionados.find(s => s.id === item.id);
                 const cat = (item.categoria||'').toUpperCase();
                 let bloqueado = false;
@@ -1541,8 +1515,6 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                   </div>
                 );
               })}
-              </>
-            )}
           </div>
         </div>
 
