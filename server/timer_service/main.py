@@ -229,6 +229,8 @@ class TimerManager:
         logger.info(f"Timer creado: {timer.nombre} ({timer.id}) - {duracion_minutos} minutos - Inicio: {server_now.isoformat()}")
         
         server_timestamp = self.get_server_timestamp()
+        # Importante: NO excluir al websocket origen para que el cliente que crea el timer
+        # reciba inmediatamente el evento y lo refleje en su UI (evita esperas y desfaces).
         await self.broadcast({
             "type": "TIMER_CREATED",
             "data": {
@@ -237,7 +239,7 @@ class TimerManager:
                     "server_timestamp": server_timestamp
                 }
             }
-        }, exclude=websocket)
+        })
 
         try:
             await message_queue.publish_fanout("timers.events", {
@@ -281,10 +283,11 @@ class TimerManager:
                 
         logger.info(f"Timer actualizado: {timer.nombre} ({timer_id})")
         
+        # Incluir siempre al origen para que vea inmediatamente la pausa / reanudación / cambios.
         await self.broadcast({
             "type": "TIMER_UPDATED",
             "data": {"timer": timer.to_dict()}
-        }, exclude=websocket)
+        })
 
         try:
             await message_queue.publish_fanout("timers.events", {
@@ -304,10 +307,11 @@ class TimerManager:
             
             logger.info(f"Timer eliminado: {timer.nombre} ({timer_id})")
             
+            # Incluir origen para que el cliente que borra elimine su copia local sin esperar sync.
             await self.broadcast({
                 "type": "TIMER_DELETED",
                 "data": {"timerId": timer_id}
-            }, exclude=websocket)
+            })
 
             try:
                 await message_queue.publish_fanout("timers.events", {

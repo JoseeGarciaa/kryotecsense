@@ -75,54 +75,57 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     switch (lastMessage.type) {
       case 'TIMER_SYNC':
         if (typeof lastMessage.data?.server_timestamp === 'number') {
-          setServerOffsetMs(lastMessage.data.server_timestamp - Date.now());
-        }
-        if (Array.isArray(lastMessage.data.timers)) {
-          const timersActualizados = lastMessage.data.timers.map((t: any) => {
-            const fechaInicioSrv = new Date(t.fechaInicio);
-            const fechaFinSrv = new Date(t.fechaFin);
-            // Ajustar fechaFin para compensar diferencia de reloj (mostrar consistente entre dispositivos)
-            const adjustedFin = new Date(fechaFinSrv.getTime() - serverOffsetMs);
-            const adjustedInicio = new Date(fechaInicioSrv.getTime() - serverOffsetMs);
-            return {
-              ...t,
-              fechaInicio: adjustedInicio,
-              fechaFin: adjustedFin,
-              tiempoRestanteSegundos: t.server_remaining_time ?? t.tiempoRestanteSegundos
-            } as Timer;
-          });
-          setTimers(timersActualizados);
+          const newOffset = lastMessage.data.server_timestamp - Date.now();
+          setServerOffsetMs(newOffset);
+          if (Array.isArray(lastMessage.data.timers)) {
+            setTimers(lastMessage.data.timers.map((t: any) => {
+              const fechaInicioSrv = new Date(t.fechaInicio);
+              const fechaFinSrv = new Date(t.fechaFin);
+              return {
+                ...t,
+                fechaInicio: new Date(fechaInicioSrv.getTime() - newOffset),
+                fechaFin: new Date(fechaFinSrv.getTime() - newOffset),
+                tiempoRestanteSegundos: t.server_remaining_time ?? t.tiempoRestanteSegundos
+              } as Timer;
+            }));
+          }
         }
         break;
 
       case 'TIMER_BATCH_UPDATE':
         if (typeof lastMessage.data?.server_timestamp === 'number') {
-          setServerOffsetMs(lastMessage.data.server_timestamp - Date.now());
+          const newOffset = lastMessage.data.server_timestamp - Date.now();
+          setServerOffsetMs(newOffset);
         }
         if (Array.isArray(lastMessage.data.updates)) {
           setTimers(prev => prev.map(timer => {
             const update = lastMessage.data.updates.find((u: any) => u.timerId === timer.id);
             if (!update) return timer;
-            return { ...timer, tiempoRestanteSegundos: update.tiempoRestanteSegundos, completado: update.completado, activo: update.activo };
+            return {
+              ...timer,
+              tiempoRestanteSegundos: update.tiempoRestanteSegundos,
+              completado: update.completado,
+              activo: update.activo
+            };
           }));
         }
         break;
 
       case 'TIMER_CREATED':
-        if (typeof lastMessage.data?.timer?.server_timestamp === 'number') {
-          setServerOffsetMs(lastMessage.data.timer.server_timestamp - Date.now());
-        }
         if (lastMessage.data.timer) {
           const t = lastMessage.data.timer;
-            const fechaInicioSrv = new Date(t.fechaInicio);
-            const fechaFinSrv = new Date(t.fechaFin);
-            const adjustedFin = new Date(fechaFinSrv.getTime() - serverOffsetMs);
-            const adjustedInicio = new Date(fechaInicioSrv.getTime() - serverOffsetMs);
-          const nuevo: Timer = { ...t, fechaInicio: adjustedInicio, fechaFin: adjustedFin };
-          setTimers(prev => {
-            if (prev.find(x => x.id === nuevo.id)) return prev.map(x => x.id === nuevo.id ? nuevo : x);
-            return [...prev, nuevo];
-          });
+          const newOffset = typeof t.server_timestamp === 'number' ? (t.server_timestamp - Date.now()) : serverOffsetMs;
+          if (typeof t.server_timestamp === 'number') setServerOffsetMs(newOffset);
+          const fechaInicioSrv = new Date(t.fechaInicio);
+          const fechaFinSrv = new Date(t.fechaFin);
+          const nuevo: Timer = {
+            ...t,
+            fechaInicio: new Date(fechaInicioSrv.getTime() - newOffset),
+            fechaFin: new Date(fechaFinSrv.getTime() - newOffset)
+          };
+          setTimers(prev => prev.find(x => x.id === nuevo.id)
+            ? prev.map(x => x.id === nuevo.id ? nuevo : x)
+            : [...prev, nuevo]);
         }
         break;
 

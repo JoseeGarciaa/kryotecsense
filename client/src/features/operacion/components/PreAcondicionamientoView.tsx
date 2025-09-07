@@ -712,11 +712,12 @@ const PreAcondicionamientoView: React.FC = () => {
                 <button
                   disabled={!timersCongelamientoCompletadosEnSeccion.length && !ticsCongelamiento.some(t => obtenerTimerActivoPorTipo(t.rfid,'congelamiento'))}
                   onClick={() => {
-                    const nombres = ticsCongelamiento.map(t => t.rfid);
+                    const nombres = ticsCongelamiento.map(t => norm(t.rfid));
                     if (!nombres.length) return;
-                    if (!window.confirm(`¿Eliminar TODOS los cronómetros (activos/completados) de Congelamiento (${nombres.length})?`)) return;
-                    // eliminar activos y completados por nombre
-                    timers.filter(t => t.tipoOperacion==='congelamiento' && nombres.includes(t.nombre)).forEach(t=>eliminarTimer(t.id));
+                    const totalTimers = timers.filter(t => t.tipoOperacion==='congelamiento' && nombres.includes(norm(t.nombre))).length;
+                    if (!totalTimers) { alert('No hay cronómetros para eliminar.'); return; }
+                    if (!window.confirm(`¿Eliminar ${totalTimers} cronómetro(s) de Congelamiento?`)) return;
+                    timers.filter(t => t.tipoOperacion==='congelamiento' && nombres.includes(norm(t.nombre))).forEach(t=>eliminarTimer(t.id));
                   }}
                   className={`flex items-center justify-center gap-2 px-3 py-2 rounded-l-md text-sm ${(timersCongelamientoCompletadosEnSeccion.length || ticsCongelamiento.some(t => obtenerTimerActivoPorTipo(t.rfid,'congelamiento')))? 'bg-yellow-600 hover:bg-yellow-700 text-white':'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
                 >
@@ -741,7 +742,7 @@ const PreAcondicionamientoView: React.FC = () => {
                           key={l.lote}
                           onClick={() => {
             if (!window.confirm(`¿Eliminar cronómetros del lote ${l.lote}?`)) return;
-            timers.filter(t => t.tipoOperacion==='congelamiento' && l.rfids.includes(t.nombre)).forEach(t=>eliminarTimer(t.id));
+                    timers.filter(t => t.tipoOperacion==='congelamiento' && l.rfids.map(r=>norm(r)).includes(norm(t.nombre))).forEach(t=>eliminarTimer(t.id));
                             setShowDropdownLimpiarCongelacion(false);
                           }}
                           className="w-full text-left px-3 py-2 hover:bg-gray-100 text-xs flex items-center justify-between"
@@ -919,10 +920,12 @@ const PreAcondicionamientoView: React.FC = () => {
                 <button
                   disabled={!timersAtemperamientoCompletadosEnSeccion.length && !ticsAtemperamiento.some(t => obtenerTimerActivoPorTipo(t.rfid,'atemperamiento'))}
                   onClick={() => {
-                    const nombres = ticsAtemperamiento.map(t => t.rfid);
+                    const nombres = ticsAtemperamiento.map(t => norm(t.rfid));
                     if (!nombres.length) return;
-                    if (!window.confirm(`¿Eliminar TODOS los cronómetros (activos/completados) de Atemperamiento (${nombres.length})?`)) return;
-                    timers.filter(t => t.tipoOperacion==='atemperamiento' && nombres.includes(t.nombre)).forEach(t=>eliminarTimer(t.id));
+                    const totalTimers = timers.filter(t => t.tipoOperacion==='atemperamiento' && nombres.includes(norm(t.nombre))).length;
+                    if (!totalTimers) { alert('No hay cronómetros para eliminar.'); return; }
+                    if (!window.confirm(`¿Eliminar ${totalTimers} cronómetro(s) de Atemperamiento?`)) return;
+                    timers.filter(t => t.tipoOperacion==='atemperamiento' && nombres.includes(norm(t.nombre))).forEach(t=>eliminarTimer(t.id));
                   }}
                   className={`flex items-center justify-center gap-2 px-3 py-2 rounded-l-md text-sm ${(timersAtemperamientoCompletadosEnSeccion.length || ticsAtemperamiento.some(t => obtenerTimerActivoPorTipo(t.rfid,'atemperamiento')))? 'bg-yellow-600 hover:bg-yellow-700 text-white':'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
                 >
@@ -947,7 +950,7 @@ const PreAcondicionamientoView: React.FC = () => {
                           key={l.lote}
                           onClick={() => {
             if (!window.confirm(`¿Eliminar cronómetros del lote ${l.lote}?`)) return;
-            timers.filter(t => t.tipoOperacion==='atemperamiento' && l.rfids.includes(t.nombre)).forEach(t=>eliminarTimer(t.id));
+                    timers.filter(t => t.tipoOperacion==='atemperamiento' && l.rfids.map(r=>norm(r)).includes(norm(t.nombre))).forEach(t=>eliminarTimer(t.id));
                             setShowDropdownLimpiarAtemperamiento(false);
                           }}
                           className="w-full text-left px-3 py-2 hover:bg-gray-100 text-xs flex items-center justify-between"
