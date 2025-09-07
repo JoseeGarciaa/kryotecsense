@@ -631,36 +631,38 @@ const PreAcondicionamientoView: React.FC = () => {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
-              {ticsCongelamiento.filter(t => !obtenerTimerActivoPorTipo(t.rfid, 'congelamiento')).length > 0 && (
-                <button
-                  onClick={() => {
-                    const sinTimer = ticsCongelamiento.filter(t => !obtenerTimerActivoPorTipo(t.rfid, 'congelamiento'));
-                    setRfidsPendientesTimer(sinTimer.map(t => t.rfid));
-                    setTipoOperacionTimer('congelamiento');
-                    setMostrarModalTimer(true);
-                  }}
-                  className="flex items-center justify-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm"
-                >
-                  <Play size={16} />
-                  Iniciar Todos ({ticsCongelamiento.filter(t => !obtenerTimerActivoPorTipo(t.rfid, 'congelamiento')).length})
-                </button>
-              )}
-              {timersCongelamientoCompletadosEnSeccion.length > 0 && (
-                <>
+              {(() => {
+                const faltanIniciar = ticsCongelamiento.filter(t => !obtenerTimerActivoPorTipo(t.rfid, 'congelamiento')).length;
+                return (
                   <button
-                    onClick={() => limpiarTimersCompletadosPorTipo('congelamiento', timersCongelamientoCompletadosEnSeccion.map(t => t.id))}
-                    className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm"
+                    disabled={!faltanIniciar}
+                    onClick={() => {
+                      if (!faltanIniciar) return;
+                      const sinTimer = ticsCongelamiento.filter(t => !obtenerTimerActivoPorTipo(t.rfid, 'congelamiento'));
+                      setRfidsPendientesTimer(sinTimer.map(t => t.rfid));
+                      setTipoOperacionTimer('congelamiento');
+                      setMostrarModalTimer(true);
+                    }}
+                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm ${faltanIniciar? 'bg-green-600 hover:bg-green-700 text-white':'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
                   >
-                    <X size={16} /> Limpiar (Congelamiento)
+                    <Play size={16} /> Iniciar Todos ({faltanIniciar})
                   </button>
-                  <button
-                    onClick={completarTodasCongelamiento}
-                    className="flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm"
-                  >
-                    <CheckCircle size={16} /> Completar todas (Congelamiento)
-                  </button>
-                </>
-              )}
+                );
+              })()}
+              <button
+                disabled={!timersCongelamientoCompletadosEnSeccion.length}
+                onClick={() => timersCongelamientoCompletadosEnSeccion.length && limpiarTimersCompletadosPorTipo('congelamiento', timersCongelamientoCompletadosEnSeccion.map(t => t.id))}
+                className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm ${timersCongelamientoCompletadosEnSeccion.length? 'bg-yellow-600 hover:bg-yellow-700 text-white':'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+              >
+                <X size={16} /> Limpiar (Congelamiento)
+              </button>
+              <button
+                disabled={!timersCongelamientoCompletadosEnSeccion.length}
+                onClick={() => timersCongelamientoCompletadosEnSeccion.length && completarTodasCongelamiento()}
+                className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm ${timersCongelamientoCompletadosEnSeccion.length? 'bg-blue-600 hover:bg-blue-700 text-white':'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+              >
+                <CheckCircle size={16} /> Completar todas (Congelamiento)
+              </button>
               <div className="flex gap-2">
                 <button
                   className={`p-2 rounded-md ${cargando ? 'bg-blue-100 text-blue-400 cursor-not-allowed' : 'hover:bg-blue-100 text-blue-600'}`}
@@ -801,35 +803,38 @@ const PreAcondicionamientoView: React.FC = () => {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-              {ticsAtemperamiento.filter(t => !obtenerTimerActivoPorTipo(t.rfid, 'atemperamiento')).length > 0 && (
-                <button
-                  onClick={() => {
-                    const sinTimer = ticsAtemperamiento.filter(t => !obtenerTimerActivoPorTipo(t.rfid, 'atemperamiento'));
-                    setRfidsPendientesTimer(sinTimer.map(t => t.rfid));
-                    setTipoOperacionTimer('atemperamiento');
-                    setMostrarModalTimer(true);
-                  }}
-                  className="flex items-center justify-center gap-2 px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm"
-                >
-                  <Play size={16} /> Iniciar Todos ({ticsAtemperamiento.filter(t => !obtenerTimerActivoPorTipo(t.rfid, 'atemperamiento')).length})
-                </button>
-              )}
-              {timersAtemperamientoCompletadosEnSeccion.length > 0 && (
-                <>
+              {(() => {
+                const faltanIniciar = ticsAtemperamiento.filter(t => !obtenerTimerActivoPorTipo(t.rfid, 'atemperamiento')).length;
+                return (
                   <button
-                    onClick={() => limpiarTimersCompletadosPorTipo('atemperamiento', timersAtemperamientoCompletadosEnSeccion.map(t => t.id))}
-                    className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm"
+                    disabled={!faltanIniciar}
+                    onClick={() => {
+                      if (!faltanIniciar) return;
+                      const sinTimer = ticsAtemperamiento.filter(t => !obtenerTimerActivoPorTipo(t.rfid, 'atemperamiento'));
+                      setRfidsPendientesTimer(sinTimer.map(t => t.rfid));
+                      setTipoOperacionTimer('atemperamiento');
+                      setMostrarModalTimer(true);
+                    }}
+                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm ${faltanIniciar? 'bg-orange-600 hover:bg-orange-700 text-white':'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
                   >
-                    <X size={16} /> Limpiar (Atemperamiento)
+                    <Play size={16} /> Iniciar Todos ({faltanIniciar})
                   </button>
-                  <button
-                    onClick={completarTodasAtemperamiento}
-                    className="flex items-center justify-center gap-2 px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm"
-                  >
-                    <CheckCircle size={16} /> Completar todas (Atemperamiento)
-                  </button>
-                </>
-              )}
+                );
+              })()}
+              <button
+                disabled={!timersAtemperamientoCompletadosEnSeccion.length}
+                onClick={() => timersAtemperamientoCompletadosEnSeccion.length && limpiarTimersCompletadosPorTipo('atemperamiento', timersAtemperamientoCompletadosEnSeccion.map(t => t.id))}
+                className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm ${timersAtemperamientoCompletadosEnSeccion.length? 'bg-yellow-600 hover:bg-yellow-700 text-white':'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+              >
+                <X size={16} /> Limpiar (Atemperamiento)
+              </button>
+              <button
+                disabled={!timersAtemperamientoCompletadosEnSeccion.length}
+                onClick={() => timersAtemperamientoCompletadosEnSeccion.length && completarTodasAtemperamiento()}
+                className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm ${timersAtemperamientoCompletadosEnSeccion.length? 'bg-orange-600 hover:bg-orange-700 text-white':'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+              >
+                <CheckCircle size={16} /> Completar todas (Atemperamiento)
+              </button>
               <div className="flex gap-2 items-center">
                 <button
                   className={`p-2 rounded-md ${cargando ? 'bg-orange-100 text-orange-400 cursor-not-allowed' : 'hover:bg-orange-100 text-orange-600'}`}

@@ -55,6 +55,8 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
   const prevTimersRef = useRef<Map<string, boolean>>(new Map());
   // Completados recientes (clave por nombre normalizado o id)
   const recentCompletionsRef = useRef<Map<string, { ts: number; minutes: number; tipo: string }>>(new Map());
+  // Nombres limpiados manualmente recientemente (para evitar que reaparezcan inmediatamente por un SYNC tardío)
+  const clearedNamesRef = useRef<Map<string, number>>(new Map()); // nombre normalizado -> expiry timestamp
   // Intervalo de limpieza de completados recientes
   useEffect(() => {
     const id = setInterval(() => {
@@ -62,6 +64,10 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
       const limit = 2 * 60 * 1000; // 2 minutos
       for (const [k, v] of recentCompletionsRef.current.entries()) {
         if (now - v.ts > limit) recentCompletionsRef.current.delete(k);
+      }
+      // Limpiar expirados de clearedNamesRef
+      for (const [k, expiry] of clearedNamesRef.current.entries()) {
+        if (now > expiry) clearedNamesRef.current.delete(k);
       }
     }, 30000);
     return () => clearInterval(id);
@@ -119,6 +125,16 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
             fechaFin: new Date(timer.fechaFin),
             tiempoRestanteSegundos: timer.server_remaining_time || timer.tiempoRestanteSegundos
           }));
+          // Filtrar timers que fueron limpiados recientemente por el usuario (protección anti "reaparecer")
+          const now = Date.now();
+          timersActualizados = timersActualizados.filter((t: any) => {
+            const key = String(t.nombre).toLowerCase();
+            const expiry = clearedNamesRef.current.get(key);
+            if (expiry && now <= expiry) {
+              return false; // suprimir
+            }
+            return true;
+          });
           // Normalizar batch si sigue vigente (alinear misma fechaInicio/fin para todos los nombres del batch)
           const batchSync = pendingBatchRef.current;
           if (batchSync && Date.now() <= batchSync.expiresAt) {
@@ -179,6 +195,11 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
             fechaInicio: new Date(lastMessage.data.timer.fechaInicio),
             fechaFin: new Date(lastMessage.data.timer.fechaFin)
           };
+          // Suprimir si el usuario lo limpió manualmente hace muy poco (servidor tardío)
+          const clearedExpiry = clearedNamesRef.current.get(String(nuevoTimer.nombre).toLowerCase());
+          if (clearedExpiry && Date.now() <= clearedExpiry) {
+            break; // ignorar evento
+          }
           // Si estamos iniciando un lote, normalizar fechaInicio/fin y opcionalmente suprimir hasta SYNC
           const batch = pendingBatchRef.current;
           const isBatchMember = batch && Date.now() <= batch.expiresAt && batch.names.has(nuevoTimer.nombre);
@@ -386,6 +407,8 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
       // Limpiar recent completions (por nombre y por id)
       recentCompletionsRef.current.delete(claveNorm);
       aEliminar.forEach(id => recentCompletionsRef.current.delete(id));
+  // Bloquear recreación durante unos segundos
+  clearedNamesRef.current.set(claveNorm, Date.now() + 5000);
       return restantes;
     });
   };
