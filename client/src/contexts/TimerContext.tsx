@@ -261,31 +261,33 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
 
   const iniciarTimers = (nombres: string[], tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => {
     if (nombres.length === 0) return;
-    const ahora = Date.now();
-    const nuevos: Timer[] = nombres.map((nombre, idx) => ({
-      id: `local-${ahora}-${idx}-${Math.random().toString(36).slice(2,6)}`,
-      nombre,
-      tipoOperacion,
-      tiempoInicialMinutos: tiempoMinutos,
-      tiempoRestanteSegundos: tiempoMinutos * 60,
-      fechaInicio: new Date(),
-      fechaFin: new Date(Date.now() + tiempoMinutos * 60000),
-      activo: true,
-      completado: false,
-      pendienteSync: true,
-    }));
-    setTimers(prev => [...prev, ...nuevos]);
+    // Nueva estrategia batch: no crear timers optimistas para evitar
+    // desincronización visual y parpadeo cuando llegan los definitivos.
+    // Mostramos placeholders mediante isStartingBatchFor hasta que el servidor
+    // envíe TIMER_CREATED o un TIMER_SYNC.
     if (isConnected) {
-      const timersData = nuevos.map(t => ({
-        nombre: t.nombre,
-        tipoOperacion: t.tipoOperacion,
-        tiempoInicialMinutos: t.tiempoInicialMinutos,
-      }));
-      pendingBatchRef.current = { names: new Set(nombres), expiresAt: Date.now() + 3000 };
+      pendingBatchRef.current = { names: new Set(nombres), expiresAt: Date.now() + 5000 };
+      const timersData = nombres.map(nombre => ({ nombre, tipoOperacion, tiempoInicialMinutos: tiempoMinutos }));
       sendMessage({ type: 'CREATE_TIMERS_BATCH', data: { timers: timersData } });
-      setTimeout(() => {
-        if (isConnected) sendMessage({ type: 'REQUEST_SYNC', data: {} });
-      }, 200);
+      // Solicitar sync tras breve delay para consolidar todos en un solo SYNC
+      setTimeout(() => { if (isConnected) sendMessage({ type: 'REQUEST_SYNC', data: {} }); }, 250);
+    } else {
+      // Fallback offline: crear locales (sincronizarán luego)
+      const ahora = Date.now();
+      const base = new Date();
+      const locales: Timer[] = nombres.map((nombre, idx) => ({
+        id: `offline-${ahora}-${idx}-${Math.random().toString(36).slice(2,6)}`,
+        nombre,
+        tipoOperacion,
+        tiempoInicialMinutos: tiempoMinutos,
+        tiempoRestanteSegundos: tiempoMinutos * 60,
+        fechaInicio: base,
+        fechaFin: new Date(base.getTime() + tiempoMinutos * 60000),
+        activo: true,
+        completado: false,
+        pendienteSync: true,
+      }));
+      setTimers(prev => [...prev, ...locales]);
     }
   };
 
