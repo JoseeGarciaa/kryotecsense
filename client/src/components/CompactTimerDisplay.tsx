@@ -17,25 +17,9 @@ const CompactTimerDisplay: React.FC<CompactTimerDisplayProps> = ({
   onEliminar,
   formatearTiempo
 }) => {
-  // Tick local SOLO para refrescar la UI; la fuente de verdad sigue siendo el servidor.
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  // Calcular remaining dinámico (si activo usamos fechaFin, si pausado usamos tiempoRestanteSegundos entregado por el server)
-  const enrich = (t: Timer) => {
-    let remaining = t.tiempoRestanteSegundos;
-    if (t.completado) remaining = 0;
-    else if (t.activo && t.fechaFin) {
-      const diff = Math.ceil((t.fechaFin.getTime() - Date.now()) / 1000);
-      remaining = diff < 0 ? 0 : diff; // clamp
-    }
-    return { ...t, _remaining: remaining } as Timer & { _remaining: number };
-  };
-
-  const timersActivos = useMemo(() => timers.filter(t => !t.completado).map(enrich), [timers]);
+  // La fuente de verdad del tiempo restante ya viene del servidor en tiempoRestanteSegundos.
+  // Sólo necesitamos un re-render por cada batch update recibido (lo provoca el cambio de estado en timers).
+  const timersActivos = useMemo(() => timers.filter(t => !t.completado), [timers]);
 
   if (timersActivos.length === 0) return null;
 
@@ -60,8 +44,9 @@ const CompactTimerDisplay: React.FC<CompactTimerDisplayProps> = ({
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-xs">
       {timersActivos.map((timer) => {
         const styles = typeStyles[timer.tipoOperacion] || typeStyles.congelamiento;
-        const urg = timer._remaining < 300; // <5m
-        const progreso = timer.tiempoInicialMinutos > 0 ? (timer._remaining / (timer.tiempoInicialMinutos * 60)) * 100 : 0;
+  const remaining = Math.max(0, timer.tiempoRestanteSegundos || 0);
+  const urg = remaining < 300; // <5m
+  const progreso = timer.tiempoInicialMinutos > 0 ? (remaining / (timer.tiempoInicialMinutos * 60)) * 100 : 0;
         return (
           <div
             key={timer.id}
@@ -87,7 +72,7 @@ const CompactTimerDisplay: React.FC<CompactTimerDisplayProps> = ({
             </div>
             {/* Tiempo + controles */}
             <div className="flex items-center justify-between">
-              <div className={`text-xl font-bold ${urg ? 'text-red-600' : styles.accent}`}>{formatearTiempo(timer._remaining)}</div>
+              <div className={`text-xl font-bold ${urg ? 'text-red-600' : styles.accent}`}>{formatearTiempo(remaining)}</div>
               <div className="flex items-center gap-1">
                 {timer.activo ? (
                   <button

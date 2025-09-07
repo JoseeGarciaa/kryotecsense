@@ -40,7 +40,7 @@ interface TimerProviderProps {
 export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
   const [timers, setTimers] = useState<Timer[]>([]);
   // Referencias eliminadas (prevTimers / recentCompletions) ya que la lógica de "recent completion" local fue retirada.
-  const [serverOffsetMs, setServerOffsetMs] = useState(0); // server_timestamp - Date.now()
+  // Eliminado: offset de servidor; usaremos directamente fechas/segundos enviados.
   
   // WebSocket para comunicación con el backend
   const timerWsUrl = (() => {
@@ -74,29 +74,17 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
 
     switch (lastMessage.type) {
       case 'TIMER_SYNC':
-        if (typeof lastMessage.data?.server_timestamp === 'number') {
-          const newOffset = lastMessage.data.server_timestamp - Date.now();
-          setServerOffsetMs(newOffset);
-          if (Array.isArray(lastMessage.data.timers)) {
-            setTimers(lastMessage.data.timers.map((t: any) => {
-              const fechaInicioSrv = new Date(t.fechaInicio);
-              const fechaFinSrv = new Date(t.fechaFin);
-              return {
-                ...t,
-                fechaInicio: new Date(fechaInicioSrv.getTime() - newOffset),
-                fechaFin: new Date(fechaFinSrv.getTime() - newOffset),
-                tiempoRestanteSegundos: t.server_remaining_time ?? t.tiempoRestanteSegundos
-              } as Timer;
-            }));
-          }
+        if (Array.isArray(lastMessage.data.timers)) {
+          setTimers(lastMessage.data.timers.map((t: any) => ({
+            ...t,
+            fechaInicio: new Date(t.fechaInicio),
+            fechaFin: new Date(t.fechaFin),
+            tiempoRestanteSegundos: t.server_remaining_time ?? t.tiempoRestanteSegundos
+          })));
         }
         break;
 
       case 'TIMER_BATCH_UPDATE':
-        if (typeof lastMessage.data?.server_timestamp === 'number') {
-          const newOffset = lastMessage.data.server_timestamp - Date.now();
-          setServerOffsetMs(newOffset);
-        }
         if (Array.isArray(lastMessage.data.updates)) {
           setTimers(prev => prev.map(timer => {
             const update = lastMessage.data.updates.find((u: any) => u.timerId === timer.id);
@@ -114,29 +102,24 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
       case 'TIMER_CREATED':
         if (lastMessage.data.timer) {
           const t = lastMessage.data.timer;
-          const newOffset = typeof t.server_timestamp === 'number' ? (t.server_timestamp - Date.now()) : serverOffsetMs;
-          if (typeof t.server_timestamp === 'number') setServerOffsetMs(newOffset);
-          const fechaInicioSrv = new Date(t.fechaInicio);
-          const fechaFinSrv = new Date(t.fechaFin);
           const nuevo: Timer = {
             ...t,
-            fechaInicio: new Date(fechaInicioSrv.getTime() - newOffset),
-            fechaFin: new Date(fechaFinSrv.getTime() - newOffset)
+            fechaInicio: new Date(t.fechaInicio),
+            fechaFin: new Date(t.fechaFin)
           };
-          setTimers(prev => prev.find(x => x.id === nuevo.id)
-            ? prev.map(x => x.id === nuevo.id ? nuevo : x)
-            : [...prev, nuevo]);
+          setTimers(prev => prev.find(x => x.id === nuevo.id) ? prev.map(x => x.id === nuevo.id ? nuevo : x) : [...prev, nuevo]);
         }
         break;
 
       case 'TIMER_UPDATED':
         if (lastMessage.data.timer) {
           const t = lastMessage.data.timer;
-          const fechaInicioSrv = new Date(t.fechaInicio);
-          const fechaFinSrv = new Date(t.fechaFin);
-          const adjustedFin = new Date(fechaFinSrv.getTime() - serverOffsetMs);
-          const adjustedInicio = new Date(fechaInicioSrv.getTime() - serverOffsetMs);
-          setTimers(prev => prev.map(timer => timer.id === t.id ? { ...timer, ...t, fechaInicio: adjustedInicio, fechaFin: adjustedFin } : timer));
+            const nuevo: Timer = {
+              ...t,
+              fechaInicio: new Date(t.fechaInicio),
+              fechaFin: new Date(t.fechaFin)
+            };
+            setTimers(prev => prev.find(x => x.id === nuevo.id) ? prev.map(x => x.id === nuevo.id ? nuevo : x) : [...prev, nuevo]);
         }
         break;
 

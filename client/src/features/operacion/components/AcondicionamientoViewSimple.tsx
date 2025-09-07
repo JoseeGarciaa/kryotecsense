@@ -504,7 +504,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
       <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
         <div className="flex items-center justify-center">
           <span className={`font-mono text-xs font-medium truncate ${esUrgente ? 'text-red-600' : 'text-indigo-600'}`}>
-            <InlineCountdown endTime={timerActivo.fechaFin} paused={!timerActivo.activo} format={formatearTiempo} />
+            <InlineCountdown seconds={timerActivo.tiempoRestanteSegundos} paused={!timerActivo.activo} format={formatearTiempo} />
           </span>
         </div>
   {!timerActivo.activo && <span className="text-xs text-gray-500">(pausado)</span>}
@@ -548,7 +548,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
       <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
         <div className="flex items-center justify-center">
           <span className={`font-mono text-xs font-medium truncate ${esUrgente ? 'text-red-600' : 'text-indigo-600'}`}>
-            <InlineCountdown endTime={timerActivo.fechaFin} paused={!timerActivo.activo} format={formatearTiempo} />
+            <InlineCountdown seconds={timerActivo.tiempoRestanteSegundos} paused={!timerActivo.activo} format={formatearTiempo} />
           </span>
         </div>
   {!timerActivo.activo && <span className="text-xs text-gray-500">(pausado)</span>}
