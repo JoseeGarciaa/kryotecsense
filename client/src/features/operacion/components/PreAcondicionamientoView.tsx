@@ -228,22 +228,26 @@ const PreAcondicionamientoView: React.FC = () => {
         try { await apiServiceClient.post('/inventory/iniciar-timers-masivo', { items_ids: items.map((i:any)=>i.id).filter(Boolean), tipoOperacion: tipoSel, tiempoMinutos }); } catch {}
       }
       setCargandoTemporizador(false);
-      // Asignación de lote controlada: cada batch recibe un nuevo lote secuencial basado en timestamp + contador diario
+      // Asignación de lote controlada (local): derivar índice diario escaneando inventario existente.
       setTimeout(async () => {
         try {
-          // Obtener último índice usado hoy desde backend (endpoint hipotético). Si no existe, usar sufijo 001.
-          let indice = '001';
+          const today = new Date();
+          const fechaBase = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+          // Buscar lotes existentes con el prefijo de hoy para calcular siguiente índice
+          let maxIndice = 0;
           try {
-            const today = new Date();
-            const fechaBase = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
-            const resp:any = await apiServiceClient.get(`/inventory/inventario/ultimo-lote-dia?fecha=${fechaBase}`);
-            if (resp?.data?.ultimoIndice) {
-              const num = parseInt(resp.data.ultimoIndice,10)+1;
-              indice = String(num).padStart(3,'0');
-            }
-            // Registrar nuevo índice (ignorar errores silenciosamente)
-            await apiServiceClient.post('/inventory/inventario/registrar-lote-batch', { rfids, indice, fecha: fechaBase, sub_estado: subEstadoFinal });
-          } catch { /* fallback silencioso */ }
+            operaciones.inventarioCompleto.forEach((item:any) => {
+              const lote = String(item.lote || '');
+              if (lote.startsWith(fechaBase) && lote.length >= fechaBase.length + 3) {
+                const suf = lote.slice(fechaBase.length, fechaBase.length + 3);
+                const val = parseInt(suf, 10);
+                if (!isNaN(val) && val > maxIndice) maxIndice = val;
+              }
+            });
+          } catch {}
+          const indice = String(maxIndice + 1).padStart(3, '0');
+          // Intentar registrar lote en backend (si endpoint existe). Silenciar fallos.
+          try { await apiServiceClient.post('/inventory/inventario/registrar-lote-batch', { rfids, indice, fecha: fechaBase, sub_estado: subEstadoFinal }); } catch {}
           await cargarDatos();
         } catch {}
       }, 120);
@@ -430,9 +434,16 @@ const PreAcondicionamientoView: React.FC = () => {
           <span className="text-gray-400 text-xs">Sin cronómetro</span>
           <button
             onClick={() => {
-              setRfidsPendientesTimer([rfid]);
-              if (ticsCongelamiento.find(t => t.rfid === rfid)) setTipoOperacionTimer('congelamiento');
-              else if (ticsAtemperamiento.find(t => t.rfid === rfid)) setTipoOperacionTimer('atemperamiento');
+              // Al iniciar individual: agrupar todos los RFIDs del mismo lote y fase.
+              const esCong = ticsCongelamiento.some(t => t.rfid === rfid);
+              const lista = esCong ? ticsCongelamiento : ticsAtemperamiento;
+              const itemBase = lista.find(t => t.rfid === rfid);
+              let rfidsLote: string[] = [rfid];
+              if (itemBase?.lote) {
+                rfidsLote = Array.from(new Set(lista.filter(x => x.lote === itemBase.lote).map(x => x.rfid)));
+              }
+              setRfidsPendientesTimer(rfidsLote);
+              setTipoOperacionTimer(esCong ? 'congelamiento' : 'atemperamiento');
               setMostrarModalTimer(true);
             }}
             className="p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs"
