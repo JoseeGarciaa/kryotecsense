@@ -979,7 +979,9 @@ const PreAcondicionamientoView: React.FC = () => {
         mostrarModal={mostrarModalLotes}
         onCancelar={() => setMostrarModalLotes(false)}
         onSeleccionarLote={manejarSeleccionLote}
-        subEstado={tipoEscaneoActual === 'congelamiento' ? 'Congelamiento' : 'Atemperamiento'}
+  subEstado={tipoEscaneoActual === 'congelamiento' ? 'Congelamiento' : 'Atemperamiento'}
+  // Pasar RFIDs que están visualmente congelados (cronómetro acabado) para permitir moverlos aunque el backend aún no cambió sub_estado
+  visualCongelados={tipoEscaneoActual === 'atemperamiento' ? ticsCongelamiento.filter(t => esTicCongeladoVisual(t.rfid)).map(t => t.rfid) : []}
       />
 
       {/* Modal cronómetro */}

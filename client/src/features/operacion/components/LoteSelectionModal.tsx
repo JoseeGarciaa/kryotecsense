@@ -6,7 +6,8 @@ interface LoteSelectionModalProps {
   mostrarModal: boolean;
   onCancelar: () => void;
   onSeleccionarLote: (tics: string[]) => void;
-  subEstado: string;
+  subEstado: string; // destino
+  visualCongelados?: string[]; // RFIDs considerados "congelados" aunque aún tengan sub_estado Congelamiento
 }
 
 interface Lote {
@@ -36,7 +37,8 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
   mostrarModal,
   onCancelar,
   onSeleccionarLote,
-  subEstado
+  subEstado,
+  visualCongelados = []
 }) => {
   const [lotes, setLotes] = useState<Lote[]>([]);
   const [itemsSinLote, setItemsSinLote] = useState<ItemSinLote[]>([]);
@@ -97,14 +99,16 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
 
         const subLower = String(item.sub_estado || '').toLowerCase();
         const subNorm = subLower.replace(/[^a-z]/g, '');
-        // Si el objetivo es atemperamiento, SOLO aceptar sub_estado terminado ("congelado").
-        // Excluir enérgicamente 'congelacion' / 'congelamiento' (fase en curso con cronómetro).
-        // Para cualquier otro destino conservar la lógica anterior (contains del objetivo).
+        // Lógica de inclusión del sub-estado:
+        // - Para mover a Atemperamiento: aceptar si ya está realmente en 'congelado' (subNorm === 'congelado')
+        //   o si su RFID está marcado como visualmente congelado (timer terminado) en visualCongelados.
+        // - Para otros destinos, mantener contains del objetivo.
         let subOk: boolean;
         if (esObjetivoAtemperamiento) {
-          // Normalizar: permitir variantes con acentos/espacios pero que resulten en 'congelado'
-          // subNorm ya tiene solo letras (sin acentos). Revisar match exacto 'congelado'.
-          subOk = subNorm === 'congelado';
+          if (subNorm === 'congelado') subOk = true; else {
+            const rfid = String(item.rfid || '').trim();
+            subOk = visualCongelados.includes(rfid);
+          }
         } else {
           subOk = subLower.includes(objetivo) || subNorm.includes(objetivoNorm);
         }
