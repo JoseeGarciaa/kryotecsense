@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Scan, Plus, Loader, ChevronDown, Menu, Play, Pause, Edit, Trash2, Search, CheckCircle, X } from 'lucide-react';
+import InlineCountdown from '../../../shared/components/InlineCountdown';
 import { useOperaciones } from '../hooks/useOperaciones';
 import RfidScanModal from './RfidScanModal';
 import LoteSelectionModal from './LoteSelectionModal';
@@ -146,7 +147,9 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     eliminarTimer,
   formatearTiempo,
   isStartingBatchFor,
-    isConnected
+  isConnected,
+  getRecentCompletion,
+  clearRecentCompletion
   } = useTimerContext();
   
   // Efecto para cargar los datos iniciales
@@ -742,11 +745,14 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
     // Si el timer activo llegó a 0s, tratar como completado inmediato
     const ceroAlcanzado = timer && ((timer.tiempoRestanteSegundos ?? 0) <= 0);
 
-    if (timerCompletado || ceroAlcanzado) {
+    // Recent completion (cuando el servidor borra rápido el timer y queremos evitar parpadeo)
+    const reciente = !timerCompletado && !timer ? getRecentCompletion(rfid, tipoSeccion) : null;
+
+    const mostrarCompleto = !!reciente || !!timerCompletado || (!!timer && ceroAlcanzado);
+    if (mostrarCompleto) {
       const minutos = timerCompletado
         ? timerCompletado.tiempoInicialMinutos
-        : (timer ? timer.tiempoInicialMinutos : 0);
-      // Timer completado - mostrar estado completado
+        : (reciente?.minutes ?? (timer ? timer.tiempoInicialMinutos : 0));
       return (
         <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
           <span className="text-green-600 text-xs font-medium flex items-center gap-1">
@@ -757,25 +763,16 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             {minutos}min
           </div>
           <div className="flex gap-1">
-            {/* Permitir completar también con cero alcanzado en Congelación */}
-            {!esAtemperamiento && (timerCompletado || ceroAlcanzado) && (
-              <button
-                onClick={() => completarTIC(rfid, timerCompletado ?? null, tipoSeccion)}
-                className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
-                title="Completar"
-              >
-                <CheckCircle className="w-3 h-3" />
-              </button>
-            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
                 const confirmar = window.confirm(`¿Limpiar el cronómetro completado de ${rfid}?`);
-                if (confirmar) {
-                  if (timerCompletado) {
-                    limpiarTimerConDebounce(timerCompletado.id, rfid);
-                  }
+                if (!confirmar) return;
+                if (timerCompletado) {
+                  limpiarTimerConDebounce(timerCompletado.id, rfid);
+                } else if (reciente) {
+                  clearRecentCompletion(rfid);
                 }
               }}
               disabled={timerCompletado ? botonesLimpiandoSet.has(timerCompletado.id) : false}
@@ -788,6 +785,15 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
             >
               <X className="w-3 h-3" />
             </button>
+            {!esAtemperamiento && mostrarCompleto && (
+              <button
+                onClick={() => completarTIC(rfid, timerCompletado ?? null, tipoSeccion)}
+                className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
+                title="Completar"
+              >
+                <CheckCircle className="w-3 h-3" />
+              </button>
+            )}
           </div>
         </div>
       );
@@ -823,21 +829,13 @@ const PreAcondicionamientoView: React.FC<PreAcondicionamientoViewProps> = () => 
       );
     }
 
-    // Mostrar tiempo directamente desde el contexto (sin countdown local)
-    const tiempoFormateado = formatearTiempo(timer.tiempoRestanteSegundos);
-    const esUrgente = timer.tiempoRestanteSegundos < 300; // Menos de 5 minutos
-    
+    // Mostrar tiempo con InlineCountdown como en Acondicionamiento
+    const esUrgente = timer.tiempoRestanteSegundos < 300;
     return (
       <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
         <div className="flex items-center justify-center">
-          <span
-            className={`font-mono text-xs font-medium truncate ${
-              esUrgente ? 'text-red-600' :
-              timer.tipoOperacion === 'congelamiento' ? 'text-blue-600' : 'text-orange-600'
-            }`}
-            key={`timer-${timer.id}-${timer.tiempoRestanteSegundos}`}
-          >
-            {tiempoFormateado}
+          <span className={`font-mono text-xs font-medium truncate ${esUrgente ? 'text-red-600' : (timer.tipoOperacion === 'congelamiento' ? 'text-blue-600' : 'text-orange-600')}`}> 
+            <InlineCountdown endTime={timer.fechaFin} seconds={timer.tiempoRestanteSegundos} paused={!timer.activo} format={formatearTiempo} />
           </span>
         </div>
         {!timer.activo && (
