@@ -465,9 +465,9 @@ class TimerManager:
                         }
                     })
                 
-                # Log ocasional para debug
-                if len(active_timers) > 0 and int(current_time.timestamp()) % 10 == 0:
-                    logger.debug(f"Tick: {len(active_timers)} timers activos")
+                # Log periódico cada 10s (aunque no haya activos) para verificar que el loop vive
+                if int(current_time.timestamp()) % 10 == 0:
+                    logger.info(f"[TICK] activos={len(active_timers)} total={len(self.timers)} conexiones={len(self.connections)}")
                 
             except Exception as e:
                 logger.error(f"Error en tick_timers: {e}", exc_info=True)
