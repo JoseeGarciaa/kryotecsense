@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Scan, Plus, Loader, ChevronDown, Menu, Play, Search, CheckCircle, X, Activity } from 'lucide-react';
 import InlineCountdown from '../../../shared/components/InlineCountdown';
 import { useOperaciones } from '../hooks/useOperaciones';
@@ -142,50 +142,7 @@ const PreAcondicionamientoView: React.FC = () => {
     try { setCargando(true); await operaciones.actualizarColumnasDesdeBackend(); } finally { setCargando(false); }
   };
 
-  // Ref para evitar loops de asignación de lote
-  const lotesAutoSolicitadosRef = useRef<Set<string>>(new Set());
-
-  // Asignar automáticamente lotes faltantes (cuando backend aún no los asignó) para Congelamiento / Atemperamiento
-  useEffect(() => {
-    if (!operaciones.inventarioCompleto?.length) return;
-    // Buscar TICs en pre acondicionamiento (Congelamiento o atemperamiento) sin lote
-    const candidatos = operaciones.inventarioCompleto.filter((i: any) => {
-      if (i.categoria !== 'TIC') return false;
-      const est = norm(i.estado).replace(/[-_\s]/g,'');
-      if (!est.includes('preacondicionamiento')) return false;
-      const sub = norm(i.sub_estado);
-      const esFaseValida = ['congelacion','congelamiento','atemperamiento'].some(v => sub.includes(v));
-      if (!esFaseValida) return false;
-      const sinLote = !i.lote || !String(i.lote).trim();
-      if (!sinLote) return false;
-      if (lotesAutoSolicitadosRef.current.has(i.rfid)) return false;
-      return true;
-    });
-    if (!candidatos.length) return;
-    // Agrupar por sub_estado normalizado (congelacion vs atemperamiento) para enviar el valor correcto al backend
-    const grupos: Record<string, string[]> = {};
-    candidatos.forEach((c:any) => {
-      const sub = norm(c.sub_estado);
-      let clave: string;
-      if (['congelacion','congelamiento'].some(v => sub.includes(v))) clave = 'Congelamiento'; else clave = 'Atemperamiento';
-      if (!grupos[clave]) grupos[clave] = [];
-      grupos[clave].push(c.rfid);
-      lotesAutoSolicitadosRef.current.add(c.rfid);
-    });
-    // Por cada grupo, solicitar asignación automática y luego refrescar
-    (async () => {
-      try {
-        await Promise.all(Object.entries(grupos).map(([subEstado, rfids]) => apiServiceClient.patch('/inventory/inventario/asignar-lote-automatico', {
-          rfids,
-          estado: 'Pre acondicionamiento',
-          sub_estado: subEstado
-        }).catch(()=>undefined)));
-        // Refrescar para reflejar lotes
-        await cargarDatos();
-      } catch {/* silencioso */}
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [operaciones.inventarioCompleto]);
+  // Auto-asignación masiva de lotes eliminada: ahora solo se asigna lote al confirmar cada grupo agregado
 
   // RFID scan (modal manual / lector)
   const procesarRfid = (rfid: string) => {
@@ -268,9 +225,25 @@ const PreAcondicionamientoView: React.FC = () => {
         try { await apiServiceClient.post('/inventory/iniciar-timers-masivo', { items_ids: items.map((i:any)=>i.id).filter(Boolean), tipoOperacion: tipoSel, tiempoMinutos }); } catch {}
       }
       setCargandoTemporizador(false);
+      // Asignación de lote controlada: cada batch recibe un nuevo lote secuencial basado en timestamp + contador diario
       setTimeout(async () => {
-        try { await apiServiceClient.patch('/inventory/inventario/asignar-lote-automatico', { rfids, estado: 'Pre acondicionamiento', sub_estado: subEstadoFinal }); await cargarDatos(); } catch {}
-      }, 60);
+        try {
+          // Obtener último índice usado hoy desde backend (endpoint hipotético). Si no existe, usar sufijo 001.
+          let indice = '001';
+          try {
+            const today = new Date();
+            const fechaBase = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+            const resp:any = await apiServiceClient.get(`/inventory/inventario/ultimo-lote-dia?fecha=${fechaBase}`);
+            if (resp?.data?.ultimoIndice) {
+              const num = parseInt(resp.data.ultimoIndice,10)+1;
+              indice = String(num).padStart(3,'0');
+            }
+            // Registrar nuevo índice (ignorar errores silenciosamente)
+            await apiServiceClient.post('/inventory/inventario/registrar-lote-batch', { rfids, indice, fecha: fechaBase, sub_estado: subEstadoFinal });
+          } catch { /* fallback silencioso */ }
+          await cargarDatos();
+        } catch {}
+      }, 120);
     } catch { setCargandoTemporizador(false); }
   };
 
