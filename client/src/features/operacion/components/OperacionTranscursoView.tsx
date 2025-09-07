@@ -27,7 +27,7 @@ interface ItemEnTransito {
 const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
   const { inventarioCompleto, actualizarColumnasDesdeBackend } = useOperaciones();
   const envio = useEnvio(actualizarColumnasDesdeBackend);
-  const { timers, formatearTiempo, pausarTimer, reanudarTimer, eliminarTimer, crearTimer, obtenerTimersCompletados, isConnected, getRecentCompletion, getRecentCompletionById, forzarSincronizacion } = useTimerContext();
+  const { timers, formatearTiempo, pausarTimer, reanudarTimer, eliminarTimer, crearTimer, obtenerTimersCompletados, isConnected, forzarSincronizacion } = useTimerContext();
 
   // InlineCountdown compartido
   const [busqueda, setBusqueda] = useState('');
@@ -92,22 +92,15 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
 
     //    Filtro: solo los que tienen su tiempo de envío de Despacho COMPLETADO (persistente, reciente etiqueta '(Despacho)' o llegó a 0)
     const elegibles = baseListaDespacho.filter((item: any) => {
-      // Considerar preferentemente la variante "Envío (Despacho)" para habilitar el modal
       const timerCompletadoDesp = completadosDespachoPorId.get(item.id);
       if (timerCompletadoDesp) return true;
-
-      // Considerar "reciente" SOLO del nombre exacto de Despacho (no por ID genérico para evitar confundir con Ensamblaje)
-      const reciente = getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio');
-      if (reciente) return true;
-
-  const timerActivoDesp = activosDespachoPorId.get(item.id);
-  if (timerActivoDesp && (timerActivoDesp.tiempoRestanteSegundos ?? 0) <= 0) return true;
-
+      const timerActivoDesp = activosDespachoPorId.get(item.id);
+      if (timerActivoDesp && (timerActivoDesp.tiempoRestanteSegundos ?? 0) <= 0) return true;
       return false;
     });
 
     setItemsListosDespacho(elegibles);
-  }, [inventarioCompleto, completadosDespachoPorId, activosDespachoPorId, completadosPorId, getRecentCompletion, getRecentCompletionById]);
+  }, [inventarioCompleto, completadosDespachoPorId, activosDespachoPorId, completadosPorId]);
   
   // Lista filtrada para el modal (memoizada)
   const itemsFiltradosModal = useMemo(() => {

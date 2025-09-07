@@ -14,7 +14,7 @@ interface AcondicionamientoViewSimpleProps {
 
 const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = ({ isOpen, onClose }) => {
   const { inventarioCompleto: inventarioCompletoData, cambiarEstadoItem, actualizarColumnasDesdeBackend } = useOperaciones(); // renombrado para claridad
-  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer, getRecentCompletion, getRecentCompletionById, iniciarTimers, isStartingBatchFor, marcarTimersCompletados, clearRecentCompletion } = useTimerContext();
+  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer } = useTimerContext();
   
   const [mostrarModalTraerEnsamblaje, setMostrarModalTraerEnsamblaje] = useState(false);
   const [mostrarModalTraerDespacho, setMostrarModalTraerDespacho] = useState(false);
@@ -145,31 +145,9 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     return lista.map(t => ({ ...t, tiempoRestanteSegundos: 0, activo: false, completado: true, fechaFin: new Date(ahora) }));
   };
 
-  const completarTodosEnsamblaje = async () => {
-    if (timersActivosEnsamblaje.length === 0) return;
-    const ok = window.confirm(`Completar ${timersActivosEnsamblaje.length} cronómetros en Ensamblaje inmediatamente?`);
-    if (!ok) return;
-    setCargandoCompletarBatch(true);
-    try {
-      marcarTimersCompletados(timersActivosEnsamblaje.map(t=>t.id));
-      try { if (isConnected) forzarSincronizacion(); } catch {}
-    } finally {
-      setCargandoCompletarBatch(false);
-    }
-  };
+  const completarTodosEnsamblaje = async () => { /* función legacy eliminada (no forzado local) */ };
 
-  const completarTodosDespacho = async () => {
-    if (timersActivosDespacho.length === 0) return;
-    const ok = window.confirm(`Completar ${timersActivosDespacho.length} cronómetros en Despacho inmediatamente?`);
-    if (!ok) return;
-    setCargandoCompletarBatchDespacho(true);
-    try {
-      marcarTimersCompletados(timersActivosDespacho.map(t=>t.id));
-      try { if (isConnected) forzarSincronizacion(); } catch {}
-    } finally {
-      setCargandoCompletarBatchDespacho(false);
-    }
-  };
+  const completarTodosDespacho = async () => { /* función legacy eliminada */ };
 
   // Ref para no repetir actualizaciones a 'Ensamblado'
   const idsMarcadosEnsambladoRef = useRef<Set<number>>(new Set());
@@ -352,18 +330,11 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
           && (t.nombre || '').includes(nombreBase)
           && !/(\s*\(\s*despacho\s*\))/i.test(t.nombre || '')
       );
-
-      // Completado reciente: 'Envío #<id> - <nombre>'
-      const reciente = !timerCompletado
-        ? getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
-        : null;
-
-      if (reciente) return true;
-      if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
       if (timerCompletado) return true;
+      if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true; // llegó a cero
       return false;
     });
-  }, [inventarioCompletoData, timers, getRecentCompletion]);
+  }, [inventarioCompletoData, timers]);
 
   // (Eliminado) Filtro de 'solo completados' para Lista para Despacho
 
@@ -500,15 +471,9 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     const nombreBase = `#${item.id} -`;
     const timerActivo = timers.find(t => t.tipoOperacion === 'envio' && t.activo && !t.completado && (t.nombre || '').includes(nombreBase) && !/\(\s*despacho\s*\)/i.test(t.nombre || ''));
     const timerCompletado = timers.find(t => t.tipoOperacion === 'envio' && t.completado && (t.nombre || '').includes(nombreBase) && !/\(\s*despacho\s*\)/i.test(t.nombre || ''));
-    const reciente = !timerCompletado ? getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio') : null;
-    const mostrarCompleto = (() => {
-      if (reciente) return true;
-      if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
-      if (timerCompletado) return true;
-      return false;
-    })();
+  const mostrarCompleto = !!timerCompletado || (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0);
     if (mostrarCompleto) {
-      const minutos = timerCompletado ? timerCompletado.tiempoInicialMinutos : (reciente?.minutes ?? (timerActivo ? timerActivo.tiempoInicialMinutos : 0));
+  const minutos = timerCompletado ? timerCompletado.tiempoInicialMinutos : (timerActivo ? timerActivo.tiempoInicialMinutos : 0);
       return (
         <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
           <span className="text-green-600 text-xs font-medium flex items-center gap-1">
@@ -516,27 +481,6 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
             <span className="truncate">Completo</span>
           </span>
           <div className="text-xs text-gray-500 text-center truncate">{minutos}min</div>
-          <div className="flex gap-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation(); e.preventDefault();
-                const confirmar = window.confirm(`¿Limpiar el cronómetro completado de ${item.rfid}?`);
-                if (!confirmar) return;
-                try { if (timerCompletado) eliminarTimer(timerCompletado.id); else if (reciente) clearRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`); } catch {}
-              }}
-              className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
-              title="Limpiar"
-            >
-              <X className="w-3 h-3" />
-            </button>
-            <button
-              onClick={() => completarDesdeEnsamblaje(item)}
-              className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
-              title="Completar"
-            >
-              <CheckCircle className="w-3 h-3" />
-            </button>
-          </div>
         </div>
       );
     }
@@ -562,30 +506,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
             <InlineCountdown endTime={timerActivo.fechaFin} paused={!timerActivo.activo} format={formatearTiempo} />
           </span>
         </div>
-        {!timerActivo.activo && <span className="text-xs text-gray-500">Pausado</span>}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => (timerActivo.activo ? pausarTimer(timerActivo.id) : reanudarTimer(timerActivo.id))}
-            className={`p-1.5 rounded text-xs transition-colors ${timerActivo.activo ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700' : 'bg-green-100 hover:bg-green-200 text-green-700'}`}
-            title={timerActivo.activo ? 'Pausar' : 'Reanudar'}
-          >
-            {timerActivo.activo ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-          </button>
-          <button
-            onClick={() => abrirTemporizadorParaItem(item, 'Ensamblaje')}
-            className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
-            title="Editar cronómetro"
-          >
-            <Edit className="w-3 h-3" />
-          </button>
-          <button
-            onClick={() => eliminarTimer(timerActivo.id)}
-            className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs transition-colors"
-            title="Eliminar cronómetro"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-        </div>
+  {!timerActivo.activo && <span className="text-xs text-gray-500">(pausado)</span>}
       </div>
     );
   };
@@ -594,15 +515,9 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     const nombreBase = `#${item.id} -`;
     const timerActivo = timers.find(t => t.tipoOperacion === 'envio' && t.activo && !t.completado && (t.nombre || '').includes(nombreBase) && /\(\s*despacho\s*\)/i.test(t.nombre || ''));
     const timerCompletado = timers.find(t => t.tipoOperacion === 'envio' && t.completado && (t.nombre || '').includes(nombreBase) && /\(\s*despacho\s*\)/i.test(t.nombre || ''));
-    const reciente = !timerCompletado ? getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio') : null;
-    const mostrarCompleto = (() => {
-      if (reciente) return true;
-      if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
-      if (timerCompletado) return true;
-      return false;
-    })();
+    const mostrarCompleto = !!timerCompletado || (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0);
     if (mostrarCompleto) {
-      const minutos = timerCompletado ? timerCompletado.tiempoInicialMinutos : (reciente?.minutes ?? (timerActivo ? timerActivo.tiempoInicialMinutos : 0));
+      const minutos = timerCompletado ? timerCompletado.tiempoInicialMinutos : (timerActivo ? timerActivo.tiempoInicialMinutos : 0);
       return (
         <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
           <span className="text-green-600 text-xs font-medium flex items-center gap-1">
@@ -610,27 +525,6 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
             <span className="truncate">Completo</span>
           </span>
           <div className="text-xs text-gray-500 text-center truncate">{minutos}min</div>
-          <div className="flex gap-1">
-            <button
-              onClick={(e) => {
-                e.stopPropagation(); e.preventDefault();
-                const confirmar = window.confirm(`¿Limpiar el cronómetro completado de ${item.rfid}?`);
-                if (!confirmar) return;
-                try { if (timerCompletado) eliminarTimer(timerCompletado.id); else if (reciente) clearRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`); } catch {}
-              }}
-              className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
-              title="Limpiar"
-            >
-              <X className="w-3 h-3" />
-            </button>
-            <button
-              onClick={() => abrirTemporizadorParaItem(item, 'Despacho')}
-              className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
-              title="Crear nuevo cronómetro"
-            >
-              <Play className="w-3 h-3" />
-            </button>
-          </div>
         </div>
       );
     }
@@ -656,30 +550,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
             <InlineCountdown endTime={timerActivo.fechaFin} paused={!timerActivo.activo} format={formatearTiempo} />
           </span>
         </div>
-        {!timerActivo.activo && <span className="text-xs text-gray-500">Pausado</span>}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => (timerActivo.activo ? pausarTimer(timerActivo.id) : reanudarTimer(timerActivo.id))}
-            className={`p-1.5 rounded text-xs transition-colors ${timerActivo.activo ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700' : 'bg-green-100 hover:bg-green-200 text-green-700'}`}
-            title={timerActivo.activo ? 'Pausar' : 'Reanudar'}
-          >
-            {timerActivo.activo ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-          </button>
-          <button
-            onClick={() => abrirTemporizadorParaItem(item, 'Despacho')}
-            className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
-            title="Editar cronómetro"
-          >
-            <Edit className="w-3 h-3" />
-          </button>
-          <button
-            onClick={() => eliminarTimer(timerActivo.id)}
-            className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs transition-colors"
-            title="Eliminar cronómetro"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-        </div>
+  {!timerActivo.activo && <span className="text-xs text-gray-500">(pausado)</span>}
       </div>
     );
   };
@@ -1146,33 +1017,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
         />
       )}
 
-      {mostrarBatchTimerModal && (
-        <TimerModal
-          mostrarModal={mostrarBatchTimerModal}
-          onCancelar={() => { if (!cargandoBatch) setMostrarBatchTimerModal(false); }}
-          onConfirmar={async (min) => {
-            const elegibles = batchModoDespacho ? hayElegiblesBatchDespacho : hayElegiblesBatch;
-            if (min <= 0 || !elegibles) return;
-            if (batchModoDespacho) setCargandoBatchDespacho(true); else setCargandoBatch(true);
-            try {
-              const nombres = batchModoDespacho ? nombresBatchDespacho : nombresBatch;
-              iniciarTimers(nombres, 'envio', min);
-              try { if (isConnected) forzarSincronizacion(); } catch {}
-              setMostrarBatchTimerModal(false);
-            } catch (e) {
-              console.warn('Error iniciando batch timers:', e);
-            } finally {
-              if (batchModoDespacho) setCargandoBatchDespacho(false); else setCargandoBatch(false);
-            }
-          }}
-          titulo={batchModoDespacho ? 'Configurar Cronómetro • Batch Despacho' : 'Configurar Cronómetro • Batch Ensamblaje'}
-          descripcion={batchModoDespacho
-            ? `Define el tiempo para ${nombresBatchDespacho.length} item(s) sin cronómetro en Lista para Despacho`
-            : `Define el tiempo para ${nombresBatch.length} item(s) sin cronómetro en Ensamblaje`}
-          tipoOperacion="envio"
-          cargando={batchModoDespacho ? cargandoBatchDespacho : cargandoBatch}
-        />
-      )}
+  {/* Batch timer modal eliminado (soporte batch local retirado) */}
     </div>
   );
 };
