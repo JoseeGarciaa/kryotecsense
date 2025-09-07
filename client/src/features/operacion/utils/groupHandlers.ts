@@ -22,7 +22,7 @@ export const createGroupHandlers = (
     // Delegar a la función especializada según la columna
     if (columnId === 'en-bodega') {
       handleCardClickBodega(item);
-    } else if (columnId === 'pre-acondicionamiento') {
+    } else if (columnId === 'Pre acondicionamiento') {
       handleCardClickPreAcondicionamiento(item);
     } else if (columnId === 'acondicionamiento') {
       handleCardClickAcondicionamiento(item);

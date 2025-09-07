@@ -279,9 +279,9 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
     actualizarColumnasDesdeBackend();
   }, []); // Solo se ejecuta una vez al montar
   
-  // useEffect para actualizar datos cuando cambia la fase (excepto pre-acondicionamiento dedicado)
+  // useEffect para actualizar datos cuando cambia la fase (excepto Pre acondicionamiento dedicado)
   useEffect(() => {
-    if (fase && fase !== 'pre-acondicionamiento') {
+    if (fase && fase !== 'Pre acondicionamiento') {
       console.log('🔄 Actualizando datos por cambio de fase:', fase);
       actualizarColumnasDesdeBackend();
     }
@@ -329,7 +329,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
   const phases: Record<string, string> = {
     'all': 'Todas las fases',
     'en-bodega': 'En bodega',
-    'pre-acondicionamiento': 'Registrar pre acondicionamiento',
+    'Pre acondicionamiento': 'Registrar pre acondicionamiento',
     'acondicionamiento': 'Acondicionamiento',
     'operacion': 'Operación',
     'devolucion': 'Devolución',
@@ -386,7 +386,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
   }, [obtenerTemporizadorParaTIC, formatearTiempo]);
 
   const contarTimersActivosEnColumna = useCallback((columnId: string): { activos: number, completados: number } => {
-    if (columnId !== 'pre-acondicionamiento') return { activos: 0, completados: 0 };
+    if (columnId !== 'Pre acondicionamiento') return { activos: 0, completados: 0 };
     
     const column = columns[columnId];
     if (!column || !column.items) return { activos: 0, completados: 0 };
@@ -646,7 +646,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
     if (!isViewOnly) return columns;
     const cloned: typeof columns = { ...columns } as any;
     Object.keys(cloned).forEach((cid) => {
-      if (cid !== 'pre-acondicionamiento') {
+      if (cid !== 'Pre acondicionamiento') {
         const col = cloned[cid];
         if (col && Array.isArray(col.items)) {
           cloned[cid] = {
@@ -670,7 +670,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
     
   // Eliminado: mutación de columnas en render. Ahora usamos columnsForRender arriba.
 
-  if (fase === 'pre-acondicionamiento') {
+  if (fase === 'Pre acondicionamiento') {
     return <PreAcondicionamientoView />;
   }
 
@@ -727,9 +727,9 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
       <DragDropContext onDragEnd={() => {}}>
         <div className="flex flex-col lg:flex-row gap-3 sm:gap-4 lg:gap-6 lg:overflow-x-auto">
           {filteredColumns.map(([columnId, column]) => (
-            // Si la columna es pre-acondicionamiento y no estamos en la vista específica de pre-acondicionamiento,
+            // Si la columna es Pre acondicionamiento y no estamos en la vista específica de Pre acondicionamiento,
             // renderizamos un componente especial
-            columnId === 'pre-acondicionamiento' && fase !== 'pre-acondicionamiento' ? (
+            columnId === 'Pre acondicionamiento' && fase !== 'Pre acondicionamiento' ? (
               <div key={columnId} className="w-full lg:w-80 lg:flex-shrink-0 bg-white rounded-lg shadow-sm border border-gray-200 mb-4 lg:mb-0">
                   <div className={`flex justify-between items-center p-3 sm:p-4 rounded-t-lg border-t-4 border-t-primary-600 bg-gray-50`}>
                     <div className="flex items-center gap-2">
@@ -769,8 +769,8 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
                           return null;
                         })()}
 
-                        {/* Mostrar counters de timers (sólo para pre-acondicionamiento)", */}
-            {columnId === 'pre-acondicionamiento' && contarTimersActivosEnColumna && (
+                        {/* Mostrar counters de timers (sólo para Pre acondicionamiento)", */}
+            {columnId === 'Pre acondicionamiento' && contarTimersActivosEnColumna && (
                           <div className="flex items-center gap-2 mt-1">
                             {(() => {
               const { activos, completados } = contarTimersActivosEnColumna(columnId);
@@ -798,7 +798,7 @@ const Operacion: React.FC<OperacionProps> = ({ fase }) => {
                   </div>
                   <div className="p-2 sm:p-3 transition-colors duration-200 min-h-[300px] sm:min-h-[400px] lg:min-h-[500px] overflow-auto">
                   {(() => {
-                    // Filtrar los items de pre-acondicionamiento por tipo
+                    // Filtrar los items de Pre acondicionamiento por tipo
                     const itemsCongelacion = column.items.filter(item => 
                       item.tipo === 'CONGELACION' || item.sub_estado === 'Congelación' || item.sub_estado === 'Congelamiento'
                     );

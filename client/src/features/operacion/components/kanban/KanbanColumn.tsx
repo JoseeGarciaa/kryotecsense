@@ -54,7 +54,7 @@ interface KanbanColumnProps {
 
 const columnColors: { [key: string]: string } = {
   'default': 'border-t-primary-400',
-  'pre-acondicionamiento': 'border-t-primary-600',
+  'Pre acondicionamiento': 'border-t-primary-600',
   'acondicionamiento': 'border-t-primary-500',
   'En transito': 'border-t-primary-400',
   'inspeccion': 'border-t-primary-300',
@@ -245,13 +245,13 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
                         </button>
                     )}
                     
-                    {/* Botón Volver para Pre-acondicionamiento cuando hay navegación activa */}
-                    {columnId === 'pre-acondicionamiento' && (navegacionPreAcondicionamiento || subgrupoPreAcondicionamiento) && (
+                    {/* Botón Volver para Pre acondicionamiento cuando hay navegación activa */}
+                    {columnId === 'Pre acondicionamiento' && (navegacionPreAcondicionamiento || subgrupoPreAcondicionamiento) && (
                         <button
                             onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                console.log('🔙 Botón Volver Pre-acondicionamiento clickeado');
+                                console.log('🔙 Botón Volver Pre acondicionamiento clickeado');
                                 if (manejarVolverNivel && volverNivelAnteriorPreAcondicionamiento) {
                                     manejarVolverNivel(volverNivelAnteriorPreAcondicionamiento);
                                 } else if (volverNivelAnteriorPreAcondicionamiento) {
@@ -316,8 +316,8 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
                             </div>
                         )}
                         
-                        {/* Mostrar timers activos solo para pre-acondicionamiento */}
-                        {columnId === 'pre-acondicionamiento' && contarTimersActivos && (
+                        {/* Mostrar timers activos solo para Pre acondicionamiento */}
+                        {columnId === 'Pre acondicionamiento' && contarTimersActivos && (
                             <div className="flex items-center gap-2 mt-1">
                                 {(() => {
                                     const { activos, completados } = contarTimersActivos(columnId);

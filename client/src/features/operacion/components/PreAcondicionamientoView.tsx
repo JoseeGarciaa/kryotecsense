@@ -143,7 +143,7 @@ const PreAcondicionamientoView: React.FC = () => {
       const estadoLower = norm(item.estado);
       const subLower = norm(item.sub_estado);
       const esPre = estadoLower.replace(/[-_\s]/g,'').includes('preacondicionamiento');
-      if (!(esPre && subLower.includes('congel'))) { alert('Debe provenir de Congelación en Pre-acondicionamiento.'); return; }
+      if (!(esPre && subLower.includes('congel'))) { alert('Debe provenir de Congelación en Pre acondicionamiento.'); return; }
     }
     if (!rfidsEscaneados.includes(limpio)) setRfidsEscaneados(p => [...p, limpio]);
   };
@@ -210,7 +210,7 @@ const PreAcondicionamientoView: React.FC = () => {
       }
       setCargandoTemporizador(false);
       setTimeout(async () => {
-        try { await apiServiceClient.patch('/inventory/inventario/asignar-lote-automatico', { rfids, estado: 'Pre-acondicionamiento', sub_estado: subEstadoFinal }); await cargarDatos(); } catch {}
+        try { await apiServiceClient.patch('/inventory/inventario/asignar-lote-automatico', { rfids, estado: 'Pre acondicionamiento', sub_estado: subEstadoFinal }); await cargarDatos(); } catch {}
       }, 60);
     } catch { setCargandoTemporizador(false); }
   };
@@ -227,12 +227,28 @@ const PreAcondicionamientoView: React.FC = () => {
     const n = norm(rfid); return timers.find(t => norm(t.nombre) === n && t.completado && t.tipoOperacion === tipo);
   };
   const tieneTimerActivo = (rfid: string) => { const t = obtenerTemporizadorTIC(rfid); return t ? t.activo && !t.completado : false; };
+  // Estado visual: si el cronómetro de congelación terminó o se limpió recientemente, mostrar "Congelado" sin cambiar todavía el sub_estado real (hasta confirmación).
+  const esTicCongeladoVisual = (rfid: string) => {
+    const timerActivo = obtenerTimerActivoPorTipo(rfid, 'congelamiento');
+    const timerCompletado = obtenerTimerCompletadoPorTipo(rfid, 'congelamiento');
+    const ceroAlcanzado = timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0;
+    const reciente = !timerCompletado && !timerActivo ? getRecentCompletion(rfid, 'congelamiento') : null;
+    return !!timerCompletado || !!reciente || !!ceroAlcanzado;
+  };
+  // Estado visual para atemperamiento
+  const esTicAtemperadoVisual = (rfid: string) => {
+    const timerActivo = obtenerTimerActivoPorTipo(rfid, 'atemperamiento');
+    const timerCompletado = obtenerTimerCompletadoPorTipo(rfid, 'atemperamiento');
+    const ceroAlcanzado = timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0;
+    const reciente = !timerCompletado && !timerActivo ? getRecentCompletion(rfid, 'atemperamiento') : null;
+    return !!timerCompletado || !!reciente || !!ceroAlcanzado;
+  };
 
   const completarTIC = async (rfid: string, timerCompletado: any | null, tipoSeccion?: 'congelamiento' | 'atemperamiento') => {
     try {
       const tipoOp: 'congelamiento' | 'atemperamiento' = timerCompletado?.tipoOperacion || (tipoSeccion as any) || 'congelamiento';
       let siguienteEstado = ''; let siguienteSubEstado = ''; let tiempoNuevo = 0;
-      if (tipoOp === 'congelamiento') { siguienteEstado = 'Pre-acondicionamiento'; siguienteSubEstado = 'Atemperamiento'; }
+      if (tipoOp === 'congelamiento') { siguienteEstado = 'Pre acondicionamiento'; siguienteSubEstado = 'Atemperamiento'; }
       else { siguienteEstado = 'Acondicionamiento'; siguienteSubEstado = 'Ensamblaje'; }
       const msg = tipoOp === 'congelamiento'
         ? `¿Completar congelamiento de ${rfid}?\nSe moverá a Atemperamiento.`
@@ -502,7 +518,7 @@ const PreAcondicionamientoView: React.FC = () => {
               <div className="text-[10px] text-gray-600 truncate" title={item.rfid}>{item.rfid}</div>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-medium ${esAtemperamiento?'bg-orange-100 text-orange-700':'bg-blue-100 text-blue-700'}`}>{esAtemperamiento? 'Atemperamiento':'Congelación'}</span>
+              <span className={`hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-medium ${esAtemperamiento?'bg-orange-100 text-orange-700':'bg-blue-100 text-blue-700'}`}>{esAtemperamiento? (esTicAtemperadoVisual(item.rfid) ? 'Atemperado' : 'Atemperamiento') : (esTicCongeladoVisual(item.rfid) ? 'Congelado' : 'Congelación')}</span>
               {renderizarTemporizador(item.rfid, esAtemperamiento)}
             </div>
           </div>
@@ -647,7 +663,7 @@ const PreAcondicionamientoView: React.FC = () => {
                         <td className="px-3 py-2 text-xs font-medium text-gray-900" title={tic.rfid}>{tic.rfid}</td>
                         <td className="px-3 py-2 text-xs text-gray-900" title={tic.nombre_unidad}>{tic.nombre_unidad}</td>
                         <td className="px-3 py-2 text-xs text-gray-900" title={tic.lote}>{tic.lote}</td>
-                        <td className="px-3 py-2"><span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{tic.sub_estado}</span></td>
+                        <td className="px-3 py-2"><span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{esTicCongeladoVisual(tic.rfid) ? 'Congelado' : 'Congelamiento'}</span></td>
                         <td className="px-3 py-2 text-center"><div className="flex justify-center">{renderizarTemporizador(tic.rfid)}</div></td>
                       </tr>
                     ))
@@ -795,7 +811,7 @@ const PreAcondicionamientoView: React.FC = () => {
                         <td className="px-3 py-2 text-xs font-medium text-gray-900" title={tic.rfid}>{tic.rfid}</td>
                         <td className="px-3 py-2 text-xs text-gray-900" title={tic.nombre_unidad}>{tic.nombre_unidad}</td>
                         <td className="px-3 py-2 text-xs text-gray-900" title={tic.lote}>{tic.lote}</td>
-                        <td className="px-3 py-2"><span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">{tic.sub_estado}</span></td>
+                        <td className="px-3 py-2"><span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">{esTicAtemperadoVisual(tic.rfid) ? 'Atemperado' : 'Atemperamiento'}</span></td>
                         <td className="px-3 py-2 text-center"><div className="flex justify-center">{renderizarTemporizador(tic.rfid, true)}</div></td>
                       </tr>
                     ))
@@ -838,7 +854,7 @@ const PreAcondicionamientoView: React.FC = () => {
         onConfirmar={confirmarAdicion}
         onCancelar={() => { setMostrarModalEscaneo(false); setRfidsEscaneados([]); setUltimosRfidsEscaneados({}); setRfidInput(''); }}
         titulo={`Escanear TICs para ${tipoEscaneoActual === 'congelamiento' ? 'Congelamiento' : 'Atemperamiento'}`}
-        descripcion={tipoEscaneoActual === 'atemperamiento' ? 'Solo TICs provenientes de Congelación.' : 'Solo TICs en Pre-acondicionamiento.'}
+        descripcion={tipoEscaneoActual === 'atemperamiento' ? 'Solo TICs provenientes de Congelación.' : 'Solo TICs en Pre acondicionamiento.'}
         onEliminarRfid={rfid => setRfidsEscaneados(prev => prev.filter(r => r !== rfid))}
         subEstado={tipoEscaneoActual === 'congelamiento' ? 'Congelación' : 'Atemperamiento'}
         onProcesarRfidIndividual={procesarRfid}

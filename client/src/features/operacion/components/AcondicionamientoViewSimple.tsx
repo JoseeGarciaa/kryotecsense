@@ -148,7 +148,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
 
   // Filtrar items disponibles para Ensamblaje: TICs que vengan de la fase anterior
   // Reglas actualizadas:
-  //  - Incluir TICs en Pre-acondicionamiento con sub_estado Atemperamiento (independiente del estado del timer)
+  //  - Incluir TICs en Pre acondicionamiento con sub_estado Atemperamiento (independiente del estado del timer)
   //  - También incluir si están en Bodega (fallback)
   //  - Excluir cualquier estado relacionado con congelación
   const itemsDisponibles = (inventarioCompleto || []).filter(item => {

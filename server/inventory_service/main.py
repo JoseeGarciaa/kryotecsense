@@ -481,7 +481,7 @@ async def update_inventario_estado(
         # Verificar si necesitamos asignar un lote automático
         lote_automatico = None
         if (estado_update.estado and 
-            estado_update.estado.lower() in ['pre-acondicionamiento', 'preacondicionamiento'] and
+            estado_update.estado.lower() in ['Pre acondicionamiento', 'preacondicionamiento'] and
             estado_update.sub_estado and 
             estado_update.sub_estado.lower() in ['congelación', 'congelacion', 'atemperamiento']):
             

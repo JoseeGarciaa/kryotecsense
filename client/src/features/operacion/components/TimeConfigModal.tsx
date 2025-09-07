@@ -65,7 +65,7 @@ const TimeConfigModal: React.FC<TimeConfigModalProps> = ({
         {/* Content */}
         <div className="mb-6">
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Configurar tiempo de pre-acondicionamiento para: <span className="font-semibold">{itemName}</span>
+            Configurar tiempo de Pre acondicionamiento para: <span className="font-semibold">{itemName}</span>
           </p>
 
           {/* Time Inputs sin labels; placeholders grises */}

@@ -891,7 +891,7 @@ def api_reports_disponibles(
                 SELECT 
                     COUNT(*) as total_credocubes,
                     COUNT(CASE WHEN validacion_limpieza IS NOT NULL THEN 1 END) as con_validaciones,
-                    COUNT(CASE WHEN estado IN ('Operación','Acondicionamiento','operación','acondicionamiento','Pre-acondicionamiento','pre-acondicionamiento') THEN 1 END) as en_proceso
+                    COUNT(CASE WHEN estado IN ('Operación','Acondicionamiento','operación','acondicionamiento','Pre acondicionamiento','Pre acondicionamiento') THEN 1 END) as en_proceso
                 FROM {tenant_schema}.inventario_credocubes
                 """
             )
@@ -983,7 +983,7 @@ def api_reports_metrics(
             text(
                 f"""
                 SELECT COUNT(*) FROM {tenant_schema}.inventario_credocubes 
-                WHERE estado IN ('Operación','Acondicionamiento','Pre-acondicionamiento','Devolución','operación','acondicionamiento','pre-acondicionamiento','devolución')
+                WHERE estado IN ('Operación','Acondicionamiento','Pre acondicionamiento','Devolución','operación','acondicionamiento','Pre acondicionamiento','devolución')
                 """
             )
         ).fetchone()[0]
@@ -1012,7 +1012,7 @@ def api_reports_metrics(
         tasa_exito_global = f"{eficiencia if eficiencia > 0 else 95.0}%"
         credocubes_activos = db.execute(
             text(
-                f"SELECT COUNT(*) FROM {tenant_schema}.inventario_credocubes WHERE estado IN ('Operación','Acondicionamiento','Pre-acondicionamiento','Devolución','operación','acondicionamiento','pre-acondicionamiento','devolución')"
+                f"SELECT COUNT(*) FROM {tenant_schema}.inventario_credocubes WHERE estado IN ('Operación','Acondicionamiento','Pre acondicionamiento','Devolución','operación','acondicionamiento','Pre acondicionamiento','devolución')"
             )
         ).fetchone()[0]
         alertas_resueltas = max(0, min(50, int(procesos * 0.15) + int(validaciones * 0.05)))
@@ -1636,7 +1636,7 @@ def api_inventory_update_estado(
         if estado_update.estado and estado_update.sub_estado:
             est = estado_update.estado.strip().lower()
             sub = estado_update.sub_estado.strip().lower() if estado_update.sub_estado else ""
-            if est in ["pre-acondicionamiento", "preacondicionamiento"] and sub in ["congelación", "congelacion", "atemperamiento"]:
+            if est in ["Pre acondicionamiento", "preacondicionamiento"] and sub in ["congelación", "congelacion", "atemperamiento"]:
                 # Si no tiene lote, asignar automático
                 lote_row = db.execute(
                     text(f"SELECT lote FROM {tenant_schema}.inventario_credocubes WHERE id = :id"),

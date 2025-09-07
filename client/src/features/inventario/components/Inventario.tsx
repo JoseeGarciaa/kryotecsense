@@ -203,7 +203,7 @@ const Inventario: React.FC = () => {
       case 'en bodega':
       
         return 'bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200';
-      case 'pre-acondicionamiento':
+      case 'Pre acondicionamiento':
         return 'bg-primary-600 text-white dark:bg-primary-700 dark:text-white';
       case 'acondicionamiento':
         return 'bg-primary-500 text-white dark:bg-primary-600 dark:text-white';

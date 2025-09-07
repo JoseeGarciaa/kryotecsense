@@ -75,7 +75,7 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
         throw new Error('Datos de inventario inválidos');
       }
 
-      // Agrupar por lote únicamente TICs en Pre-acondicionamiento y en el sub-estado fuente
+      // Agrupar por lote únicamente TICs en Pre acondicionamiento y en el sub-estado fuente
       const loteMap = new Map<string, any[]>();
       const estadoLoteMap = new Map<string, {estado: string, sub_estado: string}>();
       const itemsSinLoteArray: ItemSinLote[] = [];

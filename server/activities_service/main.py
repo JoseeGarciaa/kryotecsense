@@ -56,18 +56,18 @@ def create_actividad(actividad: ActividadOperacionCreate, db: Session = Depends(
                     detail=f"No se encontró inventario con ID {actividad.inventario_id}"
                 )
                 
-            # Verificar si ya existe una actividad para este inventario_id con estado_nuevo=Pre-acondicionamiento
-            if actividad.estado_nuevo == "Pre-acondicionamiento":
+            # Verificar si ya existe una actividad para este inventario_id con estado_nuevo=Pre acondicionamiento
+            if actividad.estado_nuevo == "Pre acondicionamiento":
                 actividad_existente = db.query(ActividadOperacion).filter(
                     ActividadOperacion.inventario_id == actividad.inventario_id,
-                    ActividadOperacion.estado_nuevo == "Pre-acondicionamiento"
+                    ActividadOperacion.estado_nuevo == "Pre acondicionamiento"
                 ).first()
                 
                 if actividad_existente:
-                    logger.warning(f"Ya existe una actividad para el inventario_id {actividad.inventario_id} con estado Pre-acondicionamiento")
+                    logger.warning(f"Ya existe una actividad para el inventario_id {actividad.inventario_id} con estado Pre acondicionamiento")
                     raise HTTPException(
                         status_code=status.HTTP_409_CONFLICT,
-                        detail=f"Ya existe una actividad para este TIC en estado Pre-acondicionamiento. No se permiten duplicados."
+                        detail=f"Ya existe una actividad para este TIC en estado Pre acondicionamiento. No se permiten duplicados."
                     )
         
         # Validar que el usuario_id existe si se proporciona

@@ -185,7 +185,7 @@ def get_report_metrics(
         procesos_query = f"""
             SELECT COUNT(*) as total 
             FROM {tenant_schema}.inventario_credocubes 
-            WHERE estado IN ('Operación', 'Acondicionamiento', 'Pre-acondicionamiento', 'Devolución', 'operación', 'acondicionamiento', 'pre-acondicionamiento', 'devolución')
+            WHERE estado IN ('Operación', 'Acondicionamiento', 'Pre acondicionamiento', 'Devolución', 'operación', 'acondicionamiento', 'Pre acondicionamiento', 'devolución')
         """
         procesos_auditados = db.execute(text(procesos_query)).fetchone()[0]
         
@@ -227,7 +227,7 @@ def get_report_metrics(
         credocubes_activos_query = f"""
             SELECT COUNT(*) 
             FROM {tenant_schema}.inventario_credocubes 
-            WHERE estado IN ('Operación', 'Acondicionamiento', 'Pre-acondicionamiento', 'Devolución', 'operación', 'acondicionamiento', 'pre-acondicionamiento', 'devolución')
+            WHERE estado IN ('Operación', 'Acondicionamiento', 'Pre acondicionamiento', 'Devolución', 'operación', 'acondicionamiento', 'Pre acondicionamiento', 'devolución')
         """
         try:
             credocubes_activos = db.execute(text(credocubes_activos_query)).fetchone()[0]
@@ -444,7 +444,7 @@ def get_procesos_data(db: Session, tenant_schema: str) -> List[Dict]:
             ic.id,
             ic.lote
         FROM {tenant_schema}.inventario_credocubes ic
-        WHERE ic.estado IN ('Operación', 'Acondicionamiento', 'Pre-acondicionamiento', 'operación', 'acondicionamiento', 'pre-acondicionamiento', 'devolución', 'Devolución')
+        WHERE ic.estado IN ('Operación', 'Acondicionamiento', 'Pre acondicionamiento', 'operación', 'acondicionamiento', 'Pre acondicionamiento', 'devolución', 'Devolución')
         ORDER BY ic.id DESC
     """
     

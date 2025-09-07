@@ -22,7 +22,7 @@ export const useOperaciones = () => {
       name: 'En bodega',
       items: []
     },
-    'pre-acondicionamiento': {
+    'Pre acondicionamiento': {
       name: 'Registrar pre acondicionamiento',
       items: []
     },
@@ -65,11 +65,11 @@ export const useOperaciones = () => {
     
     // Manejar completación de timer sin log (ya maneja el hook de timer)
     if (message.type === 'timer_completed') {
-      // El hook de pre-acondicionamiento ya maneja esto
+      // El hook de Pre acondicionamiento ya maneja esto
     }
   });
 
-  // Estados para cronómetro de pre-acondicionamiento
+  // Estados para cronómetro de Pre acondicionamiento
   const [tiempoPreAcondicionamiento, setTiempoPreAcondicionamiento] = useState<{ [key: string]: number }>({});
   const [timersActivos, setTimersActivos] = useState<{ [key: string]: number }>({});
   const [mostrarModalTiempo, setMostrarModalTiempo] = useState(false);
@@ -104,7 +104,7 @@ export const useOperaciones = () => {
     
     // Validar que el item sea específicamente un TIC si se requiere
     if (soloTics && itemEncontrado.categoria !== 'TIC') {
-      console.warn(`⚠️ RFID ${rfid.trim()} no es un TIC (categoría: ${itemEncontrado.categoria}). Solo se permiten TICs en pre-acondicionamiento.`);
+      console.warn(`⚠️ RFID ${rfid.trim()} no es un TIC (categoría: ${itemEncontrado.categoria}). Solo se permiten TICs en Pre acondicionamiento.`);
       return;
     }
     
@@ -146,7 +146,7 @@ export const useOperaciones = () => {
     }
   };
 
-  // Función específica para pre-acondicionamiento que solo acepta TICs
+  // Función específica para Pre acondicionamiento que solo acepta TICs
   const handleRfidChangePreAcondicionamiento = (value: string) => {
     setRfidInput(value);
     
@@ -170,7 +170,7 @@ export const useOperaciones = () => {
       setRfidInput('');
       
       if (codigosCompletos.length > 0) {
-        console.log(`🔄 Auto-procesados ${codigosCompletos.length} códigos TIC de 24 caracteres para pre-acondicionamiento`);
+        console.log(`🔄 Auto-procesados ${codigosCompletos.length} códigos TIC de 24 caracteres para Pre acondicionamiento`);
       }
     }
   };
@@ -278,7 +278,7 @@ export const useOperaciones = () => {
         if (!e) return '';
         // Unificar cualquier variante que contenga "bodega" ("en bodega", "bodega", "bodega - disponible", etc.)
         if (e.includes('bodega')) return 'en bodega';
-        if (e.includes('pre acond')) return 'pre-acondicionamiento';
+        if (e.includes('pre acond')) return 'Pre acondicionamiento';
         if (e.includes('acondicion')) return 'acondicionamiento';
         if (e.includes('operacion')) return 'operacion';
         if (e.includes('devolucion')) return 'devolucion';
@@ -315,7 +315,7 @@ export const useOperaciones = () => {
       }
       const itemsPreAcondicionamiento = inventario.filter((item: any) => {
         if (!item || !item.estado || !item.categoria) return false;
-        return normalizarEstado(item.estado) === 'pre-acondicionamiento' && categoriaValida(item.categoria);
+        return normalizarEstado(item.estado) === 'Pre acondicionamiento' && categoriaValida(item.categoria);
       });
       const itemsAcondicionamiento = inventario.filter((item: any) => {
         if (!item || !item.estado || !item.categoria) return false;
@@ -350,13 +350,13 @@ export const useOperaciones = () => {
           ...prevColumns['en-bodega'],
           items: cardsGruposPrincipales
         },
-        'pre-acondicionamiento': {
-          ...prevColumns['pre-acondicionamiento'],
+        'Pre acondicionamiento': {
+          ...prevColumns['Pre acondicionamiento'],
           items: (() => {
-            // Crear cards de pre-acondicionamiento usando el hook especializado
-            // Crear cards para pre-acondicionamiento
+            // Crear cards de Pre acondicionamiento usando el hook especializado
+            // Crear cards para Pre acondicionamiento
             const cardsPreAcondicionamiento = preAcondicionamientoHook.crearCardsPreAcondicionamiento(itemsPreAcondicionamiento);
-            // Cards de pre-acondicionamiento creadas
+            // Cards de Pre acondicionamiento creadas
             return cardsPreAcondicionamiento;
           })()
         },
@@ -548,7 +548,7 @@ export const useOperaciones = () => {
       setColumns(prevColumns => ({
         ...prevColumns,
         'bodega': { ...prevColumns['bodega'], items: [] },
-        'pre-acondicionamiento': { ...prevColumns['pre-acondicionamiento'], items: [] },
+        'Pre acondicionamiento': { ...prevColumns['Pre acondicionamiento'], items: [] },
         'acondicionamiento': { ...prevColumns['acondicionamiento'], items: [] },
         'operacion': { ...prevColumns['operacion'], items: [] },
         'devolucion': { ...prevColumns['devolucion'], items: [] },
@@ -651,7 +651,7 @@ export const useOperaciones = () => {
     setRfidInput('');
   };
 
-  // Función específica para manejar escaneo RFID en pre-acondicionamiento (solo TICs)
+  // Función específica para manejar escaneo RFID en Pre acondicionamiento (solo TICs)
   const manejarEscaneoRfidPreAcondicionamiento = () => {
     const rfid = rfidInput.trim();
     if (!rfid) return;
@@ -676,8 +676,8 @@ export const useOperaciones = () => {
     
     // Validar que el item sea específicamente un TIC
     if (itemEncontrado.categoria !== 'TIC') {
-      console.warn(`⚠️ RFID ${rfid} no es un TIC (categoría: ${itemEncontrado.categoria}). Solo se permiten TICs en pre-acondicionamiento.`);
-      alert(`El item ${rfid} no es un TIC (categoría: ${itemEncontrado.categoria}). Solo se permiten TICs en pre-acondicionamiento.`);
+      console.warn(`⚠️ RFID ${rfid} no es un TIC (categoría: ${itemEncontrado.categoria}). Solo se permiten TICs en Pre acondicionamiento.`);
+      alert(`El item ${rfid} no es un TIC (categoría: ${itemEncontrado.categoria}). Solo se permiten TICs en Pre acondicionamiento.`);
       setRfidInput('');
       return;
     }
@@ -716,12 +716,12 @@ export const useOperaciones = () => {
       }
       
       if (itemEncontrado.categoria !== 'TIC') {
-        console.warn(`⚠️ ${itemEncontrado.nombre_unidad} no es un TIC. Solo los TICs pueden ir a pre-acondicionamiento.`);
-        alert(`⚠️ ${itemEncontrado.nombre_unidad} no es un TIC. Solo los TICs pueden ir a pre-acondicionamiento.`);
+        console.warn(`⚠️ ${itemEncontrado.nombre_unidad} no es un TIC. Solo los TICs pueden ir a Pre acondicionamiento.`);
+        alert(`⚠️ ${itemEncontrado.nombre_unidad} no es un TIC. Solo los TICs pueden ir a Pre acondicionamiento.`);
         return false;
       }
       
-      // Verificar si ya está en pre-acondicionamiento consultando las actividades
+      // Verificar si ya está en Pre acondicionamiento consultando las actividades
       const actividadesResponse = await apiServiceClient.get('/activities/actividades/');
       const actividades = actividadesResponse.data;
       
@@ -732,9 +732,9 @@ export const useOperaciones = () => {
       
       if (ultimasActividades.length > 0) {
         const ultimaActividad = ultimasActividades[0];
-        if (ultimaActividad.estado_nuevo === 'Pre-acondicionamiento') {
-          console.warn(`⚠️ ${itemEncontrado.nombre_unidad} ya está en pre-acondicionamiento.`);
-          alert(`⚠️ ${itemEncontrado.nombre_unidad} ya está en pre-acondicionamiento.`);
+        if (ultimaActividad.estado_nuevo === 'Pre acondicionamiento') {
+          console.warn(`⚠️ ${itemEncontrado.nombre_unidad} ya está en Pre acondicionamiento.`);
+          alert(`⚠️ ${itemEncontrado.nombre_unidad} ya está en Pre acondicionamiento.`);
           return false;
         }
       }
@@ -754,10 +754,10 @@ export const useOperaciones = () => {
     }
   };
 
-  // Función para confirmar pre-acondicionamiento
+  // Función para confirmar Pre acondicionamiento
   const confirmarPreAcondicionamiento = async (rfids: string[], subEstado: string = 'Congelación') => {
     try {
-      console.log(`🔄 [DEBUG-HOOK] Confirmando pre-acondicionamiento para ${rfids.length} TICs con sub-estado: ${subEstado}`);
+      console.log(`🔄 [DEBUG-HOOK] Confirmando Pre acondicionamiento para ${rfids.length} TICs con sub-estado: ${subEstado}`);
       console.log(`📋 [DEBUG-HOOK] RFIDs recibidos:`, rfids);
       
       // Primero, actualizar el inventario para asegurarnos de tener datos frescos
@@ -769,7 +769,7 @@ export const useOperaciones = () => {
       const actividades = actividadesResponse.data;
       console.log(`📝 [DEBUG-HOOK] Actividades obtenidas:`, actividades?.length || 0);
       
-      // Validar que las TICs no estén ya en pre-acondicionamiento
+      // Validar que las TICs no estén ya en Pre acondicionamiento
       const ticsInvalidas: string[] = [];
       const ticsValidas: any[] = [];
       
@@ -802,21 +802,21 @@ export const useOperaciones = () => {
         
         // Validar que sea un TIC
         if (item.categoria !== 'TIC') {
-          console.warn(`⚠️ ${item.nombre_unidad} no es un TIC. Solo los TICs pueden ir a pre-acondicionamiento.`);
+          console.warn(`⚠️ ${item.nombre_unidad} no es un TIC. Solo los TICs pueden ir a Pre acondicionamiento.`);
           ticsInvalidas.push(rfid);
           continue;
         }
         
-        // Validar que el estado sea 'disponible', 'En bodega' o ya esté en 'Pre-acondicionamiento'
-        // Si ya está en Pre-acondicionamiento, permitir cambio de sub_estado
-        if (item.estado && item.estado !== 'disponible' && item.estado !== 'Pre-acondicionamiento' && item.estado !== 'En bodega') {
-          console.warn(`⚠️ ${item.nombre_unidad} ya tiene un estado asignado: ${item.estado}. Solo se pueden mover TICs disponibles, en bodega o en pre-acondicionamiento.`);
+        // Validar que el estado sea 'disponible', 'En bodega' o ya esté en 'Pre acondicionamiento'
+        // Si ya está en Pre acondicionamiento, permitir cambio de sub_estado
+        if (item.estado && item.estado !== 'disponible' && item.estado !== 'Pre acondicionamiento' && item.estado !== 'En bodega') {
+          console.warn(`⚠️ ${item.nombre_unidad} ya tiene un estado asignado: ${item.estado}. Solo se pueden mover TICs disponibles, en bodega o en Pre acondicionamiento.`);
           ticsInvalidas.push(rfid);
           continue;
         }
         
-        // Si ya está en Pre-acondicionamiento, verificar si es un cambio de sub_estado
-        if (item.estado === 'Pre-acondicionamiento') {
+        // Si ya está en Pre acondicionamiento, verificar si es un cambio de sub_estado
+        if (item.estado === 'Pre acondicionamiento') {
           if (item.sub_estado === subEstado) {
             console.warn(`⚠️ ${item.nombre_unidad} ya está en ${subEstado}.`);
             ticsInvalidas.push(rfid);
@@ -839,7 +839,7 @@ export const useOperaciones = () => {
       
       // Mostrar advertencias si hay TICs inválidas
       if (ticsInvalidas.length > 0) {
-        alert(`⚠️ Algunas TICs no pueden ser movidas a pre-acondicionamiento:\n\n${ticsInvalidas.join('\n')}`);
+        alert(`⚠️ Algunas TICs no pueden ser movidas a Pre acondicionamiento:\n\n${ticsInvalidas.join('\n')}`);
         
         // Si todas las TICs son inválidas, no continuar
         if (ticsValidas.length === 0) {
@@ -853,7 +853,7 @@ export const useOperaciones = () => {
         try {
           console.log(`📦 [DEBUG-HOOK] Moviendo TIC: ${item.nombre_unidad} (ID: ${item.id})`);
           console.log(`🔄 [DEBUG-HOOK] Estado actual: ${item.estado} / ${item.sub_estado}`);
-          console.log(`🎯 [DEBUG-HOOK] Nuevo estado: Pre-acondicionamiento / ${subEstado}`);
+          console.log(`🎯 [DEBUG-HOOK] Nuevo estado: Pre acondicionamiento / ${subEstado}`);
           
           // Crear el objeto con los campos que espera el esquema InventarioCreate
           const actualizacionTIC = {
@@ -861,7 +861,7 @@ export const useOperaciones = () => {
             nombre_unidad: item.nombre_unidad,
             rfid: item.rfid,
             lote: item.lote || null,
-            estado: 'Pre-acondicionamiento',
+            estado: 'Pre acondicionamiento',
             sub_estado: subEstado,
             validacion_limpieza: item.validacion_limpieza || null,
             validacion_goteo: item.validacion_goteo || null,
@@ -926,7 +926,7 @@ export const useOperaciones = () => {
         console.error('Estado del error:', error.response.status);
         console.error('Cabeceras del error:', error.response.headers);
         
-        let mensajeError = 'Error al mover los TICs a pre-acondicionamiento';
+        let mensajeError = 'Error al mover los TICs a Pre acondicionamiento';
         if (error.response.data && error.response.data.detail) {
           mensajeError += ': ' + error.response.data.detail;
         }
@@ -972,7 +972,7 @@ export const useOperaciones = () => {
         nombre_unidad: item.nombre_unidad,
         rfid: item.rfid,
         lote: item.lote || null,
-        estado: 'Pre-acondicionamiento',
+        estado: 'Pre acondicionamiento',
         sub_estado: 'Atemperamiento',
         validacion_limpieza: item.validacion_limpieza || null,
         validacion_goteo: item.validacion_goteo || null,
@@ -986,7 +986,7 @@ export const useOperaciones = () => {
         await apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionTIC);
         console.log(`✅ TIC ${itemId} movido a atemperamiento exitosamente`);
 
-        // Limpiar tiempo de pre-acondicionamiento
+        // Limpiar tiempo de Pre acondicionamiento
         setTiempoPreAcondicionamiento(prev => {
           const newTiempos = { ...prev };
           delete newTiempos[itemId];
@@ -1070,7 +1070,7 @@ export const useOperaciones = () => {
     }
   };
   
-  // Funciones para cronómetro de pre-acondicionamiento
+  // Funciones para cronómetro de Pre acondicionamiento
   const iniciarCronometro = (itemId: string, horas: number, minutos: number) => {
     const tiempoTotalMinutos = (horas * 60) + minutos;
     const tiempoMs = tiempoTotalMinutos * 60 * 1000;

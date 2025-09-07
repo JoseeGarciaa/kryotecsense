@@ -3,15 +3,15 @@ import { apiServiceClient } from '../../../api/apiClient';
 import { createUtcTimestamp, formatDateForDisplay } from '../../../shared/utils/dateUtils';
 
 export const usePreAcondicionamiento = () => {
-  // Estados específicos para pre-acondicionamiento
+  // Estados específicos para Pre acondicionamiento
   const [navegacionPreAcondicionamiento, setNavegacionPreAcondicionamiento] = useState<string | null>(null);
   const [subgrupoPreAcondicionamiento, setSubgrupoPreAcondicionamiento] = useState<string | null>(null);
   const [tiempoPreAcondicionamiento, setTiempoPreAcondicionamiento] = useState<{[key: string]: number}>({});
   const [timersActivos, setTimersActivos] = useState<{[key: string]: number}>({});
 
-  // Función para crear grupos de pre-acondicionamiento
+  // Función para crear grupos de Pre acondicionamiento
   const crearGruposPreAcondicionamiento = (items: any[]) => {
-    console.log('🔧 Creando grupos de pre-acondicionamiento:', items.length);
+    console.log('🔧 Creando grupos de Pre acondicionamiento:', items.length);
     
     const grupos = {
       congelacion: [] as any[],
@@ -62,9 +62,9 @@ export const usePreAcondicionamiento = () => {
     return subgrupos;
   };
 
-  // Función para crear cards de pre-acondicionamiento con navegación de 3 niveles
+  // Función para crear cards de Pre acondicionamiento con navegación de 3 niveles
   const crearCardsPreAcondicionamiento = (items: any[]) => {
-    console.log('🔧 Creando cards de pre-acondicionamiento:', { 
+    console.log('🔧 Creando cards de Pre acondicionamiento:', { 
       items: items.length, 
       navegacionPreAcondicionamiento,
       subgrupoPreAcondicionamiento,
@@ -86,7 +86,7 @@ export const usePreAcondicionamiento = () => {
         date: formatDateForDisplay(new Date().toISOString()),
         nombre_unidad: 'Congelación',
         rfid: 'CONGELACION-PRINCIPAL',
-        estado: 'Pre-acondicionamiento',
+        estado: 'Pre acondicionamiento',
         sub_estado: 'Congelación',
         tipo: 'CONGELACION',
         tipo_base: 'CONGELACION',
@@ -107,7 +107,7 @@ export const usePreAcondicionamiento = () => {
         date: formatDateForDisplay(new Date().toISOString()),
         nombre_unidad: 'Atemperamiento',
         rfid: 'ATEMPERAMIENTO-PRINCIPAL',
-        estado: 'Pre-acondicionamiento',
+        estado: 'Pre acondicionamiento',
         sub_estado: 'Atemperamiento',
         tipo: 'ATEMPERAMIENTO',
         tipo_base: 'ATEMPERAMIENTO',
@@ -140,7 +140,7 @@ export const usePreAcondicionamiento = () => {
             date: formatDateForDisplay(new Date().toISOString()),
             nombre_unidad: `Congelación ${lote}`,
             rfid: `CONGELACION-${lote}`,
-            estado: 'Pre-acondicionamiento',
+            estado: 'Pre acondicionamiento',
             sub_estado: 'Congelación',
             tipo: 'CONGELACION_LOTE',
             tipo_base: 'CONGELACION',
@@ -165,7 +165,7 @@ export const usePreAcondicionamiento = () => {
             date: formatDateForDisplay(new Date().toISOString()),
             nombre_unidad: `Atemperamiento ${lote}`,
             rfid: `ATEMPERAMIENTO-${lote}`,
-            estado: 'Pre-acondicionamiento',
+            estado: 'Pre acondicionamiento',
             sub_estado: 'Atemperamiento',
             tipo: 'ATEMPERAMIENTO_LOTE',
             tipo_base: 'ATEMPERAMIENTO',
@@ -251,9 +251,9 @@ export const usePreAcondicionamiento = () => {
         rfid: item.rfid,
         actividad: 'Cambio de sub-estado',
         descripcion: `Movido de congelación a atemperamiento - cronómetro completado`,
-        estado_anterior: item.estado || 'Pre-acondicionamiento',
+        estado_anterior: item.estado || 'Pre acondicionamiento',
         sub_estado_anterior: 'Congelación',
-        estado_nuevo: 'Pre-acondicionamiento',
+        estado_nuevo: 'Pre acondicionamiento',
         sub_estado_nuevo: 'Atemperamiento'
       };
       
@@ -263,7 +263,7 @@ export const usePreAcondicionamiento = () => {
       // Actualizar columnas desde backend
       await actualizarColumnas();
       
-      // Limpiar tiempo de pre-acondicionamiento
+      // Limpiar tiempo de Pre acondicionamiento
       setTiempoPreAcondicionamiento(prev => {
         const newTiempos = { ...prev };
         delete newTiempos[itemId];
@@ -357,7 +357,7 @@ export const usePreAcondicionamiento = () => {
 
   // Función para manejar clicks en cards
   const handleCardClick = (item: any) => {
-    console.log('💆 Card Pre-acondicionamiento clickeada:', {
+    console.log('💆 Card Pre acondicionamiento clickeada:', {
       item,
       es_proceso_principal: item?.es_proceso_principal,
       es_lote: item?.es_lote,

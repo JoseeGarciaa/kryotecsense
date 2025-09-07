@@ -11,7 +11,7 @@ export const createDragDropHandlers = (
   createInspectionTimer?: (id: string | number, nombre: string | undefined) => void
 ) => {
   
-  // Función para mover un grupo completo de TICs a pre-acondicionamiento (OPTIMIZADA)
+  // Función para mover un grupo completo de TICs a Pre acondicionamiento (OPTIMIZADA)
   const moverGrupoTicsAPreAcondicionamiento = async (grupoTics: any) => {
     try {
       console.log(`🚀 [OPTIMIZADO] Moviendo grupo completo de TICs: ${grupoTics.items_grupo.length} items`);
@@ -26,7 +26,7 @@ export const createDragDropHandlers = (
       await actualizarColumnasDesdeBackend();
       
       if (result.success > 0) {
-        const message = `✅ ${result.success} TIC(s) del grupo movidos a pre-acondicionamiento exitosamente`;
+        const message = `✅ ${result.success} TIC(s) del grupo movidos a Pre acondicionamiento exitosamente`;
         if (result.errors.length > 0) {
           alert(`${message}\n\n⚠️ Algunos items tuvieron errores:\n${result.errors.join('\n')}`);
         } else {
@@ -38,7 +38,7 @@ export const createDragDropHandlers = (
       
     } catch (error: any) {
       console.error('Error moviendo grupo de TICs:', error);
-      alert(`❌ Error al mover el grupo de TICs a pre-acondicionamiento: ${error.message}`);
+      alert(`❌ Error al mover el grupo de TICs a Pre acondicionamiento: ${error.message}`);
     }
   };
 
@@ -66,11 +66,11 @@ export const createDragDropHandlers = (
         return;
       }
       
-      // Permitir mover grupos a pre-acondicionamiento
-      if (destination.droppableId === 'pre-acondicionamiento') {
+      // Permitir mover grupos a Pre acondicionamiento
+      if (destination.droppableId === 'Pre acondicionamiento') {
         if (itemMovido.tipo_base !== 'TICS' && itemMovido.tipo_base !== 'TIC' && 
             itemMovido.tipo_base !== 'CREDOS' && itemMovido.tipo_base !== 'VIPS') {
-          alert('⚠️ Solo los grupos de TICs, CREDOS y VIPS pueden moverse a pre-acondicionamiento.');
+          alert('⚠️ Solo los grupos de TICs, CREDOS y VIPS pueden moverse a Pre acondicionamiento.');
           return;
         }
         // Mover todo el grupo
@@ -78,10 +78,10 @@ export const createDragDropHandlers = (
         return;
       }
       
-      // Permitir mover grupos de pre-acondicionamiento a acondicionamiento
+      // Permitir mover grupos de Pre acondicionamiento a acondicionamiento
       if (destination.droppableId === 'acondicionamiento') {
         if (itemMovido.es_proceso_principal || itemMovido.es_lote) {
-          // Mover grupo completo de pre-acondicionamiento a acondicionamiento
+          // Mover grupo completo de Pre acondicionamiento a acondicionamiento
           await moverGrupoPreAcondicionamientoAAcondicionamiento(itemMovido);
           return;
         }
@@ -94,19 +94,19 @@ export const createDragDropHandlers = (
       }
       
       // Para otros destinos, mostrar error
-      alert('⚠️ Los grupos de TICs solo se pueden mover entre pre-acondicionamiento y acondicionamiento.');
+      alert('⚠️ Los grupos de TICs solo se pueden mover entre Pre acondicionamiento y acondicionamiento.');
       return;
     }
     
     // Validaciones específicas por destino
-    if (destination.droppableId === 'pre-acondicionamiento') {
+    if (destination.droppableId === 'Pre acondicionamiento') {
       const nombre = itemMovido.nombre_unidad?.toUpperCase() || '';
   if (typeof nombre === 'string' && !nombre.includes('TIC') && !nombre.includes('CREDO') && !nombre.includes('VIP')) {
-        alert('⚠️ Solo los TICs, CREDOS y VIPS pueden ir a pre-acondicionamiento.');
+        alert('⚠️ Solo los TICs, CREDOS y VIPS pueden ir a Pre acondicionamiento.');
         return;
       }
       
-      // Si viene de acondicionamiento, mover de vuelta a pre-acondicionamiento
+      // Si viene de acondicionamiento, mover de vuelta a Pre acondicionamiento
       if (source.droppableId === 'acondicionamiento') {
         await moverItemAPreAcondicionamiento(itemMovido);
         return;
@@ -121,8 +121,8 @@ export const createDragDropHandlers = (
         return;
       }
       
-      // Si viene de pre-acondicionamiento, mover a acondicionamiento
-      if (source.droppableId === 'pre-acondicionamiento') {
+      // Si viene de Pre acondicionamiento, mover a acondicionamiento
+      if (source.droppableId === 'Pre acondicionamiento') {
         await moverItemAAcondicionamiento(itemMovido);
         return;
       }
@@ -210,10 +210,10 @@ export const createDragDropHandlers = (
     }
   };
 
-  // Función para mover un grupo completo de pre-acondicionamiento a acondicionamiento - OPTIMIZADA
+  // Función para mover un grupo completo de Pre acondicionamiento a acondicionamiento - OPTIMIZADA
   const moverGrupoPreAcondicionamientoAAcondicionamiento = async (grupoPreAcondicionamiento: any) => {
     try {
-      console.log(`🚀 [OPTIMIZADO] Moviendo grupo de pre-acondicionamiento a acondicionamiento: ${grupoPreAcondicionamiento.items_grupo?.length || 1} items`);
+      console.log(`🚀 [OPTIMIZADO] Moviendo grupo de Pre acondicionamiento a acondicionamiento: ${grupoPreAcondicionamiento.items_grupo?.length || 1} items`);
       
       // Si es un grupo con items_grupo, usar operaciones en lote
       if (grupoPreAcondicionamiento.items_grupo && grupoPreAcondicionamiento.items_grupo.length > 0) {
@@ -265,16 +265,16 @@ export const createDragDropHandlers = (
     }
   };
 
-  // Función para mover un item individual de acondicionamiento a pre-acondicionamiento
+  // Función para mover un item individual de acondicionamiento a Pre acondicionamiento
   const moverItemAPreAcondicionamiento = async (item: any) => {
     try {
-      console.log(`🚀 Moviendo item de acondicionamiento a pre-acondicionamiento: ${item.nombre_unidad}`);
+      console.log(`🚀 Moviendo item de acondicionamiento a Pre acondicionamiento: ${item.nombre_unidad}`);
       
       const nuevaActividad = {
         inventario_id: item.inventario_id || item.id,
         usuario_id: 1, // Usuario actual
-        descripcion: `TIC movido de vuelta a pre-acondicionamiento - ${item.nombre_unidad}`,
-        estado_nuevo: 'Pre-acondicionamiento',
+        descripcion: `TIC movido de vuelta a Pre acondicionamiento - ${item.nombre_unidad}`,
+        estado_nuevo: 'Pre acondicionamiento',
   sub_estado_nuevo: 'Congelación'
       };
       
@@ -284,23 +284,23 @@ export const createDragDropHandlers = (
       // Actualizar las columnas
       await actualizarColumnasDesdeBackend();
       
-      alert(`✅ ${item.nombre_unidad} movido de vuelta a pre-acondicionamiento`);
+      alert(`✅ ${item.nombre_unidad} movido de vuelta a Pre acondicionamiento`);
       
     } catch (error) {
-      console.error('Error moviendo item a pre-acondicionamiento:', error);
-      alert('❌ Error al mover el item a pre-acondicionamiento');
+      console.error('Error moviendo item a Pre acondicionamiento:', error);
+      alert('❌ Error al mover el item a Pre acondicionamiento');
     }
   };
 
-  // Función para mover un item individual de pre-acondicionamiento a acondicionamiento
+  // Función para mover un item individual de Pre acondicionamiento a acondicionamiento
   const moverItemAAcondicionamiento = async (item: any) => {
     try {
-      console.log(`🚀 Moviendo item de pre-acondicionamiento a acondicionamiento: ${item.nombre_unidad}`);
+      console.log(`🚀 Moviendo item de Pre acondicionamiento a acondicionamiento: ${item.nombre_unidad}`);
       
       const nuevaActividad = {
         inventario_id: item.inventario_id || item.id,
         usuario_id: 1, // Usuario actual
-  descripcion: `TIC movido a acondicionamiento desde pre-acondicionamiento - ${item.nombre_unidad}`,
+  descripcion: `TIC movido a acondicionamiento desde Pre acondicionamiento - ${item.nombre_unidad}`,
         estado_nuevo: 'Acondicionamiento',
   sub_estado_nuevo: 'Ensamblaje'
       };
@@ -325,7 +325,7 @@ export const createDragDropHandlers = (
       // Mapear columnas a estados
       const estadosPorColumna: { [key: string]: { estado: string; subEstado: string } } = {
         'en-bodega': { estado: 'En bodega', subEstado: 'Disponible' },
-        'pre-acondicionamiento': { estado: 'Pre-acondicionamiento', subEstado: 'Congelación' },
+        'Pre acondicionamiento': { estado: 'Pre acondicionamiento', subEstado: 'Congelación' },
         'acondicionamiento': { estado: 'Acondicionamiento', subEstado: 'Ensamblaje' },
         'operacion': { estado: 'Operación', subEstado: 'En transito' },
         'devolucion': { estado: 'Devolución', subEstado: 'Pendiente' },
@@ -346,10 +346,10 @@ export const createDragDropHandlers = (
         }
       }
       
-      if (destino === 'pre-acondicionamiento') {
+      if (destino === 'Pre acondicionamiento') {
         const nombre = item.nombre_unidad?.toUpperCase() || '';
         if (!nombre.includes('TIC')) {
-          throw new Error('Solo los TICs pueden ir a pre-acondicionamiento. Los CREDOS y VIPS no pasan por este proceso.');
+          throw new Error('Solo los TICs pueden ir a Pre acondicionamiento. Los CREDOS y VIPS no pasan por este proceso.');
         }
       }
       

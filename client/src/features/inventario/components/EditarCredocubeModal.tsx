@@ -109,7 +109,7 @@ const EditarCredocubeModal: React.FC<EditarCredocubeModalProps> = ({ credocube, 
               <label htmlFor="estado" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Estado</label>
               <select id="estado" value={estado} onChange={(e) => setEstado(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
                 <option value="En bodega">En bodega</option>
-                <option value="Pre-acondicionamiento">Pre-acondicionamiento</option>
+                <option value="Pre acondicionamiento">Pre acondicionamiento</option>
                 <option value="Acondicionamiento">Acondicionamiento</option>
                 <option value="Operación">Operación</option>
                 <option value="Devolución">Devolución</option>

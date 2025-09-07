@@ -40,7 +40,7 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
   // Renderizar tiempo de forma directa; el componente que retorna puede animarse internamente (InlineCountdown)
   const tiempoRestante = ((): React.ReactNode => {
     const mostrarTimerEnOperacion = columnId === 'operacion' && !isViewOnly;
-    const mostrarTimerEnPre = columnId === 'pre-acondicionamiento';
+    const mostrarTimerEnPre = columnId === 'Pre acondicionamiento';
     if (
       obtenerTiempoRestante &&
       item?.id &&
@@ -126,8 +126,8 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
       <h3 className="font-bold text-gray-800 mb-1 text-sm sm:text-base leading-tight">{item.title}</h3>
       <p className="text-xs sm:text-sm text-gray-600 mb-3 line-clamp-2">{item.description}</p>
       
-      {/* Cronómetro y botones para pre-acondicionamiento */}
-  {(!isViewOnly && (columnId === 'pre-acondicionamiento' || columnId === 'operacion')) && (
+      {/* Cronómetro y botones para Pre acondicionamiento */}
+  {(!isViewOnly && (columnId === 'Pre acondicionamiento' || columnId === 'operacion')) && (
         <div className="mb-3 p-2 bg-orange-50 rounded border">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
@@ -183,7 +183,7 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
       )}
 
       {/* Botón "Devolver a bodega" para otras fases (excepto bodega) */}
-      {columnId && columnId !== 'en-bodega' && columnId !== 'pre-acondicionamiento' && moverABodega && (
+      {columnId && columnId !== 'en-bodega' && columnId !== 'Pre acondicionamiento' && moverABodega && (
         <div className="mb-3 p-2 bg-gray-50 rounded border border-gray-200">
           <div className="flex justify-between items-center">
             <span className="text-xs text-gray-600 font-medium">Opciones:</span>

@@ -152,7 +152,7 @@ export class OptimizedBulkOperations {
   sub_estado: ((): string | undefined => {
         if (newSubState) return newSubState;
         switch (newState) {
-          case 'Pre-acondicionamiento':
+          case 'Pre acondicionamiento':
             return 'Congelación';
           case 'Acondicionamiento':
             return 'Ensamblaje';
@@ -180,7 +180,7 @@ export class OptimizedBulkOperations {
       sub_estado_nuevo: ((): string | undefined => {
             if (newSubState) return newSubState;
             switch (newState) {
-              case 'Pre-acondicionamiento':
+              case 'Pre acondicionamiento':
                 return 'Congelación';
               case 'Acondicionamiento':
                 return 'Ensamblaje';
@@ -237,15 +237,15 @@ export class OptimizedBulkOperations {
   }
 
   /**
-   * Optimización para operaciones de pre-acondicionamiento.
+   * Optimización para operaciones de Pre acondicionamiento.
    */
   async optimizedMoveToPreAcondicionamiento(
     items: any[],
     subEstado: 'Congelación' | 'Atemperamiento' = 'Congelación'
   ): Promise<{ success: number; errors: string[] }> {
-    console.log(`❄️ Optimizando movimiento a pre-acondicionamiento (${subEstado}) para ${items.length} items`);
+    console.log(`❄️ Optimizando movimiento a Pre acondicionamiento (${subEstado}) para ${items.length} items`);
     
-    return this.optimizedDragDropStateChange(items, 'Pre-acondicionamiento', subEstado);
+    return this.optimizedDragDropStateChange(items, 'Pre acondicionamiento', subEstado);
   }
 
   /**

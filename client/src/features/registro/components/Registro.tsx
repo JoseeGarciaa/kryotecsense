@@ -330,7 +330,7 @@ const Registro: React.FC = () => {
           modelo_id: modelo.modelo_id,
           nombre_unidad: lectura.nombre_unidad,
           rfid: lectura.rfid,
-          lote: null, // El lote se asignará en pre-acondicionamiento
+          lote: null, // El lote se asignará en Pre acondicionamiento
           estado: 'En bodega',
           categoria: categoriaFinal,
           validacion_limpieza: null,
@@ -711,7 +711,7 @@ const Registro: React.FC = () => {
             </div>
           </div>
           <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
-            <p><strong>Nota:</strong> El lote se asignará posteriormente en la sección de Pre-acondicionamiento</p>
+            <p><strong>Nota:</strong> El lote se asignará posteriormente en la sección de Pre acondicionamiento</p>
             <p><strong>Códigos RFID:</strong> Deben tener exactamente 24 caracteres alfanuméricos</p>
             <p><strong>Auto-procesamiento:</strong> Se procesa automáticamente al completar 24 caracteres</p>
           </div>
@@ -760,7 +760,7 @@ const Registro: React.FC = () => {
               
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-4 sm:mb-6">
                 Los items han sido agregados al inventario y están disponibles en la sección "En bodega" de operaciones.
-                El lote se asignará durante el proceso de pre-acondicionamiento.
+                El lote se asignará durante el proceso de Pre acondicionamiento.
               </p>
               <button
                 onClick={handleCloseModal}

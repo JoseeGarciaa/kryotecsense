@@ -87,7 +87,7 @@ const Navbar: React.FC<NavbarProps> = ({ seccionActiva, onSeccionChange, onCerra
   const fasesOperacion = [
     { id: 'operacion/all', nombre: 'Todas las fases' },
     { id: 'operacion/en-bodega', nombre: 'En bodega' },
-    { id: 'operacion/pre-acondicionamiento', nombre: 'Registrar pre acondicionamiento' },
+    { id: 'operacion/Pre acondicionamiento', nombre: 'Registrar pre acondicionamiento' },
     { id: 'operacion/acondicionamiento', nombre: 'Acondicionamiento' },
     { id: 'operacion/operacion', nombre: 'Operación' },
     { id: 'operacion/devolucion', nombre: 'Devolución' },

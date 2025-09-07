@@ -998,7 +998,7 @@ def get_dashboard_metrics(
         operation_query = f"""
             SELECT COUNT(*) as total 
             FROM {tenant_schema}.inventario_credocubes 
-            WHERE estado IN ('operación', 'acondicionamiento', 'pre-acondicionamiento')
+            WHERE estado IN ('operación', 'acondicionamiento', 'Pre acondicionamiento')
         """
         procesos_operacion = db.execute(text(operation_query)).fetchone()[0]
         
@@ -1252,7 +1252,7 @@ def get_recent_activity(
                     ELSE 'Hace ' || EXTRACT(DAY FROM (CURRENT_TIMESTAMP - ultima_actualizacion)) || ' días'
                 END as tiempo,
                 CASE 
-                    WHEN estado IN ('operación', 'acondicionamiento', 'pre-acondicionamiento') THEN 'operacion'
+                    WHEN estado IN ('operación', 'acondicionamiento', 'Pre acondicionamiento') THEN 'operacion'
                     WHEN validacion_limpieza IS NOT NULL OR validacion_goteo IS NOT NULL OR validacion_desinfeccion IS NOT NULL THEN 'validacion'
                     ELSE 'inventario'
                 END as tipo

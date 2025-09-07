@@ -35,7 +35,7 @@ export const createRfidHandlers = (
       
       // Verificar que sea un TIC basado en la categoría
       if (itemEncontrado.categoria !== 'TIC') {
-        alert(`⚠️ El item ${rfidLimpio} no es un TIC (categoría: ${itemEncontrado.categoria}). En pre-acondicionamiento solo se permiten TICs.`);
+        alert(`⚠️ El item ${rfidLimpio} no es un TIC (categoría: ${itemEncontrado.categoria}). En Pre acondicionamiento solo se permiten TICs.`);
         setRfidInput('');
         return;
       }
@@ -68,7 +68,7 @@ export const createRfidHandlers = (
     }
   };
 
-  // Función para confirmar pre-acondicionamiento
+  // Función para confirmar Pre acondicionamiento
   const confirmarPreAcondicionamiento = async (
     rfidsEscaneados: string[],
     setMostrarModalEscaneo: (show: boolean) => void,
@@ -81,7 +81,7 @@ export const createRfidHandlers = (
     }
     
     try {
-      console.log(`🚀 Confirmando pre-acondicionamiento para ${rfidsEscaneados.length} TICs`);
+      console.log(`🚀 Confirmando Pre acondicionamiento para ${rfidsEscaneados.length} TICs`);
       
       // Crear actividades para cada RFID escaneado
       for (const rfid of rfidsEscaneados) {
@@ -90,8 +90,8 @@ export const createRfidHandlers = (
           const nuevaActividad = {
             inventario_id: item.id,
             usuario_id: 1, // Usuario actual
-            descripcion: `TIC movido a pre-acondicionamiento - ${item.nombre_unidad}`,
-            estado_nuevo: 'Pre-acondicionamiento',
+            descripcion: `TIC movido a Pre acondicionamiento - ${item.nombre_unidad}`,
+            estado_nuevo: 'Pre acondicionamiento',
             sub_estado_nuevo: 'Congelación'
           };
           
@@ -108,11 +108,11 @@ export const createRfidHandlers = (
       setRfidsEscaneados([]);
       setRfidInput('');
       
-      alert(`${rfidsEscaneados.length} TICs movidos a pre-acondicionamiento exitosamente`);
+      alert(`${rfidsEscaneados.length} TICs movidos a Pre acondicionamiento exitosamente`);
       
     } catch (error) {
       console.error('Error creando actividades:', error);
-      alert('Error al mover los TICs a pre-acondicionamiento');
+      alert('Error al mover los TICs a Pre acondicionamiento');
     }
   };
 
