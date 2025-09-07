@@ -31,6 +31,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   // (Eliminado) Toggle 'Solo completados' para Lista para Despacho
   // Batch timers
   const [mostrarBatchTimerModal, setMostrarBatchTimerModal] = useState(false);
+  const [batchModoDespacho, setBatchModoDespacho] = useState(false); // false = Ensamblaje, true = Despacho
   const [cargandoBatch, setCargandoBatch] = useState(false);
   const [cargandoBatchDespacho, setCargandoBatchDespacho] = useState(false);
   const [cargandoCompletarBatch, setCargandoCompletarBatch] = useState(false);
@@ -422,7 +423,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setMostrarBatchTimerModal(true)}
+                    onClick={() => { setBatchModoDespacho(false); setMostrarBatchTimerModal(true); }}
                     disabled={!hayElegiblesBatch || cargandoBatch}
                     className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors border ${!hayElegiblesBatch || cargandoBatch ? 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-green-600 hover:bg-green-700 text-white border-green-600'}`}
                     title={hayElegiblesBatch ? 'Iniciar cronómetro para todos los items sin cronómetro' : 'No hay items elegibles'}
@@ -670,7 +671,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                   Agregar Items
                 </button>
                 <button
-                  onClick={() => setMostrarBatchTimerModal(true)}
+                  onClick={() => { setBatchModoDespacho(true); setMostrarBatchTimerModal(true); }}
                   disabled={!hayElegiblesBatchDespacho || cargandoBatchDespacho}
                   className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors border ${!hayElegiblesBatchDespacho || cargandoBatchDespacho ? 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-green-600 hover:bg-green-700 text-white border-green-600'}`}
                   title={hayElegiblesBatchDespacho ? 'Iniciar cronómetro (Despacho) para todos sin cronómetro' : 'No hay items elegibles'}
@@ -1036,22 +1037,26 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
           mostrarModal={mostrarBatchTimerModal}
           onCancelar={() => { if (!cargandoBatch) setMostrarBatchTimerModal(false); }}
           onConfirmar={async (min) => {
-            if (min <= 0 || !hayElegiblesBatch) return;
-            setCargandoBatch(true);
+            const elegibles = batchModoDespacho ? hayElegiblesBatchDespacho : hayElegiblesBatch;
+            if (min <= 0 || !elegibles) return;
+            if (batchModoDespacho) setCargandoBatchDespacho(true); else setCargandoBatch(true);
             try {
-              iniciarTimers(nombresBatch, 'envio', min);
+              const nombres = batchModoDespacho ? nombresBatchDespacho : nombresBatch;
+              iniciarTimers(nombres, 'envio', min);
               try { if (isConnected) forzarSincronizacion(); } catch {}
               setMostrarBatchTimerModal(false);
             } catch (e) {
               console.warn('Error iniciando batch timers:', e);
             } finally {
-              setCargandoBatch(false);
+              if (batchModoDespacho) setCargandoBatchDespacho(false); else setCargandoBatch(false);
             }
           }}
-          titulo="Configurar Cronómetro • Batch Ensamblaje"
-          descripcion={`Define el tiempo para ${nombresBatch.length} item(s) sin cronómetro en Ensamblaje`}
+          titulo={batchModoDespacho ? 'Configurar Cronómetro • Batch Despacho' : 'Configurar Cronómetro • Batch Ensamblaje'}
+          descripcion={batchModoDespacho
+            ? `Define el tiempo para ${nombresBatchDespacho.length} item(s) sin cronómetro en Lista para Despacho`
+            : `Define el tiempo para ${nombresBatch.length} item(s) sin cronómetro en Ensamblaje`}
           tipoOperacion="envio"
-          cargando={cargandoBatch}
+          cargando={batchModoDespacho ? cargandoBatchDespacho : cargandoBatch}
         />
       )}
     </div>
