@@ -1467,7 +1467,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
                     <h4 className="text-sm font-semibold text-gray-800">Composición requerida: 1 CUBE · 1 VIP · 6 TIC</h4>
-                    <p className="text-[11px] text-gray-600 mt-0.5">Escanee o seleccione items. La caja sólo se puede crear cuando la composición es exacta.</p>
+                    <p className="text-[11px] text-gray-600 mt-0.5">Sólo se permite escanear (sin selección manual). La caja se arma cuando la composición es exacta.</p>
                   </div>
                   <div className={`text-[11px] px-2 py-1 rounded-full font-medium self-start ${validComposition ? 'bg-green-100 text-green-700':'bg-orange-100 text-orange-700'}`}>{compositionStatusText()}</div>
                 </div>
@@ -1492,9 +1492,36 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                 {!validComposition && itemsSeleccionados.length>0 && (
                   <div className="mt-3 text-[11px] text-red-600 font-medium">Faltan elementos para completar la composición exacta.</div>
                 )}
+
+                {itemsSeleccionados.length>0 && (
+                  <div className="mt-4 border-t pt-3">
+                    <h5 className="text-[11px] font-semibold text-gray-700 mb-2 tracking-wide">Escaneados ({itemsSeleccionados.length})</h5>
+                    <div className="flex flex-col gap-1 max-h-40 overflow-y-auto pr-1">
+                      {itemsSeleccionados.map(it => (
+                        <div key={it.id} className="flex items-center justify-between text-[11px] bg-white/70 border border-gray-200 rounded px-2 py-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`px-1.5 py-0.5 rounded font-medium tracking-wide whitespace-nowrap ${
+                              it.categoria==='TIC' ? 'bg-green-100 text-green-700' :
+                              it.categoria==='VIP' ? 'bg-purple-100 text-purple-700' :
+                              (it.categoria==='Cube'||it.categoria==='CUBE') ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                            }`}>{it.categoria}</span>
+                            <span className="truncate max-w-[120px] text-gray-800" title={it.nombre_unidad}>{it.nombre_unidad}</span>
+                            <span className="font-mono text-[10px] text-gray-500">{it.rfid?.slice(-6)}</span>
+                          </div>
+                          <button
+                            onClick={() => setItemsSeleccionados(prev => prev.filter(x => x.id !== it.id))}
+                            className="text-gray-400 hover:text-red-600 ml-2"
+                            title="Quitar"
+                          >×</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
-            {itemsFiltrados.map((item) => {
+            {/* Ocultamos listado manual en Ensamblaje para forzar solo escaneo */}
+            {subEstadoDestino !== 'Ensamblaje' && itemsFiltrados.map((item) => {
                 const isSelected = itemsSeleccionados.find(s => s.id === item.id);
                 const cat = (item.categoria||'').toUpperCase();
                 let bloqueado = false;
