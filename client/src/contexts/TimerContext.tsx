@@ -125,21 +125,29 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
         break;
 
       case 'TIMER_BATCH_UPDATE':
-        // Actualización masiva cada segundo desde el servidor
+        // Actualización masiva cada segundo desde el servidor.
+        // Para evitar re-render global cada segundo, sólo aplicamos cambios
+        // si el estado (activo/completado) cambia o hay un salto > 5s.
         if (Array.isArray(lastMessage.data.updates)) {
+          const updatesArray = lastMessage.data.updates as any[];
           setTimers(prev => prev.map(timer => {
-            const update = lastMessage.data.updates.find((u: any) => u.timerId === timer.id);
-            if (update) {
-              return {
-                ...timer,
-                tiempoRestanteSegundos: update.tiempoRestanteSegundos,
-                completado: update.completado,
-                activo: update.activo
-              };
+            const update = updatesArray.find(u => u.timerId === timer.id);
+            if (!update) return timer;
+            const diff = Math.abs((update.tiempoRestanteSegundos ?? timer.tiempoRestanteSegundos) - timer.tiempoRestanteSegundos);
+            const estadoCambio = (update.completado !== undefined && update.completado !== timer.completado) || (update.activo !== undefined && update.activo !== timer.activo);
+            // Si el timer ya está completado localmente, mantenerlo.
+            if (timer.completado && !estadoCambio) return timer;
+            if (!estadoCambio && diff <= 5) {
+              // Ignorar ajuste pequeño de segundos; InlineCountdown se basa en fechaFin.
+              return timer;
             }
-            return timer;
+            return {
+              ...timer,
+              tiempoRestanteSegundos: update.tiempoRestanteSegundos ?? timer.tiempoRestanteSegundos,
+              completado: update.completado ?? timer.completado,
+              activo: update.activo ?? timer.activo
+            };
           }));
-          // Si había un batch en espera, libéralo al primer tick por si SYNC tarda
           if (pendingBatchRef.current && Date.now() <= pendingBatchRef.current.expiresAt) {
             pendingBatchRef.current = null;
           }

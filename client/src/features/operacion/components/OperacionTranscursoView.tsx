@@ -212,7 +212,6 @@ const OperacionTranscursoView: React.FC<OperacionTranscursoViewProps> = () => {
           <span className={`font-mono text-xs font-medium truncate ${esUrgente ? 'text-red-600' : 'text-indigo-600'}`}>
             <InlineCountdown
               endTime={timer.fechaFin}
-              seconds={timer.tiempoRestanteSegundos}
               paused={!timer.activo}
               format={formatearTiempo}
             />
