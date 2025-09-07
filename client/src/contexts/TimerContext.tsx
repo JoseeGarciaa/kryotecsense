@@ -107,7 +107,7 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     const batch = pendingBatchRef.current;
     if (!batch) return false;
     if (Date.now() > batch.expiresAt) return false;
-    return batch.names.has(nombre);
+    return batch.names.has(nombre.toLowerCase());
   };
 
   // Escuchar mensajes del WebSocket
@@ -202,21 +202,23 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
           }
           // Si estamos iniciando un lote, normalizar fechaInicio/fin y opcionalmente suprimir hasta SYNC
           const batch = pendingBatchRef.current;
-          const isBatchMember = batch && Date.now() <= batch.expiresAt && batch.names.has(nuevoTimer.nombre);
+          const isBatchMember = batch && Date.now() <= batch.expiresAt && batch.names.has(String(nuevoTimer.nombre).toLowerCase());
           if (isBatchMember && batch) {
             const fechaInicio = new Date(batch.startAt);
             const fechaFin = new Date(batch.startAt + batch.durationSec * 1000);
             const restante = Math.max(0, Math.ceil((fechaFin.getTime() - Date.now()) / 1000));
             nuevoTimer = { ...nuevoTimer, fechaInicio, fechaFin, tiempoRestanteSegundos: restante } as any;
           }
-          const isSuppressed = !!(batch && Date.now() <= batch.expiresAt && batch.names.has(nuevoTimer.nombre));
+          const isSuppressed = !!(batch && Date.now() <= batch.expiresAt && batch.names.has(String(nuevoTimer.nombre).toLowerCase()));
           setTimers(prev => {
-            // Reemplazar posible timer local pendiente con mismo nombre
+            // Reemplazar placeholder local si existe
             const existeId = prev.find(t => t.id === nuevoTimer.id);
-            const existeNombreLocal = prev.find(t => t.pendienteSync && t.nombre === nuevoTimer.nombre);
-            if (existeId) return prev.map(t => t.id === nuevoTimer.id ? { ...nuevoTimer } : t);
-            if (existeNombreLocal) {
-              return prev.map(t => (t.pendienteSync && t.nombre === nuevoTimer.nombre) ? { ...nuevoTimer } : t);
+            if (existeId) return prev.map(t => t.id === nuevoTimer.id ? { ...nuevoTimer, pendienteSync: false } : t);
+            const idxPlace = prev.findIndex(t => t.pendienteSync && t.nombre === nuevoTimer.nombre);
+            if (idxPlace >= 0) {
+              const copia = [...prev];
+              copia[idxPlace] = { ...nuevoTimer, pendienteSync: false } as any;
+              return copia;
             }
             if (isSuppressed) return prev; // esperar SYNC
             return [...prev, nuevoTimer];
@@ -303,20 +305,34 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
   };
 
   const iniciarTimers = (nombres: string[], tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => {
-    if (nombres.length === 0) return;
-    // Nueva estrategia batch: no crear timers optimistas para evitar
-    // desincronización visual y parpadeo cuando llegan los definitivos.
-    // Mostramos placeholders mediante isStartingBatchFor hasta que el servidor
-    // envíe TIMER_CREATED o un TIMER_SYNC.
+    if (!nombres.length) return;
     if (isConnected) {
-  const startAt = Date.now();
-  pendingBatchRef.current = { names: new Set(nombres), expiresAt: startAt + 5000, startAt, durationSec: tiempoMinutos * 60 };
+      const startAt = Date.now();
+      pendingBatchRef.current = { names: new Set(nombres.map(n => n.toLowerCase())), expiresAt: startAt + 5000, startAt, durationSec: tiempoMinutos * 60 };
+      // Placeholders uniformes
+      setTimers(prev => {
+        const existentes = new Set(prev.map(t => t.nombre.toLowerCase()));
+        const fechaInicio = new Date(startAt);
+        const fechaFin = new Date(startAt + tiempoMinutos * 60000);
+        const nuevos: Timer[] = nombres.filter(n => !existentes.has(n.toLowerCase())).map((nombre, idx) => ({
+          id: `batch-local-${startAt}-${idx}-${Math.random().toString(36).slice(2,6)}`,
+          nombre,
+          tipoOperacion,
+          tiempoInicialMinutos: tiempoMinutos,
+          tiempoRestanteSegundos: tiempoMinutos * 60,
+          fechaInicio,
+          fechaFin,
+          activo: true,
+          completado: false,
+          pendienteSync: true,
+        }));
+        return nuevos.length ? [...prev, ...nuevos] : prev;
+      });
       const timersData = nombres.map(nombre => ({ nombre, tipoOperacion, tiempoInicialMinutos: tiempoMinutos }));
       sendMessage({ type: 'CREATE_TIMERS_BATCH', data: { timers: timersData } });
-      // Solicitar sync tras breve delay para consolidar todos en un solo SYNC
       setTimeout(() => { if (isConnected) sendMessage({ type: 'REQUEST_SYNC', data: {} }); }, 250);
     } else {
-      // Fallback offline: crear locales (sincronizarán luego)
+      // Offline fallback
       const ahora = Date.now();
       const base = new Date();
       const locales: Timer[] = nombres.map((nombre, idx) => ({
