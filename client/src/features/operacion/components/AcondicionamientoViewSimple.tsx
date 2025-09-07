@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Package, Search, Loader, Scan, Play, Pause, Edit, Trash2, X, CheckCircle } from 'lucide-react';
+import { Plus, Package, Search, Loader, Scan, Play, Pause, Edit, Trash2, X, CheckCircle, Menu, Activity } from 'lucide-react';
 import { useOperaciones } from '../hooks/useOperaciones';
 import { apiServiceClient } from '../../../api/apiClient';
 import RfidScanModal from './RfidScanModal';
@@ -36,6 +36,8 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   const [cargandoBatchDespacho, setCargandoBatchDespacho] = useState(false);
   const [cargandoCompletarBatch, setCargandoCompletarBatch] = useState(false);
   const [cargandoCompletarBatchDespacho, setCargandoCompletarBatchDespacho] = useState(false);
+  // Vista global (tabla / lotes agrupados por lote)
+  const [vistaGlobal, setVistaGlobal] = useState<'tabla' | 'lotes'>('tabla');
 
   // Ref para evitar normalizar varias veces mismos IDs y saturar red
   const idsNormalizadosRef = useRef<Set<number>>(new Set());
@@ -393,6 +395,237 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     item.lote?.toLowerCase().includes(busquedaListaDespacho.toLowerCase())
   );
 
+  // ===== Helpers de render para cronómetros (extraídos del código inline) =====
+  const renderTimerEnsamblaje = (item: any) => {
+    const nombreBase = `#${item.id} -`;
+    const timerActivo = timers.find(t => t.tipoOperacion === 'envio' && t.activo && !t.completado && (t.nombre || '').includes(nombreBase) && !/\(\s*despacho\s*\)/i.test(t.nombre || ''));
+    const timerCompletado = timers.find(t => t.tipoOperacion === 'envio' && t.completado && (t.nombre || '').includes(nombreBase) && !/\(\s*despacho\s*\)/i.test(t.nombre || ''));
+    const reciente = !timerCompletado ? getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio') : null;
+    const mostrarCompleto = (() => {
+      if (reciente) return true;
+      if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
+      if (timerCompletado) return true;
+      return false;
+    })();
+    if (mostrarCompleto) {
+      const minutos = timerCompletado ? timerCompletado.tiempoInicialMinutos : (reciente?.minutes ?? (timerActivo ? timerActivo.tiempoInicialMinutos : 0));
+      return (
+        <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
+          <span className="text-green-600 text-xs font-medium flex items-center gap-1">
+            <CheckCircle className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">Completo</span>
+          </span>
+          <div className="text-xs text-gray-500 text-center truncate">{minutos}min</div>
+          <div className="flex gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation(); e.preventDefault();
+                const confirmar = window.confirm(`¿Limpiar el cronómetro completado de ${item.rfid}?`);
+                if (!confirmar) return;
+                try { if (timerCompletado) eliminarTimer(timerCompletado.id); else if (reciente) clearRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`); } catch {}
+              }}
+              className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
+              title="Limpiar"
+            >
+              <X className="w-3 h-3" />
+            </button>
+            <button
+              onClick={() => completarDesdeEnsamblaje(item)}
+              className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
+              title="Completar"
+            >
+              <CheckCircle className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      );
+    }
+    if (!timerActivo) {
+      return (
+        <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
+          <span className="text-gray-400 text-xs text-center">Sin cronómetro</span>
+          <button
+            onClick={() => abrirTemporizadorParaItem(item, 'Ensamblaje')}
+            className="flex items-center justify-center p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs transition-colors"
+            title="Iniciar cronómetro"
+          >
+            <Play className="w-3 h-3" />
+          </button>
+        </div>
+      );
+    }
+    const esUrgente = timerActivo.tiempoRestanteSegundos < 300;
+    return (
+      <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
+        <div className="flex items-center justify-center">
+          <span className={`font-mono text-xs font-medium truncate ${esUrgente ? 'text-red-600' : 'text-indigo-600'}`}>
+            <InlineCountdown endTime={timerActivo.fechaFin} seconds={timerActivo.tiempoRestanteSegundos} paused={!timerActivo.activo} format={formatearTiempo} />
+          </span>
+        </div>
+        {!timerActivo.activo && <span className="text-xs text-gray-500">Pausado</span>}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => (timerActivo.activo ? pausarTimer(timerActivo.id) : reanudarTimer(timerActivo.id))}
+            className={`p-1.5 rounded text-xs transition-colors ${timerActivo.activo ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700' : 'bg-green-100 hover:bg-green-200 text-green-700'}`}
+            title={timerActivo.activo ? 'Pausar' : 'Reanudar'}
+          >
+            {timerActivo.activo ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+          </button>
+          <button
+            onClick={() => abrirTemporizadorParaItem(item, 'Ensamblaje')}
+            className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
+            title="Editar cronómetro"
+          >
+            <Edit className="w-3 h-3" />
+          </button>
+          <button
+            onClick={() => eliminarTimer(timerActivo.id)}
+            className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs transition-colors"
+            title="Eliminar cronómetro"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderTimerDespacho = (item: any) => {
+    const nombreBase = `#${item.id} -`;
+    const timerActivo = timers.find(t => t.tipoOperacion === 'envio' && t.activo && !t.completado && (t.nombre || '').includes(nombreBase) && /\(\s*despacho\s*\)/i.test(t.nombre || ''));
+    const timerCompletado = timers.find(t => t.tipoOperacion === 'envio' && t.completado && (t.nombre || '').includes(nombreBase) && /\(\s*despacho\s*\)/i.test(t.nombre || ''));
+    const reciente = !timerCompletado ? getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio') : null;
+    const mostrarCompleto = (() => {
+      if (reciente) return true;
+      if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
+      if (timerCompletado) return true;
+      return false;
+    })();
+    if (mostrarCompleto) {
+      const minutos = timerCompletado ? timerCompletado.tiempoInicialMinutos : (reciente?.minutes ?? (timerActivo ? timerActivo.tiempoInicialMinutos : 0));
+      return (
+        <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
+          <span className="text-green-600 text-xs font-medium flex items-center gap-1">
+            <CheckCircle className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">Completo</span>
+          </span>
+          <div className="text-xs text-gray-500 text-center truncate">{minutos}min</div>
+          <div className="flex gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation(); e.preventDefault();
+                const confirmar = window.confirm(`¿Limpiar el cronómetro completado de ${item.rfid}?`);
+                if (!confirmar) return;
+                try { if (timerCompletado) eliminarTimer(timerCompletado.id); else if (reciente) clearRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`); } catch {}
+              }}
+              className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
+              title="Limpiar"
+            >
+              <X className="w-3 h-3" />
+            </button>
+            <button
+              onClick={() => abrirTemporizadorParaItem(item, 'Lista para Despacho')}
+              className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
+              title="Crear nuevo cronómetro"
+            >
+              <Play className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      );
+    }
+    if (!timerActivo) {
+      return (
+        <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
+          <span className="text-gray-400 text-xs text-center">Sin cronómetro</span>
+          <button
+            onClick={() => abrirTemporizadorParaItem(item, 'Lista para Despacho')}
+            className="flex items-center justify-center p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs transition-colors"
+            title="Iniciar cronómetro"
+          >
+            <Play className="w-3 h-3" />
+          </button>
+        </div>
+      );
+    }
+    const esUrgente = timerActivo.tiempoRestanteSegundos < 300;
+    return (
+      <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
+        <div className="flex items-center justify-center">
+          <span className={`font-mono text-xs font-medium truncate ${esUrgente ? 'text-red-600' : 'text-indigo-600'}`}>
+            <InlineCountdown endTime={timerActivo.fechaFin} seconds={timerActivo.tiempoRestanteSegundos} paused={!timerActivo.activo} format={formatearTiempo} />
+          </span>
+        </div>
+        {!timerActivo.activo && <span className="text-xs text-gray-500">Pausado</span>}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => (timerActivo.activo ? pausarTimer(timerActivo.id) : reanudarTimer(timerActivo.id))}
+            className={`p-1.5 rounded text-xs transition-colors ${timerActivo.activo ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700' : 'bg-green-100 hover:bg-green-200 text-green-700'}`}
+            title={timerActivo.activo ? 'Pausar' : 'Reanudar'}
+          >
+            {timerActivo.activo ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+          </button>
+          <button
+            onClick={() => abrirTemporizadorParaItem(item, 'Lista para Despacho')}
+            className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
+            title="Editar cronómetro"
+          >
+            <Edit className="w-3 h-3" />
+          </button>
+          <button
+            onClick={() => eliminarTimer(timerActivo.id)}
+            className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs transition-colors"
+            title="Eliminar cronómetro"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // ===== Agrupación por lote (solo si vistaGlobal === 'lotes') =====
+  interface GrupoLote { lote: string; items: any[]; count: number; }
+  const gruposEnsamblaje = useMemo<GrupoLote[]>(() => {
+    if (vistaGlobal !== 'lotes') return [];
+    const map = new Map<string, any[]>();
+    itemsEnsamblajeFiltrados.forEach(it => { const k = it.lote || 'SIN LOTE'; if (!map.has(k)) map.set(k, []); map.get(k)!.push(it); });
+    return Array.from(map.entries()).map(([lote, items]) => ({ lote, items, count: items.length })).sort((a,b)=>a.lote.localeCompare(b.lote));
+  }, [vistaGlobal, itemsEnsamblajeFiltrados]);
+  const gruposDespacho = useMemo<GrupoLote[]>(() => {
+    if (vistaGlobal !== 'lotes') return [];
+    const map = new Map<string, any[]>();
+    itemsListaDespachoFiltrados.forEach(it => { const k = it.lote || 'SIN LOTE'; if (!map.has(k)) map.set(k, []); map.get(k)!.push(it); });
+    return Array.from(map.entries()).map(([lote, items]) => ({ lote, items, count: items.length })).sort((a,b)=>a.lote.localeCompare(b.lote));
+  }, [vistaGlobal, itemsListaDespachoFiltrados]);
+
+  const renderGrupo = (grupo: GrupoLote, despacho=false) => (
+    <div key={(despacho?'D-':'E-')+grupo.lote} className={`rounded-xl border shadow-sm overflow-hidden ${despacho? 'bg-gradient-to-br from-green-50 to-green-100/40 border-green-200':'bg-gradient-to-br from-red-50 to-red-100/40 border-red-200'}`}>
+      <div className={`px-4 py-3 flex items-center justify-between ${despacho? 'bg-green-600':'bg-red-600'} text-white`}> 
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold">Lote {grupo.lote}</span>
+          <span className="text-[11px] tracking-wide opacity-90">{grupo.count} Item{grupo.count!==1?'s':''}</span>
+        </div>
+        <Activity className="w-5 h-5 opacity-90" />
+      </div>
+      <div className="divide-y divide-white/60">
+        {grupo.items.map(item => (
+          <div key={item.id} className="flex items-center justify-between px-3 py-2 backdrop-blur-sm bg-white/40 hover:bg-white/70 transition-colors text-xs">
+            <div className="flex flex-col mr-2 min-w-0">
+              <span className="font-medium truncate" title={item.nombre_unidad}>{item.nombre_unidad}</span>
+              <div className="text-[10px] text-gray-600 truncate" title={item.rfid}>{item.rfid}</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`hidden sm:inline px-2 py-0.5 rounded-full text-[10px] font-medium ${despacho?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}`}>{despacho? 'Lista para Despacho':'Ensamblaje'}</span>
+              {despacho? renderTimerDespacho(item) : renderTimerEnsamblaje(item)}
+            </div>
+          </div>
+        ))}
+        {!grupo.items.length && <div className="px-4 py-4 text-[11px] text-center text-gray-500">Sin items</div>}
+      </div>
+    </div>
+  );
+
   if (!isOpen) return null;
 
   return (
@@ -408,12 +641,28 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
             </div>
           )}
         </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            onClick={()=>setVistaGlobal('lotes')}
+            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border ${vistaGlobal==='lotes'? 'bg-gray-900 text-white border-gray-900':'bg-white text-gray-700 hover:bg-gray-100 border-gray-300'}`}
+            title="Vista agrupada por lote"
+          >
+            <Menu className="w-4 h-4" /> Lotes
+          </button>
+          <button
+            onClick={()=>setVistaGlobal('tabla')}
+            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium border ${vistaGlobal==='tabla'? 'bg-gray-900 text-white border-gray-900':'bg-white text-gray-700 hover:bg-gray-100 border-gray-300'}`}
+            title="Vista tabla"
+          >
+            <Menu className="w-4 h-4 rotate-90" /> Tabla
+          </button>
+        </div>
       </div>
 
       {/* Contenido principal */}
       <div className="flex-1 overflow-auto p-6 space-y-6">
         
-        {/* Sección Ensamblaje */}
+  {/* Sección Ensamblaje */}
         <div className="bg-white rounded-lg border border-red-200 overflow-hidden">
           <div className="bg-red-50 border-b border-red-200 px-6 py-4">
               <div className="flex items-center justify-between">
@@ -475,416 +724,124 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
             </div>
           </div>
 
-          {/* Tabla Ensamblaje */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RFID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NOMBRE</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ESTADO</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CRONÓMETRO</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CATEGORÍA</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {itemsEnsamblajeFiltrados.length === 0 ? (
+          {vistaGlobal==='tabla' ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center">
-                      <div className="text-gray-500">
-                        <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                        <p>No hay items en ensamblaje</p>
-                        <p className="text-sm">Agregue items usando el botón de arriba</p>
-                      </div>
-                    </td>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RFID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NOMBRE</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ESTADO</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CRONÓMETRO</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CATEGORÍA</th>
                   </tr>
-                ) : (
-                  itemsEnsamblajeFiltrados.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.rfid}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.nombre_unidad}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
-                            {item.sub_estado}
-                          </span>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {itemsEnsamblajeFiltrados.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-8 text-center">
+                        <div className="text-gray-500">
+                          <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                          <p>No hay items en ensamblaje</p>
+                          <p className="text-sm">Agregue items usando el botón de arriba</p>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {(() => {
-                          const normalize = (s: string) => s?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-                          // Ensamblaje: buscar timers de envío SIN la etiqueta (Despacho) para este ID
-                          const nombreBase = `#${item.id} -`;
-                          const timerActivo = timers.find(t => t.tipoOperacion === 'envio' && t.activo && !t.completado && (t.nombre || '').includes(nombreBase) && !/\(\s*despacho\s*\)/i.test(t.nombre || ''));
-                          const timerCompletado = timers.find(t => t.tipoOperacion === 'envio' && t.completado && (t.nombre || '').includes(nombreBase) && !/\(\s*despacho\s*\)/i.test(t.nombre || ''));
-
-                          // Solo considerar "reciente completado" para la variante de Ensamblaje
-                          const reciente = !timerCompletado
-                            ? getRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`, 'envio')
-                            : null;
-                          // Mostrar completo en estos casos:
-                          // 1) Hay un timer completado persistente y pasó la compuerta por llegada a la etapa.
-                          // 2) Hay un "reciente completado" (mostrar siempre, sin compuerta) para evitar parpadeos a "Sin cronómetro".
-                          // 3) El activo llegó a 0s (mostrar siempre, sin compuerta).
-                          const mostrarCompleto = (() => {
-                            // Mostrar completo si:
-                            // - hay registro de completado reciente (el servidor pudo limpiar el timer)
-                            // - hay un timer activo que llegó a 0
-                            // - hay un timer completado persistente por ID
-                            if (reciente) return true;
-                            if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
-                            if (timerCompletado) return true;
-                            return false;
-                          })();
-
-                          // Completado → mostrar estado 'Completo' con limpiar/editar
-                          if (mostrarCompleto) {
-                            const minutos = timerCompletado
-                              ? timerCompletado.tiempoInicialMinutos
-                              : (reciente?.minutes ?? (timerActivo ? timerActivo.tiempoInicialMinutos : 0));
-                            return (
-                              <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
-                                <span className="text-green-600 text-xs font-medium flex items-center gap-1">
-                                  <CheckCircle className="w-3 h-3 flex-shrink-0" />
-                                  <span className="truncate">Completo</span>
-                                </span>
-                                <div className="text-xs text-gray-500 text-center truncate">
-              {minutos}min
-                                </div>
-                                <div className="flex gap-1">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                      const confirmar = window.confirm(`¿Limpiar el cronómetro completado de ${item.rfid}?`);
-                                      if (!confirmar) return;
-                                      try {
-                                        if (timerCompletado) {
-                                          eliminarTimer(timerCompletado.id);
-                                        } else if (reciente) {
-                                          clearRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`);
-                                        }
-                                      } catch {}
-                                    }}
-                                    className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
-                                    title="Limpiar"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                  <button
-                                    onClick={() => completarDesdeEnsamblaje(item)}
-                                    className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
-                                    title="Completar"
-                                  >
-                                    <CheckCircle className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          // Sin cronómetro → botón iniciar
-                          if (!timerActivo) {
-                            return (
-                              <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
-                                <span className="text-gray-400 text-xs text-center">Sin cronómetro</span>
-                                <button
-                                  onClick={() => abrirTemporizadorParaItem(item, 'Ensamblaje')}
-                                  className="flex items-center justify-center p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs transition-colors"
-                                  title="Iniciar cronómetro"
-                                >
-                                  <Play className="w-3 h-3" />
-                                </button>
-                              </div>
-                            );
-                          }
-
-                          // Activo → diseño unificado
-                          const esUrgente = timerActivo.tiempoRestanteSegundos < 300;
-                          return (
-                            <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
-                              <div className="flex items-center justify-center">
-                                <span className={`font-mono text-xs font-medium truncate ${esUrgente ? 'text-red-600' : 'text-indigo-600'}`}>
-                                  <InlineCountdown endTime={timerActivo.fechaFin} seconds={timerActivo.tiempoRestanteSegundos} paused={!timerActivo.activo} format={formatearTiempo} />
-                                </span>
-                              </div>
-                              {!timerActivo.activo && (
-                                <span className="text-xs text-gray-500">Pausado</span>
-                              )}
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => (timerActivo.activo ? pausarTimer(timerActivo.id) : reanudarTimer(timerActivo.id))}
-                                  className={`p-1.5 rounded text-xs transition-colors ${timerActivo.activo ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700' : 'bg-green-100 hover:bg-green-200 text-green-700'}`}
-                                  title={timerActivo.activo ? 'Pausar' : 'Reanudar'}
-                                >
-                                  {timerActivo.activo ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-                                </button>
-                                <button
-                                  onClick={() => abrirTemporizadorParaItem(item, 'Ensamblaje')}
-                                  className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
-                                  title="Editar cronómetro"
-                                >
-                                  <Edit className="w-3 h-3" />
-                                </button>
-                                <button
-                                  onClick={() => eliminarTimer(timerActivo.id)}
-                                  className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs transition-colors"
-                                  title="Eliminar cronómetro"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          item.categoria === 'TIC' ? 'bg-green-100 text-green-800' :
-                          item.categoria === 'VIP' ? 'bg-purple-100 text-purple-800' :
-                          item.categoria === 'Cube' ? 'bg-blue-100 text-blue-800' :
-                          'bg-orange-100 text-orange-800'
-                        }`}>
-                          {item.categoria}
-                        </span>
-                      </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    itemsEnsamblajeFiltrados.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.rfid}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.nombre_unidad}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">{item.sub_estado}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">{renderTimerEnsamblaje(item)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            item.categoria === 'TIC' ? 'bg-green-100 text-green-800' :
+                            item.categoria === 'VIP' ? 'bg-purple-100 text-purple-800' :
+                            item.categoria === 'Cube' ? 'bg-blue-100 text-blue-800' :
+                            'bg-orange-100 text-orange-800'
+                          }`}>
+                            {item.categoria}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 p-4">
+              {gruposEnsamblaje.length ? gruposEnsamblaje.map(g=>renderGrupo(g,false)) : (
+                <div className="col-span-full text-center text-xs text-gray-500 py-6">No hay items en ensamblaje</div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Sección Lista para Despacho */}
         <div className="bg-white rounded-lg border border-green-200 overflow-hidden">
-          <div className="bg-green-50 border-b border-green-200 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-green-800">Items Lista para Despacho</h2>
-                <p className="text-sm text-green-600">({itemsListaDespachoFiltrados.length} de {itemsListaDespacho.length})</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => {
-                    try { if (isConnected) forzarSincronizacion(); } catch {}
-                    setMostrarModalTraerDespacho(true);
-                  }}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-md hover:bg-orange-700 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Agregar Items
-                </button>
-                <button
-                  onClick={() => { setBatchModoDespacho(true); setMostrarBatchTimerModal(true); }}
-                  disabled={!hayElegiblesBatchDespacho || cargandoBatchDespacho}
-                  className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors border ${!hayElegiblesBatchDespacho || cargandoBatchDespacho ? 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-green-600 hover:bg-green-700 text-white border-green-600'}`}
-                  title={hayElegiblesBatchDespacho ? 'Iniciar cronómetro (Despacho) para todos sin cronómetro' : 'No hay items elegibles'}
-                >
-                  {cargandoBatchDespacho ? <Loader className="w-4 h-4 animate-spin"/> : <Play className="w-4 h-4"/>}
-                  Iniciar todos
-                  {hayElegiblesBatchDespacho && <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded">{nombresBatchDespacho.length}</span>}
-                </button>
-                <button
-                  onClick={completarTodosDespacho}
-                  disabled={timersActivosDespacho.length===0 || cargandoCompletarBatchDespacho}
-                  className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors border ${timersActivosDespacho.length===0 || cargandoCompletarBatchDespacho ? 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-yellow-600 hover:bg-yellow-700 text-white border-yellow-600'}`}
-                  title={timersActivosDespacho.length? 'Completar cronómetros de Despacho' : 'No hay cronómetros activos'}
-                >
-                  {cargandoCompletarBatchDespacho ? <Loader className="w-4 h-4 animate-spin"/> : <CheckCircle className="w-4 h-4"/>}
-                  Completar todos
-                  {timersActivosDespacho.length>0 && <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded">{timersActivosDespacho.length}</span>}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Búsqueda Lista Despacho */}
-          <div className="p-4 border-b border-gray-200">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Buscar por RFID, nombre o lote..."
-                value={busquedaListaDespacho}
-                onChange={(e) => setBusquedaListaDespacho(e.target.value)}
-                maxLength={24}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* Tabla Lista Despacho */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RFID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NOMBRE</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ESTADO</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CRONÓMETRO</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CATEGORÍA</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {itemsListaDespachoFiltrados.length === 0 ? (
+          {vistaGlobal==='tabla' ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center">
-                      <div className="text-gray-500">
-                        <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                        <p>No hay items listos para despacho</p>
-                        <p className="text-sm">Agregue items usando el botón de arriba</p>
-                      </div>
-                    </td>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RFID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NOMBRE</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ESTADO</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CRONÓMETRO</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CATEGORÍA</th>
                   </tr>
-                ) : (
-                  itemsListaDespachoFiltrados.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.rfid}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.nombre_unidad}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                            {item.sub_estado}
-                          </span>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {itemsListaDespachoFiltrados.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-8 text-center">
+                        <div className="text-gray-500">
+                          <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                          <p>No hay items listos para despacho</p>
+                          <p className="text-sm">Agregue items usando el botón de arriba</p>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {(() => {
-                          const normalize = (s: string) => s?.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-                          // Lista para Despacho: buscar timers de envío CON etiqueta (Despacho) para este ID
-                          const nombreBase = `#${item.id} -`;
-                          const timerActivo = timers.find(t => t.tipoOperacion === 'envio' && t.activo && !t.completado && (t.nombre || '').includes(nombreBase) && /\(\s*despacho\s*\)/i.test(t.nombre || ''));
-                          const timerCompletado = timers.find(t => t.tipoOperacion === 'envio' && t.completado && (t.nombre || '').includes(nombreBase) && /\(\s*despacho\s*\)/i.test(t.nombre || ''));
-
-                          // Solo considerar "reciente completado" para la variante de Despacho
-                          const reciente = !timerCompletado
-                            ? getRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`, 'envio')
-                            : null;
-                          
-                          // Debug silenciado de estado de cronómetro en Lista para Despacho
-
-                          const mostrarCompleto = (() => {
-                            if (reciente) return true;
-                            if (timerActivo && (timerActivo.tiempoRestanteSegundos ?? 0) <= 0) return true;
-                            if (timerCompletado) return true;
-                            return false;
-                          })();
-
-                          if (mostrarCompleto) {
-                            const minutos = timerCompletado
-                              ? timerCompletado.tiempoInicialMinutos
-                              : (reciente?.minutes ?? (timerActivo ? timerActivo.tiempoInicialMinutos : 0));
-                            return (
-                              <div className="flex flex-col items-center space-y-1 py-1 max-w-24">
-                                <span className="text-green-600 text-xs font-medium flex items-center gap-1">
-                                  <CheckCircle className="w-3 h-3 flex-shrink-0" />
-                                  <span className="truncate">Completo</span>
-                                </span>
-                                <div className="text-xs text-gray-500 text-center truncate">
-              {minutos}min
-                                </div>
-                                <div className="flex gap-1">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                      const confirmar = window.confirm(`¿Limpiar el cronómetro completado de ${item.rfid}?`);
-                                      if (!confirmar) return;
-                                      try {
-                                        if (timerCompletado) {
-                                          eliminarTimer(timerCompletado.id);
-                                        } else if (reciente) {
-                                          clearRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`);
-                                        }
-                                      } catch {}
-                                    }}
-                                    className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
-                                    title="Limpiar"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                  <button
-                                    onClick={() => abrirTemporizadorParaItem(item, 'Lista para Despacho')}
-                                    className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
-                                    title="Crear nuevo cronómetro"
-                                  >
-                                    <Play className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          if (!timerActivo) {
-                            return (
-                              <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
-                                <span className="text-gray-400 text-xs text-center">Sin cronómetro</span>
-                                <button
-                                  onClick={() => abrirTemporizadorParaItem(item, 'Lista para Despacho')}
-                                  className="flex items-center justify-center p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs transition-colors"
-                                  title="Iniciar cronómetro"
-                                >
-                                  <Play className="w-3 h-3" />
-                                </button>
-                              </div>
-                            );
-                          }
-
-                          const esUrgente = timerActivo.tiempoRestanteSegundos < 300;
-                          return (
-                            <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
-                              <div className="flex items-center justify-center">
-                                <span className={`font-mono text-xs font-medium truncate ${esUrgente ? 'text-red-600' : 'text-indigo-600'}`}>
-                                  <InlineCountdown endTime={timerActivo.fechaFin} seconds={timerActivo.tiempoRestanteSegundos} paused={!timerActivo.activo} format={formatearTiempo} />
-                                </span>
-                              </div>
-                              {!timerActivo.activo && (
-                                <span className="text-xs text-gray-500">Pausado</span>
-                              )}
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => (timerActivo.activo ? pausarTimer(timerActivo.id) : reanudarTimer(timerActivo.id))}
-                                  className={`p-1.5 rounded text-xs transition-colors ${timerActivo.activo ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-700' : 'bg-green-100 hover:bg-green-200 text-green-700'}`}
-                                  title={timerActivo.activo ? 'Pausar' : 'Reanudar'}
-                                >
-                                  {timerActivo.activo ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-                                </button>
-                                <button
-                                  onClick={() => abrirTemporizadorParaItem(item, 'Lista para Despacho')}
-                                  className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
-                                  title="Editar cronómetro"
-                                >
-                                  <Edit className="w-3 h-3" />
-                                </button>
-                                <button
-                                  onClick={() => eliminarTimer(timerActivo.id)}
-                                  className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs transition-colors"
-                                  title="Eliminar cronómetro"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          item.categoria === 'TIC' ? 'bg-green-100 text-green-800' :
-                          item.categoria === 'VIP' ? 'bg-purple-100 text-purple-800' :
-                          item.categoria === 'Cube' ? 'bg-blue-100 text-blue-800' :
-                          'bg-orange-100 text-orange-800'
-                        }`}>
-                          {item.categoria}
-                        </span>
-                      </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ) : (
+                    itemsListaDespachoFiltrados.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.rfid}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.nombre_unidad}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">{item.sub_estado}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">{renderTimerDespacho(item)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            item.categoria === 'TIC' ? 'bg-green-100 text-green-800' :
+                            item.categoria === 'VIP' ? 'bg-purple-100 text-purple-800' :
+                            item.categoria === 'Cube' ? 'bg-blue-100 text-blue-800' :
+                            'bg-orange-100 text-orange-800'
+                          }`}>
+                            {item.categoria}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 p-4">
+              {gruposDespacho.length ? gruposDespacho.map(g=>renderGrupo(g,true)) : (
+                <div className="col-span-full text-center text-xs text-gray-500 py-6">No hay items listos para despacho</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
