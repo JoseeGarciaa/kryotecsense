@@ -1155,67 +1155,59 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
   const [horas, setHoras] = useState<string>('');
   const [minutos, setMinutos] = useState<string>('');
 
-  // Función para manejar auto-procesamiento de RFIDs de 24 caracteres
+  // Auto-procesamiento de trozos de 24 caracteres; soporta TIC (lista) y VIP/Cube (bodega, ocultos)
   const procesarRfid = (rfid: string) => {
     const code = rfid.trim();
-    if (!code) return;
-    if (code.length !== 24) {
-      console.warn(`RFID ignorado por longitud distinta de 24: '${code}'`);
+    if (!code || code.length !== 24) return;
+    if (!/^[a-zA-Z0-9]+$/.test(code)) return;
+
+    // Ya escaneado
+    if (rfidsEscaneados.includes(code)) return;
+
+    // Buscar primero en visibles (TIC atemperados)
+    let candidato: any = itemsDisponibles.find(i => i.rfid === code);
+    // Si no está y es Ensamblaje, buscar VIP/Cube en bodega (ocultos)
+    if (!candidato && subEstadoDestino === 'Ensamblaje') {
+      candidato = inventarioCompleto.find(it => it.rfid === code && ['VIP','Cube'].includes(it.categoria) && /(bodega)/i.test((it.estado||'')));
+    }
+    if (!candidato) {
+      console.warn(`RFID ${code} no elegible (no encontrado en criterios)`);
       return;
     }
 
-    const itemEncontrado = itemsDisponibles.find(item => item.rfid === code);
-
-    if (itemEncontrado) {
-      if (!rfidsEscaneados.includes(code)) {
-        setRfidsEscaneados(prev => [...prev, code]);
-        console.log(`✅ RFID ${code} auto-procesado`);
-        // En Ensamblaje agregamos inmediatamente a la selección respetando la composición
-        if (subEstadoDestino === 'Ensamblaje') {
-          setItemsSeleccionados(prev => {
-            if (prev.find(p => p.id === itemEncontrado.id)) return prev;
-            const cat = (itemEncontrado.categoria || '').toUpperCase();
-            const counts = prev.reduce((acc:any, it:any) => { const c = (it.categoria||'').toUpperCase(); acc[c] = (acc[c]||0)+1; return acc; }, {} as Record<string,number>);
-            if (cat === 'TIC' && (counts.TIC||0) >= 6) return prev;
-            if (cat === 'VIP' && (counts.VIP||0) >= 1) return prev;
-            if (cat === 'CUBE' && (counts.CUBE||counts.Cube||0) >= 1) return prev;
-            return [...prev, itemEncontrado];
-          });
-        }
-      } else {
-        console.log(`ℹ️ RFID ${code} ya está en la lista`);
-      }
-    } else {
-      console.log(`❌ RFID ${code} no encontrado en items disponibles`);
+    setRfidsEscaneados(prev => [...prev, code]);
+    if (subEstadoDestino === 'Ensamblaje') {
+      setItemsSeleccionados(prev => {
+        if (prev.find(p => p.id === candidato.id)) return prev; // ya agregado
+        const cat = (candidato.categoria || '').toUpperCase();
+        const counts = prev.reduce((acc:any, it:any) => { const c=(it.categoria||'').toUpperCase(); acc[c]=(acc[c]||0)+1; return acc; }, {} as Record<string,number>);
+        if (cat === 'TIC' && (counts.TIC||0) >= 6) return prev;
+        if (cat === 'VIP' && (counts.VIP||0) >= 1) return prev;
+        if (cat === 'CUBE' && (counts.CUBE||counts.Cube||0) >= 1) return prev;
+        return [...prev, candidato];
+      });
     }
   };
 
   // Función para manejar cambios en el input de RFID con auto-procesamiento
   const handleRfidChange = (value: string) => {
-    setRfidInput(value);
-    
-  // Auto-procesar cada 24 caracteres exactos
-  if (value.length > 0 && value.length % 24 === 0) {
-      // Extraer códigos de 24 caracteres
-      const codigosCompletos = [];
-      for (let i = 0; i < value.length; i += 24) {
-        const codigo = value.substring(i, i + 24);
-        if (codigo.length === 24) {
-          codigosCompletos.push(codigo);
-        }
+    // Acumular y procesar en cascada mientras haya bloques de 24
+    let buffer = value.replace(/\s+/g,''); // eliminar espacios/nuevas líneas del escáner
+    const procesados: string[] = [];
+    while (buffer.length >= 24) {
+      const chunk = buffer.slice(0,24);
+      if (/^[a-zA-Z0-9]{24}$/.test(chunk)) {
+        procesarRfid(chunk);
+        procesados.push(chunk);
+        buffer = buffer.slice(24);
+      } else {
+        // Si el primer bloque no es válido, cortar para evitar loop infinito
+        break;
       }
-      
-      // Procesar cada código
-      codigosCompletos.forEach(codigo => {
-        procesarRfid(codigo);
-      });
-      
-      // Limpiar el input después de procesar
-      setRfidInput('');
-      
-      if (codigosCompletos.length > 0) {
-        console.log(`🔄 Auto-procesados ${codigosCompletos.length} códigos de 24 caracteres`);
-      }
+    }
+    setRfidInput(buffer);
+    if (procesados.length) {
+      console.log(`🔄 Auto-procesados ${procesados.length} código(s)`);
     }
   };
 
