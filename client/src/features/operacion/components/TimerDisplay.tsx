@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Clock } from 'lucide-react';
 import { Timer } from '../../../contexts/TimerContext';
 
@@ -11,12 +11,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
   timers,
   formatearTiempo
 }) => {
-  // Tick local cada segundo para timers activos (evita depender de updates por WebSocket cada segundo)
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  // Eliminado tick local: el servidor envía tiempoRestanteSegundos ya decrementado.
 
   const timersActivos = timers.filter(timer => !timer.completado);
   
@@ -79,8 +74,7 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
                 }`}>
                   {(() => {
                     if (timer.completado) return formatearTiempo(0);
-                    const remaining = (!timer.activo ? timer.tiempoRestanteSegundos : Math.max(0, Math.ceil((timer.fechaFin.getTime() - now) / 1000)));
-                    return formatearTiempo(remaining);
+                    return formatearTiempo(Math.max(0, timer.tiempoRestanteSegundos));
                   })()}
                 </div>
                 
@@ -97,8 +91,8 @@ const TimerDisplay: React.FC<TimerDisplayProps> = ({
                     style={{
                       width: `${(() => {
                         const total = timer.tiempoInicialMinutos * 60;
-                        const remaining = timer.completado ? 0 : (!timer.activo ? timer.tiempoRestanteSegundos : Math.max(0, Math.ceil((timer.fechaFin.getTime() - now) / 1000)));
-                        return Math.max(0, (remaining / total) * 100);
+                        const remaining = timer.completado ? 0 : Math.max(0, timer.tiempoRestanteSegundos);
+                        return total > 0 ? Math.max(0, (remaining / total) * 100) : 0;
                       })()}%`
                     }}
                   />
