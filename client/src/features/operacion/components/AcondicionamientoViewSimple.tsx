@@ -1230,6 +1230,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
       `${selectedCounts.TIC || 0}/${requiredComposition.TIC} TIC`];
     return parts.join(' • ');
   };
+  const remaining = (cat: 'TIC'|'VIP'|'Cube') => Math.max(0, (requiredComposition as any)[cat] - (selectedCounts as any)[cat] || 0);
 
   const confirmarEscaneoRfid = async (rfids: string[]) => {
     try {
@@ -1361,31 +1362,59 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
           ) : (
             <div className="space-y-2">
               {subEstadoDestino === 'Ensamblaje' && (
-                <div className="mb-2 p-3 rounded-md border text-xs bg-gray-50">
-                  <div className="font-semibold mb-1">Armar caja (1 CUBE · 1 VIP · 6 TIC Atemperadas)</div>
-                  <div className="text-gray-600 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                    <span>Escanee RFIDs (auto-detección de rol). Composición requerida: 6 TIC · 1 VIP · 1 CUBE.</span>
-                    <span className={`font-medium ${validComposition ? 'text-green-600' : 'text-orange-600'}`}>{compositionStatusText()}</span>
+                <div className="mb-3 rounded-lg border bg-gradient-to-br from-gray-50 to-white p-4 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-800">Armar caja (1 CUBE · 1 VIP · 6 TIC Atemperadas)</h4>
+                      <p className="text-[11px] text-gray-600 mt-0.5">Seleccione o escanee items. La composición debe ser exacta para crear la caja.</p>
+                    </div>
+                    <div className={`text-[11px] px-2 py-1 rounded-full font-medium self-start ${validComposition ? 'bg-green-100 text-green-700':'bg-orange-100 text-orange-700'}`}>{compositionStatusText()}</div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 mt-4">
+                    {[{k:'Cube', label:'CUBE', color:'blue', total:requiredComposition.Cube, val:selectedCounts.Cube||0}, {k:'VIP', label:'VIP', color:'purple', total:requiredComposition.VIP, val:selectedCounts.VIP||0}, {k:'TIC', label:'TIC', color:'green', total:requiredComposition.TIC, val:selectedCounts.TIC||0}].map(card => {
+                      const pct = Math.min(100, (card.val / card.total) * 100);
+                      const full = card.val === card.total;
+                      return (
+                        <div key={card.k} className={`relative rounded-md border p-3 flex flex-col gap-2 ${full? 'bg-'+card.color+'-50 border-'+card.color+'-300':'bg-white'} transition-colors` as any}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] tracking-wide text-gray-500">{card.label}</span>
+                            <span className={`text-[10px] font-semibold ${full? 'text-green-600':'text-gray-500'}`}>{card.val}/{card.total}</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-gray-200 rounded overflow-hidden">
+                            <div className={`h-full bg-${card.color}-500 transition-all`} style={{width: pct+'%'}} />
+                          </div>
+                          {full && <span className="absolute top-1 right-1 text-[9px] text-green-600 font-medium">OK</span>}
+                        </div>
+                      );
+                    })}
                   </div>
                   {!validComposition && itemsSeleccionados.length>0 && (
-                    <div className="mt-1 text-[11px] text-red-600">La composición debe ser exacta para continuar.</div>
+                    <div className="mt-3 text-[11px] text-red-600 font-medium">Faltan elementos para completar la composición exacta.</div>
                   )}
                 </div>
               )}
               {itemsFiltrados.map((item) => {
                 const isSelected = itemsSeleccionados.find(s => s.id === item.id);
+                const cat = (item.categoria||'').toUpperCase();
+                let bloqueado = false;
+                if (subEstadoDestino==='Ensamblaje') {
+                  if (cat==='TIC' && (selectedCounts.TIC||0) >= requiredComposition.TIC && !isSelected) bloqueado=true;
+                  if (cat==='VIP' && (selectedCounts.VIP||0) >= requiredComposition.VIP && !isSelected) bloqueado=true;
+                  if (cat==='CUBE' && (selectedCounts.Cube||0) >= requiredComposition.Cube && !isSelected) bloqueado=true;
+                }
                 return (
                   <div
                     key={item.id}
                     onClick={() => {
+                      if (bloqueado) return;
                       if (isSelected) {
                         setItemsSeleccionados(prev => prev.filter(s => s.id !== item.id));
                       } else {
                         setItemsSeleccionados(prev => [...prev, item]);
                       }
                     }}
-                    className={`p-3 border rounded cursor-pointer transition-all ${
-                      isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                    className={`p-3 border rounded cursor-pointer transition-all ${bloqueado? 'opacity-40 cursor-not-allowed':''} ${
+                      isSelected ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -1394,6 +1423,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                         checked={!!isSelected}
                         onChange={() => {}}
                         className="mt-0.5 rounded"
+                        disabled={bloqueado}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -1406,6 +1436,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                             {item.categoria}
                           </span>
                           <span className="font-medium text-sm truncate" title={item.nombre_unidad}>{item.nombre_unidad}</span>
+                          {bloqueado && <span className="text-[10px] text-red-500">Cupo lleno</span>}
                         </div>
                         <div className="text-xs text-gray-600 mt-1 break-words">
                           <span className="mr-2">RFID: {item.rfid}</span>
