@@ -86,6 +86,34 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     item.estado === 'Acondicionamiento' && item.sub_estado === 'Lista para Despacho'
   ) || [];
 
+  // Próximo código incremental de CAJA (formato CJ-0001) basado en lotes existentes usados como caja
+  const nextCajaId = useMemo(() => {
+    const todos = [...itemsEnsamblaje, ...itemsListaDespacho, ...(inventarioCompleto||[])];
+    let max = 0;
+    for (const it of todos) {
+      const m = /^CJ-(\d{4,})$/.exec(it?.lote || '');
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (!Number.isNaN(n) && n > max) max = n;
+      }
+    }
+    return `CJ-${String(max + 1).padStart(4, '0')}`;
+  }, [itemsEnsamblaje, itemsListaDespacho, inventarioCompleto]);
+
+  // Helper para recalcular justo antes de confirmar (evita duplicados si otro cliente creó una caja mientras el modal estaba abierto)
+  const getNextCajaId = () => {
+    const todos = [...itemsEnsamblaje, ...itemsListaDespacho, ...(inventarioCompleto||[])];
+    let max = 0;
+    for (const it of todos) {
+      const m = /^CJ-(\d{4,})$/.exec(it?.lote || '');
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (!Number.isNaN(n) && n > max) max = n;
+      }
+    }
+    return `CJ-${String(max + 1).padStart(4, '0')}`;
+  };
+
   // Elegibles para batch (sin cronómetro de envío activo/completado en Ensamblaje)
   const nombresBatch = useMemo(() => {
     return itemsEnsamblaje
@@ -913,13 +941,14 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
           itemsDisponibles={itemsDisponibles} // Bodega o Pre-acond → Atemperamiento (sin Congelamiento)
           subEstadoDestino="Ensamblaje"
           cargando={cargandoEnsamblaje}
+          nextCajaId={nextCajaId}
       onConfirm={async (items, subEstado, tiempoOperacionMinutos) => {
             try {
               setCargandoEnsamblaje(true);
               setCargandoActualizacion(true);
               // Silenciado: log de movimiento a Ensamblaje
-        // Generar ID único de CAJA compartida
-        const cajaId = `CJ-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
+  // Generar ID incremental de CAJA compartida
+  const cajaId = getNextCajaId();
               
               // Cancelar cronómetros de los items que se van a mover
               cancelarCronometrosDeItems(items);
@@ -981,7 +1010,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
       )}
 
       {mostrarModalTraerDespacho && (
-        <AgregarItemsModal
+  <AgregarItemsModal
           isOpen={mostrarModalTraerDespacho}
           onClose={() => setMostrarModalTraerDespacho(false)}
           itemsDisponibles={itemsDisponiblesParaDespacho} // Solo items de Ensamblaje para Lista para Despacho
@@ -1100,6 +1129,7 @@ interface AgregarItemsModalProps {
   onConfirm: (items: any[], subEstado: string, tiempoOperacionMinutos?: number) => void;
   subEstadoDestino: string; // Nuevo prop para especificar el sub-estado destino
   cargando?: boolean; // Estado de carga para mostrar en el botón
+  nextCajaId?: string; // Código incremental sugerido para la próxima caja
 }
 
 const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({ 
@@ -1108,7 +1138,8 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
   itemsDisponibles, 
   onConfirm, 
   subEstadoDestino,
-  cargando = false
+  cargando = false,
+  nextCajaId
 }) => {
   const [itemsSeleccionados, setItemsSeleccionados] = useState<any[]>([]);
   const [busqueda, setBusqueda] = useState('');
@@ -1337,7 +1368,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                   ))}
                 </div>
               )}
-              <p className="text-[11px] text-gray-500">Escanee sucesivamente; cada 24 caracteres se procesa automáticamente y se agrega si hay cupo.</p>
+              <p className="text-[11px] text-gray-500">Escanee sucesivamente; cada 24 caracteres se procesa automáticamente y se agrega si hay cupo. {nextCajaId && (<span>Próxima caja sugerida: <span className="font-semibold text-gray-700">{nextCajaId}</span></span>)}</p>
             </div>
           ) : (
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-2 sm:mb-3">
