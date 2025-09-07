@@ -67,7 +67,12 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     return () => clearInterval(id);
   }, []);
   // Batch en progreso para evitar efecto "cascada" al iniciar muchos a la vez
-  const pendingBatchRef = useRef<{ names: Set<string>; expiresAt: number } | null>(null);
+  const pendingBatchRef = useRef<{
+    names: Set<string>;
+    expiresAt: number;
+    startAt: number; // timestamp ms cuando se pulsó Iniciar Todos
+    durationSec: number; // duración total en segundos
+  } | null>(null);
   
   // WebSocket para comunicación con el backend
   const timerWsUrl = (() => {
@@ -108,14 +113,24 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
       case 'TIMER_SYNC':
         // Sincronización completa desde el servidor
         if (Array.isArray(lastMessage.data.timers)) {
-          const timersActualizados = lastMessage.data.timers.map((timer: any) => ({
+          let timersActualizados = lastMessage.data.timers.map((timer: any) => ({
             ...timer,
             fechaInicio: new Date(timer.fechaInicio),
             fechaFin: new Date(timer.fechaFin),
             tiempoRestanteSegundos: timer.server_remaining_time || timer.tiempoRestanteSegundos
           }));
+          // Normalizar batch si sigue vigente (alinear misma fechaInicio/fin para todos los nombres del batch)
+          const batchSync = pendingBatchRef.current;
+          if (batchSync && Date.now() <= batchSync.expiresAt) {
+            timersActualizados = timersActualizados.map((t: any) => {
+              if (!batchSync.names.has(t.nombre)) return t;
+              const fechaInicio = new Date(batchSync.startAt);
+              const fechaFin = new Date(batchSync.startAt + batchSync.durationSec * 1000);
+              const restante = Math.max(0, Math.ceil((fechaFin.getTime() - Date.now()) / 1000));
+              return { ...t, fechaInicio, fechaFin, tiempoRestanteSegundos: restante };
+            });
+          }
           setTimers(prev => {
-            // Mantener timers locales no confirmados que aún no aparezcan por nombre
             const serverNames = new Set<string>(timersActualizados.map((t: any) => t.nombre));
             const localesPendientes = prev.filter(t => t.pendienteSync && !serverNames.has(t.nombre));
             return [...timersActualizados, ...localesPendientes];
@@ -159,14 +174,21 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
       case 'TIMER_CREATED':
         // Nuevo timer desde otro dispositivo
         if (lastMessage.data.timer) {
-          const nuevoTimer = {
+          let nuevoTimer = {
             ...lastMessage.data.timer,
             fechaInicio: new Date(lastMessage.data.timer.fechaInicio),
             fechaFin: new Date(lastMessage.data.timer.fechaFin)
           };
-          // Si estamos iniciando un lote, suprime la aparición inmediata
+          // Si estamos iniciando un lote, normalizar fechaInicio/fin y opcionalmente suprimir hasta SYNC
           const batch = pendingBatchRef.current;
-          const isSuppressed = batch && Date.now() <= batch.expiresAt && batch.names.has(nuevoTimer.nombre);
+          const isBatchMember = batch && Date.now() <= batch.expiresAt && batch.names.has(nuevoTimer.nombre);
+          if (isBatchMember && batch) {
+            const fechaInicio = new Date(batch.startAt);
+            const fechaFin = new Date(batch.startAt + batch.durationSec * 1000);
+            const restante = Math.max(0, Math.ceil((fechaFin.getTime() - Date.now()) / 1000));
+            nuevoTimer = { ...nuevoTimer, fechaInicio, fechaFin, tiempoRestanteSegundos: restante } as any;
+          }
+          const isSuppressed = !!(batch && Date.now() <= batch.expiresAt && batch.names.has(nuevoTimer.nombre));
           setTimers(prev => {
             // Reemplazar posible timer local pendiente con mismo nombre
             const existeId = prev.find(t => t.id === nuevoTimer.id);
@@ -266,7 +288,8 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     // Mostramos placeholders mediante isStartingBatchFor hasta que el servidor
     // envíe TIMER_CREATED o un TIMER_SYNC.
     if (isConnected) {
-      pendingBatchRef.current = { names: new Set(nombres), expiresAt: Date.now() + 5000 };
+  const startAt = Date.now();
+  pendingBatchRef.current = { names: new Set(nombres), expiresAt: startAt + 5000, startAt, durationSec: tiempoMinutos * 60 };
       const timersData = nombres.map(nombre => ({ nombre, tipoOperacion, tiempoInicialMinutos: tiempoMinutos }));
       sendMessage({ type: 'CREATE_TIMERS_BATCH', data: { timers: timersData } });
       // Solicitar sync tras breve delay para consolidar todos en un solo SYNC
