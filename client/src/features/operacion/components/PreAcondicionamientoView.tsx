@@ -247,7 +247,18 @@ const PreAcondicionamientoView: React.FC = () => {
           } catch {}
           const indice = String(maxIndice + 1).padStart(3, '0');
           // Intentar registrar lote en backend (si endpoint existe). Silenciar fallos.
-          try { await apiServiceClient.post('/inventory/inventario/registrar-lote-batch', { rfids, indice, fecha: fechaBase, sub_estado: subEstadoFinal }); } catch {}
+          // Intentar registrar lote sólo si el endpoint está soportado (detectar una vez)
+          let canRegistrar = (window as any).__endpointRegistrarLoteBatch !== false;
+          if (canRegistrar) {
+            try {
+              await apiServiceClient.post('/inventory/inventario/registrar-lote-batch', { rfids, indice, fecha: fechaBase, sub_estado: subEstadoFinal });
+            } catch (e:any) {
+              // Si recibimos 404/405 marcar como no soportado para suprimir futuros intentos
+              if (e?.response?.status === 404 || e?.response?.status === 405) {
+                (window as any).__endpointRegistrarLoteBatch = false;
+              }
+            }
+          }
           await cargarDatos();
         } catch {}
       }, 120);

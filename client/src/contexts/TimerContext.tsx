@@ -171,6 +171,7 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
         // si el estado (activo/completado) cambia o hay un salto > 5s.
         if (Array.isArray(lastMessage.data.updates)) {
           const updatesArray = lastMessage.data.updates as any[];
+          const batchAlign = pendingBatchRef.current && Date.now() <= pendingBatchRef.current.expiresAt ? pendingBatchRef.current : null;
           setTimers(prev => prev.map(timer => {
             const update = updatesArray.find(u => u.timerId === timer.id);
             if (!update) return timer;
@@ -178,7 +179,21 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
             const estadoCambio = (update.completado !== undefined && update.completado !== timer.completado) || (update.activo !== undefined && update.activo !== timer.activo);
             // Si el timer ya está completado localmente, mantenerlo.
             if (timer.completado && !estadoCambio) return timer;
-            if (!estadoCambio && diff <= 5) {
+            // Si pertenece al batch pendiente, forzar alineación estricta con fechaFin calculada.
+            if (batchAlign && batchAlign.names.has(normalizeName(timer.nombre))) {
+              const fechaInicio = new Date(batchAlign.startAt);
+              const fechaFin = new Date(batchAlign.startAt + batchAlign.durationSec * 1000);
+              const restanteCalc = Math.max(0, Math.ceil((fechaFin.getTime() - Date.now()) / 1000));
+              return {
+                ...timer,
+                fechaInicio,
+                fechaFin,
+                tiempoRestanteSegundos: restanteCalc,
+                completado: update?.completado ?? timer.completado,
+                activo: update?.activo ?? timer.activo
+              };
+            }
+            if (!estadoCambio && diff <= 2) {
               // Ignorar ajuste pequeño de segundos; InlineCountdown se basa en fechaFin.
               return timer;
             }
@@ -315,7 +330,9 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     if (!nombres.length) return;
     if (isConnected) {
   const startAt = Date.now();
-  pendingBatchRef.current = { names: new Set(nombres.map(n => normalizeName(n))), expiresAt: startAt + 2500, startAt, durationSec: tiempoMinutos * 60 };
+  // Ventana extendida (6s) para asegurar que todos los TIMER_CREATED / SYNC tardíos del backend
+  // se normalicen y queden perfectamente alineados visualmente.
+  pendingBatchRef.current = { names: new Set(nombres.map(n => normalizeName(n))), expiresAt: startAt + 6000, startAt, durationSec: tiempoMinutos * 60 };
       // Placeholders uniformes
       setTimers(prev => {
   const existentes = new Set(prev.map(t => normalizeName(t.nombre)));
