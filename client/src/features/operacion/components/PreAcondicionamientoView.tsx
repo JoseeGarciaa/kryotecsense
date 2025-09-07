@@ -191,7 +191,17 @@ const PreAcondicionamientoView: React.FC = () => {
     setMostrarModalTimer(false);
     setRfidsPendientesTimer([]);
     try {
-      if (rfids.length === 1) iniciarTimer(rfids[0], tipoSel, tiempoMinutos); else iniciarTimers(rfids, tipoSel, tiempoMinutos);
+      // Reemplazar timers existentes antes de crear los nuevos (evita duplicados que causan “tiempo loco”).
+      rfids.forEach(r => {
+        timers
+          .filter(t => norm(t.nombre) === norm(r) && t.tipoOperacion === tipoSel)
+          .forEach(t => eliminarTimer(t.id));
+      });
+      if (rfids.length === 1) {
+        iniciarTimer(rfids[0], tipoSel, tiempoMinutos);
+      } else {
+        iniciarTimers(rfids, tipoSel, tiempoMinutos);
+      }
       const items = operaciones.inventarioCompleto.filter(i => rfids.includes(i.rfid));
       if (items.length) {
         try { await apiServiceClient.post('/inventory/iniciar-timers-masivo', { items_ids: items.map((i:any)=>i.id).filter(Boolean), tipoOperacion: tipoSel, tiempoMinutos }); } catch {}
@@ -287,6 +297,33 @@ const PreAcondicionamientoView: React.FC = () => {
       return nuevo;
     });
   }, [eliminarTimer]);
+
+  // Dedupe defensivo: si por alguna razón quedaron timers duplicados por nombre+tipoOperacion, conservar el más reciente.
+  useEffect(() => {
+    if (!timers.length) return;
+    const seen = new Map<string, string>(); // key -> timerId a conservar
+    const toRemove: string[] = [];
+    timers.forEach(t => {
+      const key = `${norm(t.nombre)}|${t.tipoOperacion}`;
+      if (!seen.has(key)) {
+        seen.set(key, t.id);
+      } else {
+        // Conservar el que tenga fechaFin mayor (más nuevo)
+        const keptId = seen.get(key)!;
+        const kept = timers.find(x => x.id === keptId);
+        if (kept && kept.fechaFin < t.fechaFin) {
+          // Remover el anterior
+            toRemove.push(kept.id);
+            seen.set(key, t.id);
+        } else {
+          toRemove.push(t.id);
+        }
+      }
+    });
+    if (toRemove.length) {
+      toRemove.forEach(id => eliminarTimer(id));
+    }
+  }, [timers, eliminarTimer]);
 
   const limpiarTimersCompletadosPorTipo = async (tipo: 'congelamiento' | 'atemperamiento', onlyIds?: string[]) => {
     let lista = timers.filter(t => t.completado && t.tipoOperacion === tipo);
