@@ -37,6 +37,8 @@ interface TimerContextType {
   getRecentCompletionById: (id: string | number) => { minutes: number } | null;
   // Forzar completado inmediato local (batch "Completar todos")
   marcarTimersCompletados: (ids: string[]) => void;
+  // Limpiar un registro de completado reciente (sin timer persistente)
+  clearRecentCompletion: (nombre: string) => void;
 }
 
 const TimerContext = createContext<TimerContextType | undefined>(undefined);
@@ -319,6 +321,11 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     });
   };
 
+  const clearRecentCompletion = (nombre: string) => {
+    if (!nombre) return;
+    recentCompletionsRef.current.delete(nombre.toLowerCase());
+  };
+
   const formatearTiempo = (segundos: number): string => {
     const minutos = Math.floor(segundos / 60);
     const segundosRestantes = segundos % 60;
@@ -409,6 +416,7 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
   getRecentCompletion,
   getRecentCompletionById,
   marcarTimersCompletados,
+  clearRecentCompletion,
   };
 
   return (

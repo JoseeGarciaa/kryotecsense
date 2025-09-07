@@ -14,7 +14,7 @@ interface AcondicionamientoViewSimpleProps {
 
 const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = ({ isOpen, onClose }) => {
   const { inventarioCompleto, cambiarEstadoItem, actualizarColumnasDesdeBackend } = useOperaciones();
-  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer, getRecentCompletion, getRecentCompletionById, iniciarTimers, isStartingBatchFor, marcarTimersCompletados } = useTimerContext();
+  const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer, getRecentCompletion, getRecentCompletionById, iniciarTimers, isStartingBatchFor, marcarTimersCompletados, clearRecentCompletion } = useTimerContext();
   
   const [mostrarModalTraerEnsamblaje, setMostrarModalTraerEnsamblaje] = useState(false);
   const [mostrarModalTraerDespacho, setMostrarModalTraerDespacho] = useState(false);
@@ -557,9 +557,14 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                                       e.stopPropagation();
                                       e.preventDefault();
                                       const confirmar = window.confirm(`¿Limpiar el cronómetro completado de ${item.rfid}?`);
-                                      if (confirmar) {
-                try { if (timerCompletado) eliminarTimer(timerCompletado.id); } catch {}
-                                      }
+                                      if (!confirmar) return;
+                                      try {
+                                        if (timerCompletado) {
+                                          eliminarTimer(timerCompletado.id);
+                                        } else if (reciente) {
+                                          clearRecentCompletion(`Envío #${item.id} - ${item.nombre_unidad}`);
+                                        }
+                                      } catch {}
                                     }}
                                     className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
                                     title="Limpiar"
@@ -785,9 +790,14 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                                       e.stopPropagation();
                                       e.preventDefault();
                                       const confirmar = window.confirm(`¿Limpiar el cronómetro completado de ${item.rfid}?`);
-                                      if (confirmar) {
-                try { if (timerCompletado) eliminarTimer(timerCompletado.id); } catch {}
-                                      }
+                                      if (!confirmar) return;
+                                      try {
+                                        if (timerCompletado) {
+                                          eliminarTimer(timerCompletado.id);
+                                        } else if (reciente) {
+                                          clearRecentCompletion(`Envío (Despacho) #${item.id} - ${item.nombre_unidad}`);
+                                        }
+                                      } catch {}
                                     }}
                                     className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-colors"
                                     title="Limpiar"
