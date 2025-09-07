@@ -1209,6 +1209,28 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
     }
   };
 
+  // === Reglas de composición para Ensamblaje (6 TIC, 1 VIP, 1 Cube) ===
+  const requiredComposition = { TIC: 6, VIP: 1, Cube: 1 };
+  const selectedCounts = itemsSeleccionados.reduce((acc:any, it:any) => {
+    const cat = (it.categoria || '').toUpperCase();
+    const key = cat === 'TIC' ? 'TIC' : (cat === 'VIP' ? 'VIP' : (cat === 'CUBE' ? 'Cube' : null));
+    if (key) acc[key] = (acc[key] || 0) + 1; return acc;
+  }, {} as Record<string, number>);
+  const validComposition = subEstadoDestino === 'Ensamblaje'
+    ? (selectedCounts.TIC === requiredComposition.TIC &&
+       selectedCounts.VIP === requiredComposition.VIP &&
+       selectedCounts.Cube === requiredComposition.Cube &&
+       itemsSeleccionados.length === (requiredComposition.TIC + requiredComposition.VIP + requiredComposition.Cube))
+    : true;
+
+  const compositionStatusText = () => {
+    const parts = [
+      `${selectedCounts.Cube || 0}/${requiredComposition.Cube} CUBE`,
+      `${selectedCounts.VIP || 0}/${requiredComposition.VIP} VIP`,
+      `${selectedCounts.TIC || 0}/${requiredComposition.TIC} TIC`];
+    return parts.join(' • ');
+  };
+
   const confirmarEscaneoRfid = async (rfids: string[]) => {
     try {
       // Encontrar todos los items correspondientes a los RFIDs escaneados
@@ -1338,6 +1360,18 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
             </div>
           ) : (
             <div className="space-y-2">
+              {subEstadoDestino === 'Ensamblaje' && (
+                <div className="mb-2 p-3 rounded-md border text-xs bg-gray-50">
+                  <div className="font-semibold mb-1">Armar caja (1 CUBE · 1 VIP · 6 TIC Atemperadas)</div>
+                  <div className="text-gray-600 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                    <span>Escanee RFIDs (auto-detección de rol). Composición requerida: 6 TIC · 1 VIP · 1 CUBE.</span>
+                    <span className={`font-medium ${validComposition ? 'text-green-600' : 'text-orange-600'}`}>{compositionStatusText()}</span>
+                  </div>
+                  {!validComposition && itemsSeleccionados.length>0 && (
+                    <div className="mt-1 text-[11px] text-red-600">La composición debe ser exacta para continuar.</div>
+                  )}
+                </div>
+              )}
               {itemsFiltrados.map((item) => {
                 const isSelected = itemsSeleccionados.find(s => s.id === item.id);
                 return (
@@ -1409,17 +1443,20 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                   alert('Debes ingresar un tiempo (horas y/o minutos) para continuar.');
                   return;
                 }
+                if (subEstadoDestino === 'Ensamblaje' && !validComposition) {
+                  alert('Composición inválida. Debes seleccionar exactamente 6 TIC, 1 VIP y 1 CUBE.');
+                  return;
+                }
                 onConfirm(itemsSeleccionados, subEstadoDestino, totalMin > 0 ? totalMin : undefined);
               }}
-              disabled={itemsSeleccionados.length === 0 || cargando || ((subEstadoDestino === 'Ensamblaje' || subEstadoDestino === 'Lista para Despacho') && ((parseInt(horas || '0', 10) * 60 + parseInt(minutos || '0', 10)) <= 0))}
+              disabled={itemsSeleccionados.length === 0 || cargando || ((subEstadoDestino === 'Ensamblaje' || subEstadoDestino === 'Lista para Despacho') && ((parseInt(horas || '0', 10) * 60 + parseInt(minutos || '0', 10)) <= 0)) || (subEstadoDestino==='Ensamblaje' && !validComposition)}
               className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
             >
               {cargando && (
                 <Loader className="w-4 h-4 animate-spin" />
               )}
               {cargando ? 
-                `Moviendo...` : 
-                `Mover a ${subEstadoDestino} (${itemsSeleccionados.length})`
+                `Moviendo...` : subEstadoDestino === 'Ensamblaje' ? `Armar caja (${itemsSeleccionados.length})` : `Mover a ${subEstadoDestino} (${itemsSeleccionados.length})`
               }
             </button>
           </div>
