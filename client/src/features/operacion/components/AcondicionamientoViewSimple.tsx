@@ -1331,15 +1331,12 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
         return undefined;
       }).filter(Boolean) as any[];
 
-      // Agregar a la selección
+      // Agregar a la selección (con lógica especial para Lista para Despacho -> traer toda la caja por lote)
       setItemsSeleccionados(prev => {
-        const nuevosItems = itemsEncontrados.filter(item => 
-          !prev.find(selected => selected.id === item.id)
-        );
-        // Aplicar reglas de composición si es Ensamblaje
+        const nuevosItemsBase = itemsEncontrados.filter(item => !prev.find(selected => selected.id === item.id));
         if (subEstadoDestino === 'Ensamblaje') {
           const current = [...prev];
-          for (const it of nuevosItems) {
+          for (const it of nuevosItemsBase) {
             const cat = (it.categoria||'').toUpperCase();
             const counts = current.reduce((acc:any, x:any) => { const c=(x.categoria||'').toUpperCase(); acc[c]=(acc[c]||0)+1; return acc; }, {} as Record<string,number>);
             if (cat==='TIC' && (counts.TIC||0) >= 6) continue;
@@ -1349,7 +1346,27 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
           }
           return current;
         }
-        return [...prev, ...nuevosItems];
+        if (subEstadoDestino === 'Lista para Despacho') {
+          // Escanear un solo componente debe traer todo el set de la caja (mismo lote)
+            const lotesAIncluir = new Set<string>();
+            nuevosItemsBase.forEach(it => { if (it.lote) lotesAIncluir.add(it.lote); });
+            // Si escanearon exactamente 1 RFID y ese item tiene lote, incluir ese lote
+            if (rfids.length === 1 && nuevosItemsBase.length === 1 && nuevosItemsBase[0].lote) {
+              lotesAIncluir.add(nuevosItemsBase[0].lote);
+            }
+            if (lotesAIncluir.size) {
+              const allGroupItems: any[] = [];
+              lotesAIncluir.forEach(l => {
+                const grupo = itemsDisponibles.filter(x => x.lote === l);
+                grupo.forEach(g => { if (!prev.find(p => p.id === g.id) && !allGroupItems.find(a => a.id === g.id)) allGroupItems.push(g); });
+              });
+              if (allGroupItems.length) {
+                console.log(`📦 Auto-seleccionando lote(s) completo(s): ${Array.from(lotesAIncluir).join(', ')} (${allGroupItems.length} items)`);
+                return [...prev, ...allGroupItems];
+              }
+            }
+        }
+        return [...prev, ...nuevosItemsBase];
       });
 
       // Limpiar estados del escáner
