@@ -452,7 +452,18 @@ const PreAcondicionamientoView: React.FC = () => {
       return (
         <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
           <span className="text-gray-400 text-xs">Sin cronómetro</span>
-          {/* Botón iniciar individual removido */}
+          <button
+            onClick={() => {
+              setRfidsPendientesTimer([rfid]);
+              if (ticsCongelamiento.find(t => t.rfid === rfid)) setTipoOperacionTimer('congelamiento');
+              else if (ticsAtemperamiento.find(t => t.rfid === rfid)) setTipoOperacionTimer('atemperamiento');
+              setMostrarModalTimer(true);
+            }}
+            className="p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs"
+            title="Iniciar cronómetro"
+          >
+            <Play className="w-3 h-3" />
+          </button>
         </div>
       );
     }
