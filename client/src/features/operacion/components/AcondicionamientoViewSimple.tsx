@@ -787,6 +787,62 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
 
         {/* Sección Lista para Despacho */}
         <div className="bg-white rounded-lg border border-green-200 overflow-hidden">
+          <div className="bg-green-50 border-b border-green-200 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-green-800">Items Lista para Despacho</h2>
+                <p className="text-sm text-green-600">({itemsListaDespacho.length} de {itemsListaDespacho.length})</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setBatchModoDespacho(true); setMostrarBatchTimerModal(true); }}
+                  disabled={!hayElegiblesBatchDespacho || cargandoBatchDespacho}
+                  className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors border ${!hayElegiblesBatchDespacho || cargandoBatchDespacho ? 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-green-600 hover:bg-green-700 text-white border-green-600'}`}
+                  title={hayElegiblesBatchDespacho ? 'Iniciar cronómetro para todos los items sin cronómetro (Despacho)' : 'No hay items elegibles'}
+                >
+                  {cargandoBatchDespacho ? (
+                    <Loader className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Play className="w-4 h-4" />
+                  )}
+                  Iniciar todos
+                  {hayElegiblesBatchDespacho && <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded">{nombresBatchDespacho.length}</span>}
+                </button>
+                <button
+                  onClick={() => { try { if (isConnected) forzarSincronizacion(); } catch {}; setMostrarModalTraerDespacho(true); }}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Agregar Items
+                </button>
+                <button
+                  onClick={completarTodosDespacho}
+                  disabled={timersActivosDespacho.length===0 || cargandoCompletarBatchDespacho}
+                  className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors border ${timersActivosDespacho.length===0 || cargandoCompletarBatchDespacho ? 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-yellow-600 hover:bg-yellow-700 text-white border-yellow-600'}`}
+                  title={timersActivosDespacho.length? 'Completar todos los cronómetros activos (Despacho)' : 'No hay cronómetros activos'}
+                >
+                  {cargandoCompletarBatchDespacho ? <Loader className="w-4 h-4 animate-spin"/> : <CheckCircle className="w-4 h-4"/>}
+                  Completar todos
+                  {timersActivosDespacho.length>0 && <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded">{timersActivosDespacho.length}</span>}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Búsqueda Lista para Despacho */}
+          <div className="p-4 border-b border-gray-200">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Buscar por RFID, nombre o lote..."
+                value={busquedaListaDespacho}
+                onChange={(e) => setBusquedaListaDespacho(e.target.value)}
+                maxLength={24}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
           {vistaGlobal==='tabla' ? (
             <div className="overflow-x-auto">
               <table className="w-full">
