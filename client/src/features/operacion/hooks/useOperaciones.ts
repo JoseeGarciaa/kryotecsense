@@ -6,6 +6,7 @@ import { useAcondicionamiento } from './useAcondicionamiento';
 import { useEnvio } from './useEnvio';
 import { useDevolucion } from '../../devolucion/hooks/useDevolucion';
 import { useWebSocket } from './useWebSocket';
+import { notify } from '../../../shared/utils/notify';
 import { useTimerContext } from '../../../contexts/TimerContext';
 import { Item } from '../types';
 import { createUtcTimestamp, formatDateForDisplay } from '../../../shared/utils/dateUtils';
@@ -756,192 +757,101 @@ export const useOperaciones = () => {
 
   // Función para confirmar Pre acondicionamiento
   const confirmarPreAcondicionamiento = async (rfids: string[], subEstado: string = 'Congelamiento') => {
+    const t0 = performance.now();
     try {
-      console.log(`🔄 [DEBUG-HOOK] Confirmando Pre acondicionamiento para ${rfids.length} TICs con sub-estado: ${subEstado}`);
-      console.log(`📋 [DEBUG-HOOK] RFIDs recibidos:`, rfids);
-      
-      // Primero, actualizar el inventario para asegurarnos de tener datos frescos
-      await actualizarInventarioEnSegundoPlano();
-      console.log(`📊 [DEBUG-HOOK] Inventario actualizado en segundo plano`);
-      
-      // Obtener actividades actuales para verificar duplicados
-      const actividadesResponse = await apiServiceClient.get('/activities/actividades/');
-      const actividades = actividadesResponse.data;
-      console.log(`📝 [DEBUG-HOOK] Actividades obtenidas:`, actividades?.length || 0);
-      
-      // Validar que las TICs no estén ya en Pre acondicionamiento
-      const ticsInvalidas: string[] = [];
-      const ticsValidas: any[] = [];
-      
-      for (const rfid of rfids) {
-        console.log(`🔍 [DEBUG-HOOK] Procesando RFID: ${rfid}`);
-        
-        // Verificar si el RFID es válido (no vacío y alfanumérico)
-        if (!rfid || !/^[a-zA-Z0-9]+$/.test(rfid)) {
-          console.error(`❌ [DEBUG-HOOK] RFID inválido: ${rfid}. Solo se permiten letras y dígitos.`);
-          ticsInvalidas.push(rfid);
-          continue;
-        }
-        
-        // Buscar el item en el inventario actualizado
-        const item = inventarioCompleto.find((invItem: any) => invItem.rfid === rfid);
-        console.log(`🔍 [DEBUG-HOOK] Item encontrado para ${rfid}:`, item ? {
-          id: item.id,
-          nombre: item.nombre_unidad,
-          estado: item.estado,
-          sub_estado: item.sub_estado,
-          categoria: item.categoria,
-          lote: item.lote
-        } : 'NO ENCONTRADO');
-        
-        if (!item) {
-          console.error(`❌ [DEBUG-HOOK] RFID ${rfid} no encontrado en el inventario`);
-          ticsInvalidas.push(rfid);
-          continue;
-        }
-        
-        // Validar que sea un TIC
-        if (item.categoria !== 'TIC') {
-          console.warn(`⚠️ ${item.nombre_unidad} no es un TIC. Solo los TICs pueden ir a Pre acondicionamiento.`);
-          ticsInvalidas.push(rfid);
-          continue;
-        }
-        
-        // Validar que el estado sea 'disponible', 'En bodega' o ya esté en 'Pre acondicionamiento'
-        // Si ya está en Pre acondicionamiento, permitir cambio de sub_estado
-        if (item.estado && item.estado !== 'disponible' && item.estado !== 'Pre acondicionamiento' && item.estado !== 'En bodega') {
-          console.warn(`⚠️ ${item.nombre_unidad} ya tiene un estado asignado: ${item.estado}. Solo se pueden mover TICs disponibles, en bodega o en Pre acondicionamiento.`);
-          ticsInvalidas.push(rfid);
-          continue;
-        }
-        
-        // Si ya está en Pre acondicionamiento, verificar si es un cambio de sub_estado
-        if (item.estado === 'Pre acondicionamiento') {
-          if (item.sub_estado === subEstado) {
-            console.warn(`⚠️ ${item.nombre_unidad} ya está en ${subEstado}.`);
-            ticsInvalidas.push(rfid);
-            continue;
-          } else {
-            console.log(`🔄 Cambiando sub_estado de ${item.nombre_unidad} de '${item.sub_estado}' a '${subEstado}'`);
-          }
-        }
-        
-        if (!item.id || typeof item.id !== 'number') {
-          console.error(`❌ ${item.nombre_unidad} tiene un ID inválido: ${item.id}`);
-          ticsInvalidas.push(rfid);
-          continue;
-        }
-        
-        // Si pasa todas las validaciones, agregar a la lista de TICs válidas
-        // Incluir todos los campos del item original para poder hacer PUT completo
-        ticsValidas.push(item);
+      console.log(`⚡ (FAST) Confirmar Pre Acondicionamiento => RFIDs: ${rfids.length}, subEstado: ${subEstado}`);
+
+      if (!rfids || rfids.length === 0) return false;
+
+      // 1. Validaciones rápidas (solo sobre inventario en memoria). Paralelamente lanzar refresh en segundo plano.
+      actualizarInventarioEnSegundoPlano(); // no await
+
+      const invalidas: string[] = [];
+      const candidatas: any[] = [];
+
+      rfids.forEach(rfid => {
+        if (!rfid || !/^[a-zA-Z0-9]+$/.test(rfid)) { invalidas.push(rfid); return; }
+        const item = inventarioCompleto.find((i: any) => i.rfid === rfid);
+        if (!item) { invalidas.push(rfid); return; }
+        if (item.categoria !== 'TIC') { invalidas.push(rfid); return; }
+        if (item.estado && !['disponible', 'En bodega', 'Pre acondicionamiento'].includes(item.estado)) { invalidas.push(rfid); return; }
+        if (item.estado === 'Pre acondicionamiento' && item.sub_estado === subEstado) { invalidas.push(rfid); return; }
+        candidatas.push(item);
+      });
+
+      if (candidatas.length === 0) {
+        if (invalidas.length) notify(`⚠️ Ninguna TIC válida para mover. (${invalidas.length} inválidas)`, 'warning');
+        return false;
       }
-      
-      // Mostrar advertencias si hay TICs inválidas
-      if (ticsInvalidas.length > 0) {
-        alert(`⚠️ Algunas TICs no pueden ser movidas a Pre acondicionamiento:\n\n${ticsInvalidas.join('\n')}`);
-        
-        // Si todas las TICs son inválidas, no continuar
-        if (ticsValidas.length === 0) {
-          return false;
-        }
+
+      if (invalidas.length > 0) {
+        notify(`⚠️ ${invalidas.length} TIC(s) omitidas`, 'warning');
+        console.warn('Omitidas:', invalidas);
       }
-      
-      // Actualizar directamente el estado de cada TIC válida en la tabla inventario_credocubes
-      const ticsActualizados: any[] = [];
-      for (const item of ticsValidas) {
-        try {
-          console.log(`📦 [DEBUG-HOOK] Moviendo TIC: ${item.nombre_unidad} (ID: ${item.id})`);
-          console.log(`🔄 [DEBUG-HOOK] Estado actual: ${item.estado} / ${item.sub_estado}`);
-          console.log(`🎯 [DEBUG-HOOK] Nuevo estado: Pre acondicionamiento / ${subEstado}`);
-          
-          // Crear el objeto con los campos que espera el esquema InventarioCreate
-          const actualizacionTIC = {
-            modelo_id: item.modelo_id,
-            nombre_unidad: item.nombre_unidad,
-            rfid: item.rfid,
-            lote: item.lote || null,
-            estado: 'Pre acondicionamiento',
-            sub_estado: subEstado,
-            validacion_limpieza: item.validacion_limpieza || null,
-            validacion_goteo: item.validacion_goteo || null,
-            validacion_desinfeccion: item.validacion_desinfeccion || null,
-            categoria: item.categoria || null,
-            ultima_actualizacion: createUtcTimestamp() // Actualizar timestamp en UTC
-          };
-          
-          console.log('[DEBUG-HOOK] Actualizando TIC en inventario:', actualizacionTIC);
-          // Usar la ruta correcta para actualizar el inventario
-          const response = await apiServiceClient.put(`/inventory/inventario/${item.id}`, actualizacionTIC);
-          console.log(`✅ [DEBUG-HOOK] TIC actualizado:`, response.data);
-          ticsActualizados.push(response.data);
-        } catch (itemError: any) {
-          console.error(`❌ [DEBUG-HOOK] Error al actualizar TIC ${item.nombre_unidad}:`, itemError);
-          if (itemError.response) {
-            console.error('[DEBUG-HOOK] Detalles del error:', itemError.response.data);
-            alert(`Error al actualizar TIC ${item.nombre_unidad}: ${itemError.response.data.detail || 'Error desconocido'}`);
-          } else {
-            alert(`Error al actualizar TIC ${item.nombre_unidad}: ${itemError.message}`);
-          }
-        }
-      }
-      
-      console.log(`✅ [DEBUG-HOOK] ${ticsActualizados.length} TICs actualizados exitosamente`);
-      
-      // Limpiar la lista de RFIDs escaneados
+
+      // 2. Actualización optimista inmediata (percepción instantánea <100ms)
+      const ahoraUTC = createUtcTimestamp();
+      setInventarioCompleto(prev => prev.map((it: any) => {
+        const encontrado = candidatas.find(c => c.id === it.id);
+        return encontrado ? { ...it, estado: 'Pre acondicionamiento', sub_estado: subEstado, ultima_actualizacion: ahoraUTC } : it;
+      }));
+      actualizarColumnasDebounced();
       setRfidsEscaneados([]);
-      
-      // Solo actualizar UNA VEZ al final de todas las operaciones
-      if (ticsActualizados.length > 0) {
-        const ticsMovidos = ticsActualizados.length === 1 ? 'TIC' : 'TICs';
-        
-        // Mostrar mensaje de éxito ANTES de actualizar (más rápido)
-        alert(`✅ ${ticsActualizados.length} ${ticsMovidos} ${ticsActualizados.length === 1 ? 'movido' : 'movidos'} a ${subEstado} exitosamente`);
-        
-        // Actualizar estado local inmediatamente para mejor UX
-        setInventarioCompleto(prevInventario => 
-          prevInventario.map(item => {
-            const actualizado = ticsActualizados.find(tic => tic.id === item.id);
-            return actualizado ? { ...item, ...actualizado } : item;
-          })
-        );
-        
-        // Usar actualización debounced optimizada
-        actualizarColumnasDebounced();
-        
-        console.log('✅ Interfaz actualizada automáticamente después de mover TICs');
-      } else {
-        // Usar actualización debounced también aquí
-        actualizarColumnasDebounced();
-      }
-      
-      return true;
-    } catch (error: any) {
-      console.error('❌ Error creando actividades:', error);
-      
-      // Proporcionar información más detallada sobre el error
-      if (error.response) {
-        // El servidor respondió con un código de estado fuera del rango 2xx
-        console.error('Datos del error:', error.response.data);
-        console.error('Estado del error:', error.response.status);
-        console.error('Cabeceras del error:', error.response.headers);
-        
-        let mensajeError = 'Error al mover los TICs a Pre acondicionamiento';
-        if (error.response.data && error.response.data.detail) {
-          mensajeError += ': ' + error.response.data.detail;
+
+      // Notificación temprana antes de llamadas de red (objetivo SLA < 3s)
+      notify(`⏳ Moviendo ${candidatas.length} TIC(s) a ${subEstado}...`, 'info', 1800);
+
+      // 3. Preparar peticiones PATCH mínimas (más livianas que PUT completo)
+      const peticiones = candidatas.map(item => {
+        const payload: any = { estado: 'Pre acondicionamiento', sub_estado: subEstado };
+        // Mantener lote existente (no lo alteramos aquí)
+        if (item.lote) payload.lote = item.lote;
+        return apiServiceClient.patch(`/inventory/inventario/${item.id}/estado`, payload)
+          .then(r => ({ ok: true, id: item.id, data: r.data }))
+          .catch(e => ({ ok: false, id: item.id, error: e }));
+      });
+
+      // 4. Ejecutar en paralelo y reconciliar resultados sin bloquear percepción inicial
+      const results = await Promise.allSettled(peticiones);
+      const fallos: any[] = [];
+      const exitos: any[] = [];
+
+      results.forEach(r => {
+        if (r.status === 'fulfilled') {
+          const val = r.value as any;
+            if (val.ok) exitos.push(val); else fallos.push(val);
+        } else {
+          fallos.push(r.reason);
         }
-        
-        alert('❌ ' + mensajeError);
-      } else if (error.request) {
-        // La solicitud fue hecha pero no se recibió respuesta
-        console.error('No se recibió respuesta del servidor:', error.request);
-        alert('❌ Error de conexión: No se recibió respuesta del servidor');
-      } else {
-        // Algo sucedió en la configuración de la solicitud que desencadenó un error
-        console.error('Error de configuración de la solicitud:', error.message);
-        alert('❌ Error al configurar la solicitud: ' + error.message);
+      });
+
+      // 5. Revertir optimismo para fallos específicos (si hubo)
+      if (fallos.length > 0) {
+        const idsFallidos = new Set(fallos.map(f => f.id));
+        if (idsFallidos.size > 0) {
+          // Traer estado real de backend (ligero) sólo si hay reversiones; no bloquear notificación final
+          try {
+            actualizarInventarioEnSegundoPlano(); // eventual consistency
+          } catch {}
+        }
       }
-      
+
+      // 6. Notificación final
+      if (exitos.length > 0 && fallos.length === 0) {
+        notify(`✅ ${exitos.length} TIC(s) movidas a ${subEstado}`, 'success');
+      } else if (exitos.length > 0 && fallos.length > 0) {
+        notify(`⚠️ ${exitos.length} movidas, ${fallos.length} con error`, 'warning');
+      } else if (exitos.length === 0) {
+        notify(`❌ No se pudieron mover las TICs`, 'error');
+        return false;
+      }
+
+      const t1 = performance.now();
+      console.log(`⚡ Movimiento Pre Acondicionamiento completado. Exitos: ${exitos.length}, Fallos: ${fallos.length}, Δ ${(t1 - t0).toFixed(1)}ms`);
+      return fallos.length === 0;
+    } catch (err: any) {
+      console.error('❌ Error general moviendo a Pre Acondicionamiento:', err);
+      notify(`❌ Error moviendo TICs: ${err.response?.data?.detail || err.message}`, 'error');
       return false;
     }
   };

@@ -418,16 +418,7 @@ const PreAcondicionamientoView: React.FC = () => {
     } catch (e:any) { alert(`❌ Error: ${e.message || e}`); }
   };
 
-  const completarTodasAtemperamiento = async () => {
-    try {
-      const lista = timersAtemperamientoCompletadosEnSeccion;
-      if (!lista.length) { alert('No hay TICs completadas.'); return; }
-      if (!window.confirm(`Completar ${lista.length} TIC(s) de atemperamiento y mover a Acondicionamiento?`)) return;
-      for (const t of lista) { await operaciones.moverTicAAcondicionamiento(t.nombre); eliminarTimer(t.id); }
-      await cargarDatos();
-      alert(`✅ ${lista.length} TIC(s) movidas a Acondicionamiento`);
-    } catch (e:any) { alert(`❌ Error: ${e.message || e}`); }
-  };
+  // (REMOVIDO) completarTodasAtemperamiento: ya no se usa por requerimiento del usuario.
 
   // Limpiar (botón individual) debounce simple
   const [botonesLimpiandoSet, setBotonesLimpiandoSet] = useState<Set<string>>(new Set());
@@ -621,6 +612,18 @@ const PreAcondicionamientoView: React.FC = () => {
     return Array.from(map.entries()).map(([lote, rfids]) => ({ lote, rfids, count: rfids.length }));
   }, [ticsCongelamiento]);
   const [showDropdownLimpiarCongelacion, setShowDropdownLimpiarCongelacion] = useState(false);
+
+  // Lotes para dropdown de limpieza por lote (Atemperamiento)
+  const lotesParaLimpiarAtemperamiento: LoteGroup[] = useMemo(() => {
+    const map = new Map<string, string[]>();
+    ticsAtemperamiento.forEach(t => {
+      const key = t.lote || 'SIN LOTE';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(t.rfid);
+    });
+    return Array.from(map.entries()).map(([lote, rfids]) => ({ lote, rfids, count: rfids.length }));
+  }, [ticsAtemperamiento]);
+  const [showDropdownLimpiarAtemperamiento, setShowDropdownLimpiarAtemperamiento] = useState(false);
 
   const renderGrupoLote = (grupo: GrupoLote, esAtemperamiento=false) => (
     <div key={grupo.lote} className={`rounded-xl border shadow-sm overflow-hidden ${esAtemperamiento? 'bg-gradient-to-br from-orange-50 to-orange-100/40 border-orange-200':'bg-gradient-to-br from-blue-50 to-blue-100/40 border-blue-200'}`}>
@@ -909,25 +912,54 @@ const PreAcondicionamientoView: React.FC = () => {
                   </button>
                 );
               })()}
-              <button
-                disabled={!timersAtemperamientoCompletadosEnSeccion.length && !ticsAtemperamiento.some(t => obtenerTimerActivoPorTipo(t.rfid,'atemperamiento'))}
-                onClick={() => {
-                  const nombres = ticsAtemperamiento.map(t => t.rfid);
-                  if (!nombres.length) return;
-                  if (!window.confirm(`¿Limpiar TODOS los cronómetros (activos/completados) de Atemperamiento (${nombres.length})?`)) return;
-                  forceClearTimers(nombres, 'atemperamiento');
-                }}
-                className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm ${(timersAtemperamientoCompletadosEnSeccion.length || ticsAtemperamiento.some(t => obtenerTimerActivoPorTipo(t.rfid,'atemperamiento')))? 'bg-yellow-600 hover:bg-yellow-700 text-white':'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
-              >
-                <X size={16} /> Limpiar (Atemperamiento)
-              </button>
-              <button
-                disabled={!timersAtemperamientoCompletadosEnSeccion.length}
-                onClick={() => timersAtemperamientoCompletadosEnSeccion.length && completarTodasAtemperamiento()}
-                className={`flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm ${timersAtemperamientoCompletadosEnSeccion.length? 'bg-orange-600 hover:bg-orange-700 text-white':'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
-              >
-                <CheckCircle size={16} /> Completar todas (Atemperamiento)
-              </button>
+              <div className="relative flex items-center">
+                <button
+                  disabled={!timersAtemperamientoCompletadosEnSeccion.length && !ticsAtemperamiento.some(t => obtenerTimerActivoPorTipo(t.rfid,'atemperamiento'))}
+                  onClick={() => {
+                    const nombres = ticsAtemperamiento.map(t => t.rfid);
+                    if (!nombres.length) return;
+                    if (!window.confirm(`¿Limpiar TODOS los cronómetros (activos/completados) de Atemperamiento (${nombres.length})?`)) return;
+                    forceClearTimers(nombres, 'atemperamiento');
+                  }}
+                  className={`flex items-center justify-center gap-2 px-3 py-2 rounded-l-md text-sm ${(timersAtemperamientoCompletadosEnSeccion.length || ticsAtemperamiento.some(t => obtenerTimerActivoPorTipo(t.rfid,'atemperamiento')))? 'bg-yellow-600 hover:bg-yellow-700 text-white':'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                >
+                  <X size={16} /> Limpiar
+                </button>
+                <button
+                  disabled={!ticsAtemperamiento.length}
+                  onClick={() => setShowDropdownLimpiarAtemperamiento(v=>!v)}
+                  className={`px-2 py-2 rounded-r-md border-l text-sm ${(ticsAtemperamiento.length)? 'bg-yellow-600 hover:bg-yellow-700 text-white border-yellow-700/40':'bg-gray-200 text-gray-400 cursor-not-allowed border-gray-300'}`}
+                  title="Opciones de limpieza"
+                >
+                  ▾
+                </button>
+                {showDropdownLimpiarAtemperamiento && (
+                  <div className="absolute top-full left-0 mt-1 w-56 bg-white shadow-lg border border-gray-200 rounded-md z-20 py-1 max-h-72 overflow-y-auto">
+                    <div className="px-3 py-2 text-[11px] font-medium text-gray-500">Limpiar por lote</div>
+                    {lotesParaLimpiarAtemperamiento.map((l: LoteGroup) => {
+                      const activosOLimp = l.rfids.filter((r: string) => obtenerTimerActivoPorTipo(r,'atemperamiento') || timersAtemperamientoCompletadosEnSeccion.some(t => norm(t.nombre)===norm(r))).length;
+                      if (!activosOLimp) return null;
+                      return (
+                        <button
+                          key={l.lote}
+                          onClick={() => {
+                            if (!window.confirm(`¿Limpiar cronómetros del lote ${l.lote}?`)) return;
+                            forceClearTimers(l.rfids, 'atemperamiento');
+                            setShowDropdownLimpiarAtemperamiento(false);
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-gray-100 text-xs flex items-center justify-between"
+                        >
+                          <span className="truncate max-w-[120px]" title={l.lote}>{l.lote}</span>
+                          <span className="text-[10px] text-gray-500">{activosOLimp} TICs</span>
+                        </button>
+                      );
+                    })}
+                    {lotesParaLimpiarAtemperamiento.every((l: LoteGroup) => !l.rfids.some((r: string) => obtenerTimerActivoPorTipo(r,'atemperamiento'))) && (
+                      <div className="px-3 py-2 text-[11px] text-gray-400">Sin cronómetros por lote</div>
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="flex gap-2 items-center">
                 <button
                   className={`p-2 rounded-md ${cargando ? 'bg-orange-100 text-orange-400 cursor-not-allowed' : 'hover:bg-orange-100 text-orange-600'}`}
