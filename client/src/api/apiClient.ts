@@ -21,64 +21,79 @@ const apiServiceClient = axios.create({
 });
 
 // ===== Limitador de concurrencia y reintentos básicos para mitigar ERR_INSUFFICIENT_RESOURCES =====
-type PendingRequest = {
-  resolve: (value: any) => void;
-  reject: (reason?: any) => void;
+// ===== Nueva implementación de limitador de concurrencia (solo controla despacho de config) =====
+interface QueuedConfig {
+  resolve: (cfg: InternalAxiosRequestConfig) => void;
   config: InternalAxiosRequestConfig;
-  attempt: number;
-};
+}
 
-const MAX_CONCURRENT = 5; // número máximo de requests simultáneos pesados
+const MAX_CONCURRENT = 5; // número máximo de requests simultáneos de escritura
 const RETRY_STATUS: number[] = [429, 503, 500];
 const RETRY_LIMIT = 3;
-const queue: PendingRequest[] = [];
-let activeCount = 0;
+const queued: QueuedConfig[] = [];
+let activeWrites = 0;
 
 const isWriteMethod = (method?: string) => ['post','put','patch','delete'].includes((method||'').toLowerCase());
 
-const scheduleNext = () => {
-  if (activeCount >= MAX_CONCURRENT) return;
-  const nextIndex = queue.findIndex(r => true);
-  if (nextIndex === -1) return;
-  const req = queue.splice(nextIndex,1)[0];
-  runRequest(req);
-};
-
-const runRequest = async (pending: PendingRequest) => {
-  activeCount++;
-  try {
-    const response = await axios.request(pending.config);
-    pending.resolve(response);
-  } catch (err: any) {
-    const status = err?.response?.status;
-    const networkLike = err?.code === 'ERR_NETWORK' || err?.message?.includes('Network') || err?.message?.includes('INCOMPLETE') || err?.message?.includes('INSUFFICIENT_RESOURCES');
-    if ((networkLike || (status && RETRY_STATUS.includes(status))) && pending.attempt < RETRY_LIMIT) {
-      const delay = 300 * Math.pow(2, pending.attempt); // backoff exponencial
-      setTimeout(() => {
-        pending.attempt += 1;
-        queue.push(pending);
-        scheduleNext();
-      }, delay);
-    } else {
-      pending.reject(err);
-    }
-  } finally {
-    activeCount--;
-    scheduleNext();
+const dispatchQueue = () => {
+  while (activeWrites < MAX_CONCURRENT && queued.length > 0) {
+    const { resolve, config } = queued.shift()!;
+    activeWrites++;
+    resolve(config); // deja continuar la petición (axios ejecutará el request)
   }
 };
 
-// Interceptor para aplicar cola solo a métodos de escritura y evitar saturación
+// Interceptor de request: encola SOLO operaciones de escritura; retorna el config cuando hay cupo
 apiServiceClient.interceptors.request.use((config) => {
-  if (!isWriteMethod(config.method)) return config; // lecturas siguen normal
-  return new Promise((resolve, reject) => {
-    queue.push({ resolve, reject, config, attempt: 0 });
-    scheduleNext();
+  if (!isWriteMethod(config.method)) return config;
+  return new Promise<InternalAxiosRequestConfig>((resolve) => {
+    // Inicializar contador de intentos si no existe
+    (config as any).__attempt = (config as any).__attempt || 0;
+    queued.push({ resolve, config });
+    dispatchQueue();
   });
 });
 
-// Respuesta: no necesitamos modificar (reintentos se manejan en runRequest). Solo pasar.
-apiServiceClient.interceptors.response.use(r => r, e => Promise.reject(e));
+// Interceptor de respuesta: libera cupo y maneja reintentos básicos con backoff exponencial
+apiServiceClient.interceptors.response.use(
+  (response) => {
+    if (isWriteMethod(response.config?.method)) {
+      activeWrites = Math.max(0, activeWrites - 1);
+      dispatchQueue();
+    }
+    return response;
+  },
+  (error: AxiosError) => {
+    const config = error.config as InternalAxiosRequestConfig & { __attempt?: number };
+    if (config && isWriteMethod(config.method)) {
+      const attempt = config.__attempt ?? 0;
+      const status = (error.response && (error.response as any).status) as number | undefined;
+      const networkLike = error.code === 'ERR_NETWORK' || error.message?.includes('Network') || error.message?.includes('INSUFFICIENT_RESOURCES');
+      const shouldRetry = (networkLike || (status && RETRY_STATUS.includes(status))) && attempt < RETRY_LIMIT;
+
+      activeWrites = Math.max(0, activeWrites - 1); // liberar slot del intento fallido
+
+      if (shouldRetry) {
+        const nextAttempt = attempt + 1;
+        const delay = 300 * Math.pow(2, attempt); // 300, 600, 1200ms
+        config.__attempt = nextAttempt;
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            queued.push({
+              resolve: (cfg) => resolve(apiServiceClient.request(cfg)),
+              config
+            });
+            dispatchQueue();
+          }, delay);
+        });
+      }
+
+      // No hay reintento: re-despachar siguientes y propagar error
+      dispatchQueue();
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Interceptor para añadir el token de autenticación a las cabeceras
 const addAuthInterceptor = (client: AxiosInstance) => {
