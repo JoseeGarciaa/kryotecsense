@@ -233,16 +233,9 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
     if (esCongelacion) return false;
 
     if (categoria === 'tic') {
-      // Requisito solicitado: mostrar únicamente TICs cuyo sub_estado ya sea Atemperado.
-      // No deben listarse TICs todavía en atemperamiento (proceso en curso).
+      // Mostrar TICs con sub_estado final Atemperado (aunque el timer ya no exista) – requisito
       if (!esAtemperadoFinal) return false;
-      // Además reforzamos que tengan un timer de atemperamiento completado (defensa extra, por si sub_estado ya cambió).
-      const tieneAtempCompletado = timers.some(
-        t => norm(t.nombre) === norm(item.rfid) && t.tipoOperacion === 'atemperamiento' && t.completado
-      );
-      if (!tieneAtempCompletado) return false;
-      // Aceptar si viene de Pre Acondicionamiento (fase correcta) o estuvo en bodega (fallback permitido antes).
-      const origenValido = esPreAcond || enBodega || esEnAtemperamiento; // mantener pequeñas tolerancias si se marcó timer justo antes del switch de sub_estado
+      const origenValido = esPreAcond || enBodega || esEnAtemperamiento;
       return origenValido;
     }
     // Ocultar VIP y Cube de la lista (se agregarán solo vía escaneo si vienen de bodega)
@@ -765,16 +758,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                     <Plus className="w-4 h-4" />
                     Agregar Items
                   </button>
-                  <button
-                    onClick={completarTodosEnsamblaje}
-                    disabled={timersActivosEnsamblaje.length===0 || cargandoCompletarBatch}
-                    className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors border ${timersActivosEnsamblaje.length===0 || cargandoCompletarBatch ? 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-yellow-600 hover:bg-yellow-700 text-white border-yellow-600'}`}
-                    title={timersActivosEnsamblaje.length? 'Completar todos los cronómetros activos' : 'No hay cronómetros activos'}
-                  >
-                    {cargandoCompletarBatch ? <Loader className="w-4 h-4 animate-spin"/> : <CheckCircle className="w-4 h-4"/>}
-                    Completar todos
-                    {timersActivosEnsamblaje.length>0 && <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded">{timersActivosEnsamblaje.length}</span>}
-                  </button>
+                  {/* Botón 'Completar todos' removido según requerimiento */}
                 </div>
             </div>
           </div>
@@ -885,16 +869,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
                   <Plus className="w-4 h-4" />
                   Agregar Items
                 </button>
-                <button
-                  onClick={completarTodosDespacho}
-                  disabled={timersActivosDespacho.length===0 || cargandoCompletarBatchDespacho}
-                  className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors border ${timersActivosDespacho.length===0 || cargandoCompletarBatchDespacho ? 'bg-gray-200 text-gray-500 cursor-not-allowed border-gray-300' : 'bg-yellow-600 hover:bg-yellow-700 text-white border-yellow-600'}`}
-                  title={timersActivosDespacho.length? 'Completar todos los cronómetros activos (Despacho)' : 'No hay cronómetros activos'}
-                >
-                  {cargandoCompletarBatchDespacho ? <Loader className="w-4 h-4 animate-spin"/> : <CheckCircle className="w-4 h-4"/>}
-                  Completar todos
-                  {timersActivosDespacho.length>0 && <span className="ml-1 text-xs bg-white/20 px-1.5 py-0.5 rounded">{timersActivosDespacho.length}</span>}
-                </button>
+                {/* Botón 'Completar todos' removido según requerimiento */}
               </div>
             </div>
           </div>
@@ -1207,7 +1182,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
 
     // Buscar primero en visibles (TIC listadas)
     let candidato: any = itemsDisponibles.find(i => i.rfid === code);
-    if (subEstadoDestino === 'Ensamblaje') {
+  if (subEstadoDestino === 'Ensamblaje') {
       // Si no está en visibles, permitir:
       // 1. VIP / Cube desde Bodega (ya implementado)
       if (!candidato) {
@@ -1215,7 +1190,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
       }
       // 2. TIC con sub_estado Atemperado aunque no haya pasado el filtro estricto (ej. timer ya limpiado)
       if (!candidato) {
-        candidato = inventarioCompleto.find(it => it.rfid === code && (it.categoria||'').toUpperCase()==='TIC' && /(atemperado)/i.test(it.sub_estado||''));
+    candidato = inventarioCompleto.find(it => it.rfid === code && (it.categoria||'').toUpperCase()==='TIC' && /(atemperado|atemperamient)/i.test((it.sub_estado||'')) && /(pre).*(acond)/i.test((it.estado||'')));
       }
     }
     if (!candidato) {
