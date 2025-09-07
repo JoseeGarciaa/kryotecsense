@@ -153,16 +153,32 @@ class TimerManager:
         if 'fechaFin' in timer_data and isinstance(timer_data['fechaFin'], str):
             timer_data['fechaFin'] = parse_iso_datetime(timer_data['fechaFin'])
         
+        # Rellenar campos mínimos faltantes
+        if 'tiempoRestanteSegundos' not in timer_data and 'tiempoInicialMinutos' in timer_data:
+            try:
+                mins = int(timer_data.get('tiempoInicialMinutos') or 0)
+                timer_data['tiempoRestanteSegundos'] = mins * 60
+            except Exception:
+                timer_data['tiempoRestanteSegundos'] = 0
+        if 'fechaInicio' not in timer_data:
+            timer_data['fechaInicio'] = get_utc_now()
+        if 'fechaFin' not in timer_data and 'tiempoRestanteSegundos' in timer_data:
+            timer_data['fechaFin'] = get_utc_now() + timedelta(seconds=int(timer_data['tiempoRestanteSegundos']))
+        if 'activo' not in timer_data:
+            timer_data['activo'] = True
+        if 'completado' not in timer_data:
+            timer_data['completado'] = False
+
         timer = Timer(**timer_data)
         self.timers[timer.id] = timer
         
         print(f"Timer creado: {timer.nombre} ({timer.id})")
         
-        # Broadcast a todos los clientes excepto el que envió
+        # Broadcast a todos los clientes (incluye origen para reflejo inmediato)
         await self.broadcast({
             "type": "TIMER_CREATED",
             "data": {"timer": timer.to_dict()}
-        }, exclude=websocket)
+        }, exclude=None)
         
     async def update_timer(self, timer_id: str, updates: Dict, websocket: WebSocket = None):
         """Actualizar temporizador existente"""
@@ -177,11 +193,11 @@ class TimerManager:
                 
         print(f"Timer actualizado: {timer.nombre} ({timer_id})")
         
-        # Broadcast a todos los clientes excepto el que envió
+        # Broadcast a todos los clientes (incluye origen)
         await self.broadcast({
             "type": "TIMER_UPDATED",
             "data": {"timer": timer.to_dict()}
-        }, exclude=websocket)
+        }, exclude=None)
         
         return True
         

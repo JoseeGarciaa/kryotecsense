@@ -105,9 +105,20 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
           const nuevo: Timer = {
             ...t,
             fechaInicio: new Date(t.fechaInicio),
-            fechaFin: new Date(t.fechaFin)
+            fechaFin: new Date(t.fechaFin),
+            pendienteSync: false
           };
-          setTimers(prev => prev.find(x => x.id === nuevo.id) ? prev.map(x => x.id === nuevo.id ? nuevo : x) : [...prev, nuevo]);
+          setTimers(prev => {
+            const idx = prev.findIndex(x => x.pendienteSync && x.nombre === nuevo.nombre && x.tipoOperacion === nuevo.tipoOperacion);
+            if (idx >= 0) {
+              const copia = [...prev];
+              pendingTimersRef.current.delete(prev[idx].id);
+              copia[idx] = nuevo;
+              return copia;
+            }
+            if (prev.find(x => x.id === nuevo.id)) return prev.map(x => x.id === nuevo.id ? nuevo : x);
+            return [...prev, nuevo];
+          });
         }
         break;
 
@@ -143,15 +154,41 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     }
   }, [isConnected, sendMessage]);
 
-  // Funciones para interactuar con timers
-  const iniciarTimer = (nombre: string, tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => {
+  // Creación optimista -----------------------------------------------------
+  const pendingTimersRef = useRef<Map<string, number>>(new Map());
+
+  const crearOptimista = (nombre: string, tipoOperacion: Timer['tipoOperacion'], tiempoMinutos: number) => {
+    const now = new Date();
+    const provisionalId = `local-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    const provisional: Timer = {
+      id: provisionalId,
+      nombre,
+      tipoOperacion,
+      tiempoInicialMinutos: tiempoMinutos,
+      tiempoRestanteSegundos: tiempoMinutos * 60,
+      fechaInicio: now,
+      fechaFin: new Date(now.getTime() + tiempoMinutos * 60000),
+      activo: true,
+      completado: false,
+      pendienteSync: true
+    };
+    setTimers(prev => {
+      if (prev.some(t => t.pendienteSync && t.nombre === nombre && t.tipoOperacion === tipoOperacion)) return prev;
+      return [...prev, provisional];
+    });
+    pendingTimersRef.current.set(provisionalId, Date.now());
+  };
+
+  const iniciarTimer = (nombre: string, tipoOperacion: Timer['tipoOperacion'], tiempoMinutos: number) => {
+    crearOptimista(nombre, tipoOperacion, tiempoMinutos);
     if (isConnected) {
       sendMessage({ type: 'CREATE_TIMER', data: { timer: { nombre, tipoOperacion, tiempoInicialMinutos: tiempoMinutos } } });
     }
   };
 
-  const iniciarTimers = (nombres: string[], tipoOperacion: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion', tiempoMinutos: number) => {
+  const iniciarTimers = (nombres: string[], tipoOperacion: Timer['tipoOperacion'], tiempoMinutos: number) => {
     if (!nombres.length) return;
+    nombres.forEach(n => crearOptimista(n, tipoOperacion, tiempoMinutos));
     if (isConnected) {
       const timersData = nombres.map(nombre => ({ nombre, tipoOperacion, tiempoInicialMinutos: tiempoMinutos }));
       sendMessage({ type: 'CREATE_TIMERS_BATCH', data: { timers: timersData } });
@@ -201,6 +238,24 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
   // Eliminado soporte de getRecentCompletion / getRecentCompletionById.
 
   // Eliminado: tick local. El servidor envía TIMER_BATCH_UPDATE cada segundo.
+
+  // Reconciliación de timers optimistas
+  useEffect(() => {
+    const iv = setInterval(() => {
+      if (!pendingTimersRef.current.size) return;
+      const now = Date.now();
+      let needSync = false;
+      pendingTimersRef.current.forEach((ts, provisionalId) => {
+        if (now - ts > 4000) needSync = true;
+        if (now - ts > 15000) {
+          setTimers(prev => prev.filter(t => t.id !== provisionalId));
+          pendingTimersRef.current.delete(provisionalId);
+        }
+      });
+      if (needSync) forzarSincronizacion();
+    }, 2000);
+    return () => clearInterval(iv);
+  }, [isConnected]);
 
   const contextValue: TimerContextType = {
     timers,
