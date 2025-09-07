@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Scan, Plus, Loader, ChevronDown, Menu, Play, Search, CheckCircle, X, Activity } from 'lucide-react';
 import InlineCountdown from '../../../shared/components/InlineCountdown';
 import { useOperaciones } from '../hooks/useOperaciones';
@@ -371,6 +371,33 @@ const PreAcondicionamientoView: React.FC = () => {
     const reciente = !timerCompletado && !timerActivo ? getRecentCompletion(rfid, 'atemperamiento') : null;
     return !!timerCompletado || !!reciente || !!ceroAlcanzado;
   };
+
+  // NUEVO: Persistir sub_estado 'Atemperado' en inventario cuando el cronómetro de atemperamiento finaliza.
+  // Antes sólo era visual y no quedaba guardado -> luego Ensamblaje no lo detectaba.
+  const rfidsAtemperadosPersistidosRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    // Recorremos sólo las TICs actualmente en Pre acondicionamiento / Atemperamiento.
+    const candidatos = ticsAtemperamiento.filter(t => esTicAtemperadoVisual(t.rfid));
+    if (!candidatos.length) return;
+    candidatos.forEach(tic => {
+      if (rfidsAtemperadosPersistidosRef.current.has(tic.rfid)) return; // ya persistido en esta sesión
+      // Si ya está en inventario con sub_estado 'Atemperado', marcar y omitir
+      if ((tic.sub_estado || '').toLowerCase() === 'atemperado') {
+        rfidsAtemperadosPersistidosRef.current.add(tic.rfid);
+        return;
+      }
+      // PATCH rápido sólo de sub_estado (mantiene estado actual 'Pre acondicionamiento')
+      apiServiceClient.patch(`/inventory/inventario/${tic.id}/estado`, { sub_estado: 'Atemperado' })
+        .then(() => {
+          rfidsAtemperadosPersistidosRef.current.add(tic.rfid);
+          // Disparar recarga asincrónica (sin bloquear UI)
+          try { operaciones.actualizarColumnasDesdeBackend?.(); } catch {}
+        })
+        .catch(err => {
+          console.warn('⚠️ No se pudo persistir sub_estado Atemperado para', tic.rfid, err);
+        });
+    });
+  }, [ticsAtemperamiento, timers]);
 
   const completarTIC = async (rfid: string, timerCompletado: any | null, tipoSeccion?: 'congelamiento' | 'atemperamiento') => {
     try {
