@@ -13,7 +13,7 @@ interface AcondicionamientoViewSimpleProps {
 }
 
 const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = ({ isOpen, onClose }) => {
-  const { inventarioCompleto, cambiarEstadoItem, actualizarColumnasDesdeBackend } = useOperaciones();
+  const { inventarioCompleto: inventarioCompletoData, cambiarEstadoItem, actualizarColumnasDesdeBackend } = useOperaciones(); // renombrado para claridad
   const { timers, eliminarTimer, crearTimer, formatearTiempo, forzarSincronizacion, isConnected, pausarTimer, reanudarTimer, getRecentCompletion, getRecentCompletionById, iniciarTimers, isStartingBatchFor, marcarTimersCompletados, clearRecentCompletion } = useTimerContext();
   
   const [mostrarModalTraerEnsamblaje, setMostrarModalTraerEnsamblaje] = useState(false);
@@ -78,17 +78,17 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   };
 
   // Obtener items por sub-estado
-  const itemsEnsamblaje = inventarioCompleto?.filter(item => 
+  const itemsEnsamblaje = inventarioCompletoData?.filter((item: any) => 
     item.estado === 'Acondicionamiento' && item.sub_estado === 'Ensamblaje'
   ) || [];
   
-  const itemsListaDespacho = inventarioCompleto?.filter(item => 
+  const itemsListaDespacho = inventarioCompletoData?.filter((item: any) => 
     item.estado === 'Acondicionamiento' && item.sub_estado === 'Lista para Despacho'
   ) || [];
 
   // Próximo código incremental de CAJA (formato CJ-0001) basado en lotes existentes usados como caja
   const nextCajaId = useMemo(() => {
-    const todos = [...itemsEnsamblaje, ...itemsListaDespacho, ...(inventarioCompleto||[])];
+  const todos = [...itemsEnsamblaje, ...itemsListaDespacho, ...(inventarioCompletoData||[])];
     let max = 0;
     for (const it of todos) {
       const m = /^CJ-(\d{4,})$/.exec(it?.lote || '');
@@ -98,11 +98,11 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
       }
     }
     return `CJ-${String(max + 1).padStart(4, '0')}`;
-  }, [itemsEnsamblaje, itemsListaDespacho, inventarioCompleto]);
+  }, [itemsEnsamblaje, itemsListaDespacho, inventarioCompletoData]);
 
   // Helper para recalcular justo antes de confirmar (evita duplicados si otro cliente creó una caja mientras el modal estaba abierto)
   const getNextCajaId = () => {
-    const todos = [...itemsEnsamblaje, ...itemsListaDespacho, ...(inventarioCompleto||[])];
+  const todos = [...itemsEnsamblaje, ...itemsListaDespacho, ...(inventarioCompletoData||[])];
     let max = 0;
     for (const it of todos) {
       const m = /^CJ-(\d{4,})$/.exec(it?.lote || '');
@@ -117,22 +117,22 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   // Elegibles para batch (sin cronómetro de envío activo/completado en Ensamblaje)
   const nombresBatch = useMemo(() => {
     return itemsEnsamblaje
-      .filter(item => {
+  .filter((item: any) => {
         const nombreBase = `#${item.id} -`;
         const tiene = timers.some(t => t.tipoOperacion === 'envio' && (t.nombre || '').includes(nombreBase) && !/(\(\s*despacho\s*\))/i.test(t.nombre || ''));
         return !tiene; // solo los que no tienen
       })
-      .map(item => `Envío #${item.id} - ${item.nombre_unidad}`);
+  .map((item: any) => `Envío #${item.id} - ${item.nombre_unidad}`);
   }, [itemsEnsamblaje, timers]);
   const hayElegiblesBatch = nombresBatch.length > 0;
   // Elegibles batch despacho (sin cronómetro en despacho)
   const nombresBatchDespacho = useMemo(() => {
     return itemsListaDespacho
-      .filter(item => {
+  .filter((item: any) => {
         const base = `#${item.id} -`;
         return !timers.some(t => t.tipoOperacion === 'envio' && (t.nombre||'').includes(base) && /(\(\s*despacho\s*\))/i.test(t.nombre||''));
       })
-      .map(item => `Envío (Despacho) #${item.id} - ${item.nombre_unidad}`);
+  .map((item: any) => `Envío (Despacho) #${item.id} - ${item.nombre_unidad}`);
   }, [itemsListaDespacho, timers]);
   const hayElegiblesBatchDespacho = nombresBatchDespacho.length > 0;
 
@@ -179,7 +179,8 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   //  - Incluir TICs en Pre acondicionamiento con sub_estado Atemperamiento (independiente del estado del timer)
   //  - También incluir si están en Bodega (fallback)
   //  - Excluir cualquier estado relacionado con Congelamiento
-  const itemsDisponibles = (inventarioCompleto || []).filter(item => {
+  // Solo mostrar TICs ya ATEMPERADOS (no VIP/Cube) en la lista de Ensamblaje.
+  const itemsDisponibles = (inventarioCompletoData || []).filter(item => {
     const e = norm(item.estado);
     const s = norm((item as any).sub_estado);
     const categoria = norm((item as any).categoria);
@@ -203,12 +204,8 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
       const origenValido = esPreAcond || enBodega || esEnAtemperamiento; // mantener pequeñas tolerancias si se marcó timer justo antes del switch de sub_estado
       return origenValido;
     }
-
-    // VIP y Cube se mantienen igual: pueden venir de bodega o pre acondicionamiento.
-    if (categoria === 'vip' || categoria === 'cube') {
-      return enBodega || esPreAcond;
-    }
-    return false;
+    // Ocultar VIP y Cube de la lista (se agregarán solo vía escaneo si vienen de bodega)
+    return false; // no mostrar otras categorías
   });
 
   // Filtrar items disponibles específicamente para Lista para Despacho (solo de Ensamblaje)
@@ -265,11 +262,11 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
 
   // Mostrar en el modal solo items en Ensamblaje cuyo cronómetro de envío (no 'Despacho') esté COMPLETO
   itemsDisponiblesParaDespacho = useMemo(() => {
-    const base = (inventarioCompleto || []).filter(item =>
+  const base = (inventarioCompletoData || []).filter((item: any) =>
       item.estado === 'Acondicionamiento' && item.sub_estado === 'Ensamblaje'
     );
 
-    return base.filter(item => {
+  return base.filter((item: any) => {
       const nombreBase = `#${item.id} -`;
       // Timer de Ensamblaje: etiqueta 'Envío #...'; excluir '(Despacho)'
       const timerActivo = timers.find(
@@ -295,7 +292,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
       if (timerCompletado) return true;
       return false;
     });
-  }, [inventarioCompleto, timers, getRecentCompletion]);
+  }, [inventarioCompletoData, timers, getRecentCompletion]);
 
   // (Eliminado) Filtro de 'solo completados' para Lista para Despacho
 
@@ -938,7 +935,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
       </div>
 
       {/* Modales para agregar items */}
-      {mostrarModalTraerEnsamblaje && (
+    {mostrarModalTraerEnsamblaje && (
         <AgregarItemsModal
           isOpen={mostrarModalTraerEnsamblaje}
           onClose={() => setMostrarModalTraerEnsamblaje(false)}
@@ -946,6 +943,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
           subEstadoDestino="Ensamblaje"
           cargando={cargandoEnsamblaje}
           nextCajaId={nextCajaId}
+      inventarioCompleto={inventarioCompletoData}
       onConfirm={async (items, subEstado, tiempoOperacionMinutos) => {
             try {
               setCargandoEnsamblaje(true);
@@ -1013,13 +1011,14 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
         />
       )}
 
-      {mostrarModalTraerDespacho && (
+    {mostrarModalTraerDespacho && (
   <AgregarItemsModal
           isOpen={mostrarModalTraerDespacho}
           onClose={() => setMostrarModalTraerDespacho(false)}
           itemsDisponibles={itemsDisponiblesParaDespacho} // Solo items de Ensamblaje para Lista para Despacho
           subEstadoDestino="Lista para Despacho"
           cargando={cargandoDespacho}
+      inventarioCompleto={inventarioCompletoData}
           onConfirm={async (items, subEstado, tiempoOperacionMinutos) => {
             try {
               setCargandoDespacho(true);
@@ -1134,6 +1133,7 @@ interface AgregarItemsModalProps {
   subEstadoDestino: string; // Nuevo prop para especificar el sub-estado destino
   cargando?: boolean; // Estado de carga para mostrar en el botón
   nextCajaId?: string; // Código incremental sugerido para la próxima caja
+  inventarioCompleto?: any[]; // Inventario completo para búsquedas de VIP/Cube ocultos
 }
 
 const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({ 
@@ -1143,7 +1143,8 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
   onConfirm, 
   subEstadoDestino,
   cargando = false,
-  nextCajaId
+  nextCajaId,
+  inventarioCompleto = []
 }) => {
   const [itemsSeleccionados, setItemsSeleccionados] = useState<any[]>([]);
   const [busqueda, setBusqueda] = useState('');
@@ -1224,9 +1225,8 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
       item.rfid?.toLowerCase().includes(busqueda.toLowerCase()) ||
       item.lote?.toLowerCase().includes(busqueda.toLowerCase());
 
-    const coincideCategoria = filtroCategoria === 'TODOS' || item.categoria === filtroCategoria;
-
-    return coincideBusqueda && coincideCategoria;
+  // Ya no se filtra por categoría (solo TICs en lista). El select se removió.
+  return coincideBusqueda;
   });
 
   // Funciones para manejar el escáner RFID
@@ -1245,17 +1245,27 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
     const itemEncontrado = itemsDisponibles.find(item => item.rfid === code);
 
     if (itemEncontrado) {
-      // Verificar si ya está en la lista de RFIDs escaneados
       if (!rfidsEscaneados.includes(code)) {
         setRfidsEscaneados(prev => [...prev, code]);
         setRfidInput('');
-        console.log(`✅ RFID ${code} agregado`);
-      } else {
-        console.log(`ℹ️ RFID ${code} ya está en la lista`);
+        console.log(`✅ RFID ${code} agregado (TIC listado)`);
       }
-    } else {
-      alert(`❌ No se encontró ningún item disponible con RFID: ${code}`);
+      return;
     }
+
+    // Permitir escanear VIP o Cube que provengan de Bodega (estado 'En bodega') aunque no se muestren en la lista.
+  // Usar inventarioCompleto del hook (ya en alcance superior)
+  const itemVipCube = (inventarioCompleto || []).find((it: any) => it.rfid === code && ['VIP','Cube'].includes(it.categoria) && /bodega/i.test((it.estado||'')));
+    if (itemVipCube) {
+      if (!rfidsEscaneados.includes(code)) {
+        setRfidsEscaneados(prev => [...prev, code]);
+        setRfidInput('');
+        console.log(`✅ RFID ${code} agregado (VIP/Cube oculto)`);
+      }
+      return;
+    }
+
+    alert(`❌ No elegible o no encontrado: ${code}`);
   };
 
   // === Reglas de composición para Ensamblaje (6 TIC, 1 VIP, 1 Cube) ===
@@ -1284,15 +1294,36 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
   const confirmarEscaneoRfid = async (rfids: string[]) => {
     try {
       // Encontrar todos los items correspondientes a los RFIDs escaneados
-      const itemsEncontrados = rfids.map(rfid => 
-        itemsDisponibles.find(item => item.rfid === rfid)
-      ).filter(Boolean);
+      const itemsEncontrados = rfids.map(rfid => {
+        // Primero buscar en la lista visible
+        const visible = itemsDisponibles.find(item => item.rfid === rfid);
+        if (visible) return visible;
+        // Si es Ensamblaje, permitir VIP/Cube ocultos que vengan de bodega
+        if (subEstadoDestino === 'Ensamblaje') {
+          const oculto = inventarioCompleto.find(it => it.rfid === rfid && ['VIP','Cube'].includes(it.categoria) && /(bodega)/i.test((it.estado||'')));
+          if (oculto) return oculto;
+        }
+        return undefined;
+      }).filter(Boolean) as any[];
 
       // Agregar a la selección
       setItemsSeleccionados(prev => {
         const nuevosItems = itemsEncontrados.filter(item => 
           !prev.find(selected => selected.id === item.id)
         );
+        // Aplicar reglas de composición si es Ensamblaje
+        if (subEstadoDestino === 'Ensamblaje') {
+          const current = [...prev];
+          for (const it of nuevosItems) {
+            const cat = (it.categoria||'').toUpperCase();
+            const counts = current.reduce((acc:any, x:any) => { const c=(x.categoria||'').toUpperCase(); acc[c]=(acc[c]||0)+1; return acc; }, {} as Record<string,number>);
+            if (cat==='TIC' && (counts.TIC||0) >= 6) continue;
+            if (cat==='VIP' && (counts.VIP||0) >= 1) continue;
+            if (cat==='CUBE' && (counts.CUBE||counts.Cube||0) >= 1) continue;
+            current.push(it);
+          }
+          return current;
+        }
         return [...prev, ...nuevosItems];
       });
 
@@ -1337,17 +1368,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                     className="w-full px-3 py-2 border rounded-md text-sm font-mono tracking-wide"
                   />
                 </div>
-                <div className="flex gap-2 items-center">
-                  <select
-                    value={filtroCategoria}
-                    onChange={(e) => setFiltroCategoria(e.target.value)}
-                    className="px-3 py-2 border rounded-md text-sm"
-                  >
-                    <option value="TODOS">Todas</option>
-                    <option value="TIC">TIC</option>
-                    <option value="VIP">VIP</option>
-                    <option value="Cube">Cube</option>
-                  </select>
+                <div className="flex items-center">
                   <button
                     onClick={() => manejarEscanearRfid()}
                     disabled={!rfidInput}
@@ -1375,36 +1396,16 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
               <p className="text-[11px] text-gray-500">Escanee sucesivamente; cada 24 caracteres se procesa automáticamente y se agrega si hay cupo. {nextCajaId && (<span>Próxima caja sugerida: <span className="font-semibold text-gray-700">{nextCajaId}</span></span>)}</p>
             </div>
           ) : (
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-2 sm:mb-3">
-              <div className="sm:flex-1">
-                <input
-                  type="text"
-                  placeholder="Buscar por nombre, RFID o caja..."
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                  maxLength={24}
-                  className="w-full px-3 py-2 border rounded-md text-sm"
-                />
-              </div>
-              <div className="flex gap-2">
-                <select
-                  value={filtroCategoria}
-                  onChange={(e) => setFiltroCategoria(e.target.value)}
-                  className="px-3 py-2 border rounded-md text-sm"
-                >
-                  <option value="TODOS">Todas las categorías</option>
-                  <option value="TIC">TIC</option>
-                  <option value="VIP">VIP</option>
-                  <option value="Cube">Cube</option>
-                </select>
-                <button
-                  onClick={() => setMostrarEscanerRfid(true)}
-                  className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors"
-                >
-                  <Scan className="w-4 h-4" />
-                  Escanear RFID
-                </button>
-              </div>
+            // Vista no-Ensamblaje: remover filtro y botón Escanear según requerimiento
+            <div className="flex flex-col mb-2 sm:mb-3">
+              <input
+                type="text"
+                placeholder="Buscar por nombre o RFID..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                maxLength={24}
+                className="w-full px-3 py-2 border rounded-md text-sm"
+              />
             </div>
           )}
       {(subEstadoDestino === 'Ensamblaje' || subEstadoDestino === 'Lista para Despacho') && (
