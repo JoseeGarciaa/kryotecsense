@@ -26,7 +26,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   // Estado para configurar timer por item
   const [mostrarTimerModal, setMostrarTimerModal] = useState(false);
   const [itemParaTemporizador, setItemParaTemporizador] = useState<any | null>(null);
-  const [destinoTimer, setDestinoTimer] = useState<'Ensamblaje' | 'Lista para Despacho' | null>(null);
+  const [destinoTimer, setDestinoTimer] = useState<'Ensamblaje' | 'Despacho' | null>(null);
   const [cargandoTimer, setCargandoTimer] = useState(false);
   // (Eliminado) Toggle 'Solo completados' para Lista para Despacho
   // Batch timers
@@ -83,7 +83,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   ) || [];
   
   const itemsListaDespacho = inventarioCompletoData?.filter((item: any) => 
-    item.estado === 'Acondicionamiento' && item.sub_estado === 'Lista para Despacho'
+    item.estado === 'Acondicionamiento' && (item.sub_estado === 'Despacho' || item.sub_estado === 'Despachado')
   ) || [];
 
   // Próximo código incremental de CAJA (formato CJ-0001) basado en lotes existentes usados como caja
@@ -160,7 +160,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
 
   const completarTodosDespacho = async () => {
     if (timersActivosDespacho.length === 0) return;
-    const ok = window.confirm(`Completar ${timersActivosDespacho.length} cronómetros en Lista para Despacho inmediatamente?`);
+    const ok = window.confirm(`Completar ${timersActivosDespacho.length} cronómetros en Despacho inmediatamente?`);
     if (!ok) return;
     setCargandoCompletarBatchDespacho(true);
     try {
@@ -173,6 +173,8 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
 
   // Ref para no repetir actualizaciones a 'Ensamblado'
   const idsMarcadosEnsambladoRef = useRef<Set<number>>(new Set());
+  // Ref para no repetir actualizaciones a 'Despachado'
+  const idsMarcadosDespachadoRef = useRef<Set<number>>(new Set());
 
   // Efecto: cuando un cronómetro de Ensamblaje (no Despacho) se completa, mover sub_estado a 'Ensamblado'
   useEffect(() => {
@@ -208,6 +210,41 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
         .catch(() => {
           // Si falla, permitir reintento en el próximo efecto
           idsMarcadosEnsambladoRef.current.delete(id);
+        });
+    });
+  }, [timers, inventarioCompletoData, actualizarColumnasDesdeBackend]);
+
+  // Efecto: cuando un cronómetro de Despacho se completa, mover sub_estado 'Despacho' -> 'Despachado'
+  useEffect(() => {
+    const candidatos = timers.filter(t => t.tipoOperacion === 'envio' && t.completado && /\(\s*despacho\s*\)/i.test(t.nombre||''));
+    if (!candidatos.length) return;
+    candidatos.forEach(t => {
+      const match = /#(\d+)\s*-/.exec(t.nombre || '');
+      if (!match) return;
+      const id = parseInt(match[1], 10);
+      if (!id || idsMarcadosDespachadoRef.current.has(id)) return;
+      const item = (inventarioCompletoData || []).find((it:any) => it.id === id);
+      if (!item) return;
+      if (item.sub_estado !== 'Despacho') return; // sólo si aún está en Despacho
+      idsMarcadosDespachadoRef.current.add(id);
+      const payload = {
+        modelo_id: item.modelo_id,
+        nombre_unidad: item.nombre_unidad,
+        rfid: item.rfid,
+        lote: item.lote || null,
+        estado: 'Acondicionamiento',
+        sub_estado: 'Despachado',
+        validacion_limpieza: item.validacion_limpieza || null,
+        validacion_goteo: item.validacion_goteo || null,
+        validacion_desinfeccion: item.validacion_desinfeccion || null,
+        categoria: item.categoria || null
+      };
+      apiServiceClient.put(`/inventory/inventario/${item.id}`, payload)
+        .then(() => {
+          setTimeout(() => { try { actualizarColumnasDesdeBackend(); } catch {} }, 150);
+        })
+        .catch(() => {
+          idsMarcadosDespachadoRef.current.delete(id);
         });
     });
   }, [timers, inventarioCompletoData, actualizarColumnasDesdeBackend]);
@@ -410,7 +447,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
   };
 
   // Abrir modal de tiempo para un item específico
-  const abrirTemporizadorParaItem = (item: any, destino: 'Ensamblaje' | 'Lista para Despacho') => {
+  const abrirTemporizadorParaItem = (item: any, destino: 'Ensamblaje' | 'Despacho') => {
     try { if (isConnected) forzarSincronizacion(); } catch {}
     setItemParaTemporizador(item);
     setDestinoTimer(destino);
@@ -428,7 +465,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
         relacionados.forEach(t => eliminarTimer(t.id));
       } catch {}
 
-      const label = destinoTimer === 'Lista para Despacho'
+  const label = destinoTimer === 'Despacho'
         ? `Envío (Despacho) #${itemParaTemporizador.id} - ${itemParaTemporizador.nombre_unidad}`
         : `Envío #${itemParaTemporizador.id} - ${itemParaTemporizador.nombre_unidad}`;
       try {
@@ -587,7 +624,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               <X className="w-3 h-3" />
             </button>
             <button
-              onClick={() => abrirTemporizadorParaItem(item, 'Lista para Despacho')}
+              onClick={() => abrirTemporizadorParaItem(item, 'Despacho')}
               className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
               title="Crear nuevo cronómetro"
             >
@@ -602,7 +639,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
         <div className="flex flex-col items-center space-y-1 py-1 max-w-20">
           <span className="text-gray-400 text-xs text-center">Sin cronómetro</span>
           <button
-            onClick={() => abrirTemporizadorParaItem(item, 'Lista para Despacho')}
+            onClick={() => abrirTemporizadorParaItem(item, 'Despacho')}
             className="flex items-center justify-center p-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs transition-colors"
             title="Iniciar cronómetro"
           >
@@ -629,7 +666,7 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
             {timerActivo.activo ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
           </button>
           <button
-            onClick={() => abrirTemporizadorParaItem(item, 'Lista para Despacho')}
+            onClick={() => abrirTemporizadorParaItem(item, 'Despacho')}
             className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs transition-colors"
             title="Editar cronómetro"
           >
@@ -841,10 +878,10 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
 
         {/* Sección Lista para Despacho */}
         <div className="bg-white rounded-lg border border-green-200 overflow-hidden">
-          <div className="bg-green-50 border-b border-green-200 px-6 py-4">
+    <div className="bg-green-50 border-b border-green-200 px-6 py-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-green-800">Items Lista para Despacho</h2>
+      <h2 className="text-lg font-semibold text-green-800">Items en Despacho</h2>
                 <p className="text-sm text-green-600">({itemsListaDespacho.length} de {itemsListaDespacho.length})</p>
               </div>
               <div className="flex items-center gap-2">
@@ -1027,12 +1064,12 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
         />
       )}
 
-    {mostrarModalTraerDespacho && (
+  {mostrarModalTraerDespacho && (
   <AgregarItemsModal
           isOpen={mostrarModalTraerDespacho}
           onClose={() => setMostrarModalTraerDespacho(false)}
           itemsDisponibles={itemsDisponiblesParaDespacho} // Solo items de Ensamblaje para Lista para Despacho
-          subEstadoDestino="Lista para Despacho"
+      subEstadoDestino="Despacho"
           cargando={cargandoDespacho}
       inventarioCompleto={inventarioCompletoData}
           onConfirm={async (items, subEstado, tiempoOperacionMinutos) => {
@@ -1044,14 +1081,14 @@ const AcondicionamientoViewSimple: React.FC<AcondicionamientoViewSimpleProps> = 
               // Cancelar cronómetros de los items que se van a mover
               cancelarCronometrosDeItems(items);
               
-              const tareasDespacho = items.map((item) => () => {
+        const tareasDespacho = items.map((item) => () => {
                 const actualizacionItem = {
                   modelo_id: item.modelo_id,
                   nombre_unidad: item.nombre_unidad,
                   rfid: item.rfid,
                   lote: item.lote || null,
                   estado: 'Acondicionamiento',
-                  sub_estado: subEstado,
+          sub_estado: 'Despacho',
                   validacion_limpieza: item.validacion_limpieza || null,
                   validacion_goteo: item.validacion_goteo || null,
                   validacion_desinfeccion: item.validacion_desinfeccion || null,
@@ -1346,7 +1383,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
           }
           return current;
         }
-        if (subEstadoDestino === 'Lista para Despacho') {
+  if (subEstadoDestino === 'Despacho') {
           // Escanear un solo componente debe traer todo el set de la caja (mismo lote)
             const lotesAIncluir = new Set<string>();
             nuevosItemsBase.forEach(it => { if (it.lote) lotesAIncluir.add(it.lote); });
@@ -1440,7 +1477,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
               />
             </div>
           )}
-      {(subEstadoDestino === 'Ensamblaje' || subEstadoDestino === 'Lista para Despacho') && (
+  {(subEstadoDestino === 'Ensamblaje' || subEstadoDestino === 'Despacho') && (
             <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
               <div className="sm:col-span-2">
         <label className="block text-xs text-gray-600 mb-1">Tiempo de operación para {subEstadoDestino} (obligatorio)</label>
@@ -1613,7 +1650,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                 const h = parseInt(horas || '0', 10);
                 const m = parseInt(minutos || '0', 10);
                 const totalMin = (Number.isNaN(h) ? 0 : h) * 60 + (Number.isNaN(m) ? 0 : m);
-                const requiereTiempo = subEstadoDestino === 'Ensamblaje' || subEstadoDestino === 'Lista para Despacho';
+                const requiereTiempo = subEstadoDestino === 'Ensamblaje' || subEstadoDestino === 'Despacho';
                 if (requiereTiempo && totalMin <= 0) {
                   alert('Debes ingresar un tiempo (horas y/o minutos) para continuar.');
                   return;
@@ -1624,7 +1661,7 @@ const AgregarItemsModal: React.FC<AgregarItemsModalProps> = ({
                 }
                 onConfirm(itemsSeleccionados, subEstadoDestino, totalMin > 0 ? totalMin : undefined);
               }}
-              disabled={itemsSeleccionados.length === 0 || cargando || ((subEstadoDestino === 'Ensamblaje' || subEstadoDestino === 'Lista para Despacho') && ((parseInt(horas || '0', 10) * 60 + parseInt(minutos || '0', 10)) <= 0)) || (subEstadoDestino==='Ensamblaje' && !validComposition)}
+              disabled={itemsSeleccionados.length === 0 || cargando || ((subEstadoDestino === 'Ensamblaje' || subEstadoDestino === 'Despacho') && ((parseInt(horas || '0', 10) * 60 + parseInt(minutos || '0', 10)) <= 0)) || (subEstadoDestino==='Ensamblaje' && !validComposition)}
               className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
             >
               {cargando && (
