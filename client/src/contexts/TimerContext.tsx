@@ -39,6 +39,8 @@ interface TimerContextType {
   marcarTimersCompletados: (ids: string[]) => void;
   // Limpiar un registro de completado reciente (sin timer persistente)
   clearRecentCompletion: (nombre: string) => void;
+  // Limpieza robusta: elimina todos los timers (activos o completados) asociados a un nombre y borra registros recientes.
+  forceClearTimer: (nombre: string, tipoOperacion?: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion') => void;
 }
 
 const TimerContext = createContext<TimerContextType | undefined>(undefined);
@@ -334,6 +336,35 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
     recentCompletionsRef.current.delete(nombre.toLowerCase());
   };
 
+  // Elimina cualquier timer (activo, completado o pendiente) que coincida con el nombre (y opcionalmente tipoOperacion)
+  // y limpia registros de completado recientes para evitar que reaparezca el estado "Completo" visual.
+  const forceClearTimer = (nombre: string, tipoOperacion?: 'congelamiento' | 'atemperamiento' | 'envio' | 'inspeccion') => {
+    if (!nombre) return;
+    const claveNorm = nombre.toLowerCase();
+    setTimers(prev => {
+      const aEliminar: string[] = [];
+      const restantes = prev.filter(t => {
+        const coincideNombre = t.nombre.toLowerCase() === claveNorm;
+        const coincideTipo = !tipoOperacion || t.tipoOperacion === tipoOperacion;
+        if (coincideNombre && coincideTipo) {
+          aEliminar.push(t.id);
+          return false;
+        }
+        return true;
+      });
+      // Enviar DELETE al backend para cada id eliminado (mejor esfuerzo)
+      if (isConnected && aEliminar.length) {
+        aEliminar.forEach(id => {
+          try { sendMessage({ type: 'DELETE_TIMER', data: { timerId: id } }); } catch {}
+        });
+      }
+      // Limpiar recent completions (por nombre y por id)
+      recentCompletionsRef.current.delete(claveNorm);
+      aEliminar.forEach(id => recentCompletionsRef.current.delete(id));
+      return restantes;
+    });
+  };
+
   const formatearTiempo = (segundos: number): string => {
     const minutos = Math.floor(segundos / 60);
     const segundosRestantes = segundos % 60;
@@ -425,6 +456,7 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
   getRecentCompletionById,
   marcarTimersCompletados,
   clearRecentCompletion,
+  forceClearTimer,
   };
 
   return (

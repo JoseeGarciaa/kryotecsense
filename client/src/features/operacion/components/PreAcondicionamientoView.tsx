@@ -69,7 +69,8 @@ const PreAcondicionamientoView: React.FC = () => {
     isStartingBatchFor,
     isConnected,
     getRecentCompletion,
-    clearRecentCompletion
+  clearRecentCompletion,
+  forceClearTimer
   } = useTimerContext();
 
   // Carga inicial
@@ -423,9 +424,8 @@ const PreAcondicionamientoView: React.FC = () => {
           <div className="text-xs text-gray-500 truncate">{minutos}min</div>
           <div className="flex gap-1">
             <button
-              onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (!window.confirm(`¿Limpiar cronómetro de ${rfid}?`)) return; if (timerCompletado) limpiarTimerConDebounce(timerCompletado.id); else if (reciente) clearRecentCompletion(rfid); }}
-              disabled={timerCompletado ? botonesLimpiandoSet.has(timerCompletado.id) : false}
-              className={`p-1.5 rounded text-xs transition-colors ${timerCompletado && botonesLimpiandoSet.has(timerCompletado.id) ? 'bg-gray-300 text-gray-500' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}
+              onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (!window.confirm(`¿Limpiar cronómetro de ${rfid}?`)) return; forceClearTimer(rfid, timerCompletado?.tipoOperacion || (esAtemperamiento ? 'atemperamiento' : 'congelamiento')); }}
+              className={`p-1.5 rounded text-xs transition-colors bg-gray-100 hover:bg-gray-200 text-gray-600`}
               title="Limpiar"
             >
               <X className="w-3 h-3" />
