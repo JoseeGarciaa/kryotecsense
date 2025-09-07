@@ -97,11 +97,17 @@ const LoteSelectionModal: React.FC<LoteSelectionModalProps> = ({
 
         const subLower = String(item.sub_estado || '').toLowerCase();
         const subNorm = subLower.replace(/[^a-z]/g, '');
-        // Si voy a atemperamiento, tomar como fuente cualquier sub_estado que contenga 'congel'
-        // Si el objetivo es otro, usar contains del objetivo normalizado
-        const subOk = esObjetivoAtemperamiento
-          ? subLower.includes('congel') || subNorm.includes('congelacion') || subNorm.includes('congelamiento')
-          : subLower.includes(objetivo) || subNorm.includes(objetivoNorm);
+        // Si el objetivo es atemperamiento, SOLO aceptar sub_estado terminado ("congelado").
+        // Excluir enérgicamente 'congelacion' / 'congelamiento' (fase en curso con cronómetro).
+        // Para cualquier otro destino conservar la lógica anterior (contains del objetivo).
+        let subOk: boolean;
+        if (esObjetivoAtemperamiento) {
+          // Normalizar: permitir variantes con acentos/espacios pero que resulten en 'congelado'
+          // subNorm ya tiene solo letras (sin acentos). Revisar match exacto 'congelado'.
+          subOk = subNorm === 'congelado';
+        } else {
+          subOk = subLower.includes(objetivo) || subNorm.includes(objetivoNorm);
+        }
 
         if (!categoriaOk || !estadoOk || !subOk) return;
 

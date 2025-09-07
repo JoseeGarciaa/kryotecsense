@@ -143,7 +143,12 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
           const batchSync = pendingBatchRef.current;
           if (batchSync && Date.now() <= batchSync.expiresAt) {
             timersActualizados = timersActualizados.map((t: any) => {
-              if (!batchSync.names.has(t.nombre)) return t;
+              // IMPORTANTE: los nombres en batchSync están normalizados (lowercase+trim),
+              // pero los timers del servidor pueden llegar con mayúsculas / espacios.
+              // Antes se hacía has(t.nombre) directamente y algunos quedaban fuera de la
+              // normalización provocando diferencias de 1-3s en los contadores.
+              const norm = normalizeName(String(t.nombre));
+              if (!batchSync.names.has(norm)) return t;
               const fechaInicio = new Date(batchSync.startAt);
               const fechaFin = new Date(batchSync.startAt + batchSync.durationSec * 1000);
               const restante = Math.max(0, Math.ceil((fechaFin.getTime() - Date.now()) / 1000));
@@ -203,19 +208,20 @@ export const TimerProvider: React.FC<TimerProviderProps> = ({ children }) => {
           }
           // Si estamos iniciando un lote, normalizar fechaInicio/fin y opcionalmente suprimir hasta SYNC
           const batch = pendingBatchRef.current;
-          const isBatchMember = batch && Date.now() <= batch.expiresAt && batch.names.has(normalizeName(String(nuevoTimer.nombre)));
+          const normalizedNuevo = normalizeName(String(nuevoTimer.nombre));
+          const isBatchMember = batch && Date.now() <= batch.expiresAt && batch.names.has(normalizedNuevo);
           if (isBatchMember && batch) {
             const fechaInicio = new Date(batch.startAt);
             const fechaFin = new Date(batch.startAt + batch.durationSec * 1000);
             const restante = Math.max(0, Math.ceil((fechaFin.getTime() - Date.now()) / 1000));
             nuevoTimer = { ...nuevoTimer, fechaInicio, fechaFin, tiempoRestanteSegundos: restante } as any;
           }
-          const isSuppressed = !!(batch && Date.now() <= batch.expiresAt && batch.names.has(normalizeName(String(nuevoTimer.nombre))));
+          const isSuppressed = !!(batch && Date.now() <= batch.expiresAt && batch.names.has(normalizedNuevo));
           setTimers(prev => {
             // Reemplazar placeholder local si existe
             const existeId = prev.find(t => t.id === nuevoTimer.id);
             if (existeId) return prev.map(t => t.id === nuevoTimer.id ? { ...nuevoTimer, pendienteSync: false } : t);
-            const idxPlace = prev.findIndex(t => t.pendienteSync && t.nombre === nuevoTimer.nombre);
+            const idxPlace = prev.findIndex(t => t.pendienteSync && normalizeName(t.nombre) === normalizedNuevo);
             if (idxPlace >= 0) {
               const copia = [...prev];
               copia[idxPlace] = { ...nuevoTimer, pendienteSync: false } as any;
